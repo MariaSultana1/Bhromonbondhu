@@ -17,7 +17,7 @@ const RegisterPage = () => {
 
   // ইমেজ পাথ ডিফাইন করুন (public/images/ ফোল্ডার থেকে)
   const images = {
-    logo: "/images/image-5.png",
+    logo: "/images/airplane.png",
     signupImage: "/images/image-238.png",
     eyeIcon: "/images/image-142.png",
     googleIcon: "/images/image-175.png",
@@ -64,7 +64,7 @@ const RegisterPage = () => {
         <div className="flex items-center gap-3 md:gap-4">
           <img 
             src={images.logo} 
-            alt="Bhromonbondhu Logo" 
+            alt="logo" 
             className="w-10 h-10 md:w-12 md:h-12"
             onError={(e) => e.target.src = "https://via.placeholder.com/48x48?text=Logo"}
           />

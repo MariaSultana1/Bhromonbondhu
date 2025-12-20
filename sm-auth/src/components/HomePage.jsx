@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 const HomePage = () => {
   // ইমেজ পাথ ডিফাইন করুন
   const images = {
-    logo: "/images/image-5.png",
+    logo: "/images/airplane.png",
     destination1: "/images/image-8.png",
     destination2: "/images/image-8-2.png",
     destination3: "/images/image-8-3.png",

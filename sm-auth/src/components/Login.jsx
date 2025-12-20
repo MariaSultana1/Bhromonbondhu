@@ -8,7 +8,7 @@ const LoginPage = () => {
 
   // ইমেজ পাথ ডিফাইন করুন (public/images/ ফোল্ডার থেকে)
   const images = {
-    logo: "/images/image-5.png",
+    logo: "/images/airplane.png",
     travelImage: "/images/597167217-26322675484000717-4961793980322896520-n-22.png",
     eyeIcon: "/images/image-142.png",
     googleIcon: "/images/image-175.png",
