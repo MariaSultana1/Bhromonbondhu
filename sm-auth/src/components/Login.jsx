@@ -6,7 +6,7 @@ const LoginPage = () => {
   const [passcode, setPasscode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // সরাসরি অনলাইন ইমেজ URL ব্যবহার করুন
+ 
   const images = {
     logo: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAgVBMVEX///8AAAD7+/tUVFRzc3Nvb29RUVH4+Ph5eXnX19f09PSHh4deXl7CwsJtbW3Nzc1oaGjv7++ysrLe3t6jo6O+vr5aWlqCgoLp6emSkpKsrKzh4eHHx8cwMDDS0tI+Pj4eHh6cnJwlJSUNDQ0YGBg7OztGRkYtLS0iIiKWlpY2NjYbvhWsAAARFklEQVR4nN1d22KqOhBVakWpl4JYUVor1aL1/z/wCMJkEhJyBbdnPe1tQbPITOaSyTAY/D/g+dMofpt9nw/H4fF4OuezTRxN/UcPyxGCafZ6HnKx+R9wTKPZgc+uxOzR47NEsMtb2JWYP3qMNti/y+jd8PboUZpDPn0lPh49TlPsvpT4DYc/jx6pGdaK9Ao8eqwm2Ivl8/SV5+Nxnn+dnpiht+Fyu46281USVvbPD16fluEnx/od39YBe932WRk2J/A7S3kX7p6TYfLL6t1mKrg0ekqGnwy/Q9wQTsD6GRnGDL9d28XzJ2RIq+Axa7/6CedwRBEchZLLn08PZ9QELqXXx8/GcIwJLhRueHsyhh+YYKRyx+i5GGIRPa30bul4aG6AZ/BXbAIp5M/EEOugat4lrIOLZ4gPsYi+q96U6j6SB8KIIDH4fza/nUTZZpNFic13SPGCCL6q3wbGQmnh5cKLwM+/Zt3lXT/MCJIHo7bycjCnkswH8yfVDiyiKna+hg93eYa//DZkMDL8onaY6eAAxVmmycRXluBw+KJwm+f7Wo8UmwkdEUVxyFbrNsCoSXA4nLTf4y0345uNOs/+lDUD66CmjMB9e737KnBmsMC67R6cwR2r/ayxiA4G+/q+i6IHRENAcHgRS2By1ZrvEngGdRaZAhPDJ3MHV0RLCBfUZeNSuXdpaAdLBEcluRIAEzzHq9WOTM+34BY2gVTgKllysIjqEiTx/dDAUGMR/QiYwfAnhkdQJj8WOjhAcYWudA8YgtVnHiwi3N3Ipoje0eYkmJsJ+hflyQ4WWESJLc3qj3jpPf4M3vAjllMLM1EAVLgtcpovPt4nf9Fyn+KcFiY4IwOEtTmWEcxxzlo4iaauGjsc3nhqTMhPHC/X8es2Wi9TwQwiqWimMCkRjW8PJVyQZyT4cTyDJqs92XsTZxzFBqEG5aOJIxVqBqfM1YL8AtZBE2+XLKTiLXw0gyKc8/fJW7yepkkwSMD6sIrNI4gWJu6ekZWZuMH/gduFgat8BjF+vslXthEknhp4xbyl185MDNC+4XDjhiCFr/Eo20Wf1dxQOohc0az+jONwYE/GYJHBy4zAOlsRRDjkCxxCHnE80TKHlmbihgvcL9q5cUOQxWg5XSWVB+VBdqARRtnqIB6+yBZ2Q/COyzWfbbI1WcfaCBrpIFpHRdVelMXbr6O/0fh6OQ67wdd6H+KY385VK4CUUCDj2EwQk+4n0+U63rx/oFXTIc/xaPO3W6aJvYiGZC6O/GWGmkGe1xgk6WoebzeL/DLsEmYi6qE0Aj8uxARfZBkjz08/o3i7yE+N8T2KIKqU4ucQKII6X+2vloXGvnyf3bA1E1EPqTE/FOfroB7CdLqPss1ilreV7XZCkFqnuO6gVAe14AVhMl3H27f3X92V2ExEKWeIG/eKAiMXCKY3jd3MfpVk2MhVG3iYILfMBouolg7qIVwt59F29JFfRWwNdRAT5Ga5BbF7d/DCZLWM/jajjytld8xmkNJBbkShZSZcAz9+BzrI9WWMzYQL2LtqnjQpgKOc3gvb7V01Sge5lj5FFxhKiTnsowlKCPiuDC5pfDHeEjaDzeZLBakOopxCiVmfHG02X+6Q6+AAVZrWP8V1ebqAvQ4qiOgNXiPom8hKN93AgQ4qiGiBpBnXbox2Ts1H16GI3q/Mmt7xX9ccTetkCORmAiH8a1A8/XV6+rIXM0EhaJ7UOLXs3NiiPx1ECDm7FV1VOkldtTDeZq12S10HMZJmkcWXyU6/FFIzcd/waCn20dJBjFXz2On3p+bw5ZCKaFL9Ufx4NXUQY0rVxJeQnNzQhtxVq9eEi+gr7LYYlw2OorNTZlAwEyCC/D97FjN4x/ybZuj0NLTKHr2kzN6a4A1zKhlo6PVzoWQm4tYL9M0EFxFKnzicQ8WIvhIi3i61mZngIgaO7gIq1Q1QvyjYeOEFOcZmgvsz2f173K2lGnUyScovM3ChgwhBdh5+oARysB2/tJ5qbIdtnczAmQ6KMC2/+GwaPfYZLpnBv1g9fnlEn64kIZtLHeQBTqEYTaLUTEzz4fDQWnfeNUFSiqNf0qjgqs1lI/c61sEBOsJvcApI6qpBPkz0+JyaCQFqj/9X/1apmSAJP5F74dhM8FFNor4jLtXBuXT03Ytoic/v43GGZDTNNpmCyEpdNZyy5drbrs0EAnWo5+4gT2QcpWYCE/zhGQzPwQ6cCaD0cNNqPnREVKACVMTaY2cr9LtvakXphgTxDHYtpBSoVLnojKXUVZMS9Jicw9ghBQnoZluHmDePWjrIP2fGJlXOTkm0gj1keW4ugw508GXIor9CA6+x23Fi0n/uRbRAj70ew2Z29RfXraq7agV4IsojaOI0mmM6a/x+Do6lnohKdVB45KFjcJrDje/i5lgHJ1n9r642U4RYMtnVGz5Wmq6aXAdHpIS7wy0xEdZNjhN7M8GGS1DDbdUGwhRRWzmpCxG9/X+F//MA7IRlpA4Ilo4aVDb16NTQ4BQDwOhY6OpgAdJwZje6nk7fk12vZqNA0CwGcOKqVVLpMQfeC/FwuyumgKDRLcOViBbgNS0VHk/rDOGEklUnZqIG1e6rxncPlT8M9OygipmowT+Sde67JbnjiB5bhu2Qi577QDl21aiFOBryYbFXpA/nrhqG6GD/qUdVdOCqtSR+8aHbM06h9OeodqiDBVbkL4nvpyQ47c3JkR5SthHRG8L6L/n9/8T49iSm0j16PYIc/7r+07X6Pzg5/cTEOKMhn0FVV41CHcAcqjkDL7GX1XSBRufaTNSAMLRyuWHLto+lBvsbzs1EDRCTqvwFzlH0MIfY3XBvJmq8MV8Ak979a0jwoRSuiKJT5AZmovEzd0bEx+n8bAF+2QR/7wsncsx0sACdiyIuzlV0gyvgCeITxEerDHWwAHAqNtjQY+06NRWi0QmOvhFvxMxMsF8zouWm62wGksBccEkCVyhl1USAjp3v1MrV9ZYpsvS/wl2h+hiAhYgWqK8aY4JftgwkQNmntoK30im/cAlq1MnUGRIqU9KxjOKYrfXM23oy4b+LQqdOpplbd12E3gBeZczcX606Gc4rurrOJ6IEn9GOkGadTCNZ2S43DoCcNaMFTbdWrZGL6noGUVrB7JC7bq1a3DNBD/2WUdJSu1aNeRdZ50eWkd6bPEyDetFpvwRR+tIoAjUop0wwwc53ZUirXrNaOpNyyrBPgkhGjwZKaFZOGZCDPNYi6nl+EAThDUmJNE1X0/3yc75eR9EujjNkmgxMvWFJM+l1ZUFwuXh5yfP89/fr/HM4qXRAMrGEpiXNDt4dI9jfacGXQZmZcUkzZPSMfZmmWySFft96i5JmOHBumgM2IKgvoxTBo969WX2fYV2UAUHNERagyyn1hgpOjVmG1ICgQaaSrRfVuhmSXkZvrTAhqG3rPZagnj8EbpvJ2TcTgvoZhGa96EHHX4C0pCjn1YIGwePpcr5+5+OX2ftiNNm8bbfbv78si+OIjFJbVpolzXpHVC1exIUJit7hUIE4pAdNU8it+BX1UuUDquf1fpkmmEvEhlyruWRTOrghoYmOJEAuSnPblyIouZf497qJSly1NcHHNTRGCw9Jz6nBhSpSFSZPQ68lCO4QW3oyJGDX8Bpgn7IIntTXKKrobxa1PlLyLiy9CogQ/8jdVVN5hQELSEBXRchj/vucGVCRc4H3tfgnSY5byzVMcIfLKpqYsx8ogFMXpVCCGTZjpONszRcBH8qdtaZwhX8C+JBJVNYqtrlcCflSxS1rHM7WHGNAnqGOFlLjItHEkvOZBPx31kj7Wa64t93wOmd1ElZridGkQKU5sUQS+6gas+O9VgSp9zjlld+WOL3OsbiSR6jhclNdxKiiXpIdVC2hxDlaDLljtPoTnie4kYTLIP10UObntx0AJZVwqpMoGqWKJq+2Z9Htw8lnqZPE2ivHZ1NqGWMfNdEP1YVL1GFZMcrZvzXr4YHk0h9k9X+Ufckd9R1NN49UGikaH6RP43csHqphjjd9E74T4GcDf1L0QvwF9QWc5ZesHIqTCN+YF3KdEFdXJ86cykNFNa2ZHuQ3kUZ/auYHkoGVnQeKmkWm+03rmyzUvo0+YJLz/SSi2mr2ByxPdVyVCIHS7QjesoWkSti0oi3QqyiWJLZEqYEhuBz1ogUW2iBv6y+b/TCVH1dG3yG2V2QShR32MKi6qAKw2hgWCn9OOIl9uaM8pU+yty6UJM2uIhopOwhY/VXo8PH5yq6usoWd7YUqUMH6ajBxLa8LBKC6qBLgZRlkbtEYllRr04Pk8h1jlWWmJYMrFfwIcNvuoXoAU2jbEMSfvyqOeM86DVIrQHzNi0LUXgtUmYX0yOsUHdQJw3e1RZwrNhKbKQyaOD4KmUVYom8ri4+epv0BLxD4lsNiaeN4mdqTPWmME5yacBAgg+SgQBEcHWG0mjQaEX8oOos6mUVYxVY4t3V0UAgN679Ar9JmE2J11SDSJrVqYFwi7FI4aHcMdogfVuyb7SN02qxoZBbZuqgSLppXwhg4PqkfcXMEOhljUlcpE2xeLspJlTCsIY0oJX0TRKU6fd3IuGVnlzlJJScEieGhYyB/x6tqvUMnWTUghk0yiY3srtluacv3og/Dteg98iW09vhIjkvWurUbgkQNwTkK1wtutc1sWX+sF5OSaL09qRQw2SRXlfpgDe9quIq5W4HD4cuU+MZ6NafkXIoks0ivas6OIgChdJBEwhcily+pCer/ab5ZiRTKtZfoUH6hIxEdIKd0wUR+CJv7IgQMNQ/Kq6aHcTm7O4KCZDrCIav9JmCoG8+QobcGoCj4dHhaRnTYv8YYuXLAULeVO1klW9eorIMZlBX0nSgbCYkX7QaHaplFWNad9hoSrJw1qIgRGGqPgExi24lCsJwup1C4H1KB0gdgqN87hqhYy9YWrEhOG5nyaF23kPK94BQSzIQ+Q6U6D/h+g7ooMdjY/fwepbhqAVswC4ZKmUW/9pmcHsvDzuDPKE6rZMM7j0zK+1AR5JmdxZnFOhellEFWRrXJ8pGtcQBMAlf0IYQ3JtaK7HWIEwR1QsBF5gJjuV42vpFUcSAbPbVhiDReeAm4bX28yBDEFFmGvRVDhcwimE39EnN9gJii1dTOXvkkOBJlFjOO4HQGsjKQX/u0YqiQWYQremnzyRFTSLkYNgKA4EW0kqxlj8Ap4Nd+/MZHhik+aWYRFL2fJphNMbVliApP+ZMIxrmf/vOjxgO17hVLTsALJqn+cz/vnyaJzvoT+264JBPDzyzWfxX3cHAJ8BIhpgOLZryjRzKL/GMVtRif+nnnLYhpHfACQ/PFnGQWeW6LBzn2flq0Eq2pPojtGZLMImcxCZTT445AqoarqJWt6TEB2clqbDjjbdGe2uxCZr9SGhcMyfYLm1n00T5JX61LQUyrRnEZM6dGICV/tHvt43Rtb83ZhzQlYGjzilaSoKVyFQHe6erFaSsB0cx9NYUg1sr152YWsQ72+b4ZspqWegFzaBW+kbwJmURUPdMrQSSmxdoSgltp1/WgWbMY4Fqk/kSUGszi9uxJBGuXZCCZxWq3nBLRfgkiL2sQorXOsv8PqVQuJ9F/IEGUeYgRwS9La0XyB6fb/7yvBxJkzoyw6mOMDL5qh121RxDknkay75oagD94SB4poiWaB25cVCmR8qfjowk2xdRJ31uPd/TjMQTpDqyuCHK3nh9EkN1+c9a5uFFP1qsnQ4E6ZuPuNddM+7LHzSDdZ8xl7+nvf4XgYHDuhCBda/lQgmxZmDPk/wpBiHZct0df/isEbwajtPruu6OP/xWCNydrvd11kKJN/hmCnSHcHKiqMm38B2JkzlVp6G5ZAAAAAElFTkSuQmCC" ,
     travelImage: "https://png.pngtree.com/png-vector/20251104/ourlarge/pngtree-man-traveling-vector-illustration-png-image_17900177.webp",
@@ -22,22 +22,22 @@ const LoginPage = () => {
   const handleLogin = (e) => {
     e.preventDefault();
     console.log("Login attempt with:", { email, passcode });
-    // এখানে আপনার API call যোগ করুন
+    
   };
 
   const handleDemoLogin = (role) => {
     console.log(" ", role);
-    // ডেমো লগিন লজিক
+   
   };
 
   const handleGoogleLogin = () => {
     console.log("Google login initiated");
-    // Google লগিন লজিক
+    
   };
 
   return (
     <div className="min-h-screen bg-[#e1f3f7] relative overflow-hidden">
-      {/* নেভবার */}
+      
       <nav className="w-full h-24 bg-[#cde5f9] border border-[#a6b6b8cc] backdrop-blur-sm flex items-center px-4 md:px-8 lg:px-16">
         <div className="flex items-center gap-3 md:gap-4">
           <img 
@@ -68,11 +68,11 @@ const LoginPage = () => {
         </div>
       </nav>
 
-      {/* মেইন কন্টেন্ট */}
+      
       <div className="container mx-auto px-4 py-6 md:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 lg:gap-12 items-center">
           
-          {/* লগিন ফর্ম */}
+         
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-2xl p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif text-center mb-3 md:mb-4">LOGIN</h1>
             <p className="text-base md:text-lg lg:text-xl text-center text-gray-700 mb-4 md:mb-6 lg:mb-8">
@@ -151,7 +151,7 @@ const LoginPage = () => {
               <span className="font-medium">Google</span>
             </button>
 
-            {/* ডেমো লগিন বাটন */}
+           
             <div className=" ">
               
               <div className=" ">
@@ -168,7 +168,7 @@ const LoginPage = () => {
             </div>
           </div>
 
-          {/* ডেকোরেটিভ ইমেজ */}
+          
           <div className="relative order-first lg:order-last">
             <div className="relative">
               <img
@@ -182,7 +182,7 @@ const LoginPage = () => {
         </div>
       </div>
 
-      {/* ব্যাকগ্রাউন্ড ডেকোরেশন */}
+     
       <img
         src={images.decorativeImage1}
         alt="Background"
