@@ -98,28 +98,15 @@ const HomePage = () => {
               alt="Bhromonbondhu Logo" 
               className="w-10 h-10 md:w-12 md:h-12"
             />
-            {/* TODO: আপনার লোগো ইমেজ লিংক দিন: src="YOUR_LOGO_LINK" */}
+            {/* */}
             <div className="flex flex-col">
               <h1 className="text-2xl md:text-3xl font-serif text-gray-800">ভ্রমণবন্ধু</h1>
               <p className="text-sm md:text-lg font-light text-gray-600">Bhromonbondhu</p>
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Home
-            </Link>
-            <Link to="/destinations" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Destinations
-            </Link>
-            <Link to="/about" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              About
-            </Link>
-            <Link to="/faq" className="text-gray-700 hover:text-blue-600 font-medium transition-colors">
-              Q/A
-            </Link>
-          </nav>
+         
+          
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-3">
@@ -139,7 +126,7 @@ const HomePage = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
+      
       <section className="py-12 md:py-20 px-4 md:px-8">
         <div className="container mx-auto bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-8 md:p-12 shadow-lg">
           <div className="max-w-4xl mx-auto text-center">
@@ -174,7 +161,7 @@ const HomePage = () => {
                   alt={destination.title} 
                   className="w-full h-48 md:h-56 object-cover"
                 />
-                {/* TODO: ডেস্টিনেশন ইমেজ লিংক: src="YOUR_DESTINATION_IMAGE_LINK" */}
+             
                 
                 <div className="p-4 md:p-6">
                   <h3 className="text-lg md:text-xl font-semibold text-gray-800 mb-2">
@@ -188,7 +175,7 @@ const HomePage = () => {
                         alt="Rating" 
                         className="w-5 h-5 mr-2"
                       />
-                      {/* TODO: রেটিং স্টার আইকন: src="YOUR_STAR_ICON_LINK" */}
+                     
                       <span className="text-gray-700 font-medium">{destination.rating}</span>
                     </div>
                     <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
@@ -204,7 +191,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Why Choose Bhromonbondhu */}
+     
       <section className="py-12 md:py-16 px-4 md:px-8 bg-white">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-12">
@@ -220,7 +207,7 @@ const HomePage = () => {
                     alt={feature.title} 
                     className="w-10 h-10"
                   />
-                  {/* TODO: ফিচার আইকন লিংক: src="YOUR_FEATURE_ICON_LINK" */}
+                 
                 </div>
                 <h3 className="text-xl font-semibold text-gray-800 mb-3">
                   {feature.title}
@@ -262,7 +249,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* FAQ Section */}
+     
       <section className="py-12 md:py-16 px-4 md:px-8">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-12">
@@ -284,7 +271,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Footer */}
+    
       <footer className="bg-gradient-to-r from-blue-100 to-cyan-100 py-12 px-4 md:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
@@ -310,7 +297,7 @@ const HomePage = () => {
 
     
 
-          {/* Copyright */}
+         
           <div className="mt-12 pt-6 border-t border-gray-300 text-center">
             <p className="text-gray-600">
               © 2025 Bhromonbondhu. Making travel dreams come true.

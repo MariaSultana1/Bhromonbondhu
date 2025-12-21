@@ -54,12 +54,12 @@ const RegisterPage = () => {
 
   const handleGoogleSignup = () => {
     console.log("Google signup initiated");
-    // Google সাইনআপ লজিক
+
   };
 
   return (
     <div className="min-h-screen bg-[#e1f3f7] relative overflow-hidden">
-      {/* নেভবার */}
+     
       <nav className="w-full h-24 bg-[#cde5f9] border border-[#a6b6b8cc] backdrop-blur-sm flex items-center px-4 md:px-8 lg:px-16">
         <div className="flex items-center gap-3 md:gap-4">
           <img 
@@ -90,11 +90,11 @@ const RegisterPage = () => {
         </div>
       </nav>
 
-      {/* মেইন কন্টেন্ট */}
+     
       <div className="container mx-auto px-4 py-6 md:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 lg:gap-12 items-center">
           
-          {/* ডেকোরেটিভ ইমেজ */}
+          
           <div className="relative order-first lg:order-first">
             <div className="relative">
               <img
@@ -114,7 +114,7 @@ const RegisterPage = () => {
             </div>
           </div>
 
-          {/* রেজিস্টার ফর্ম */}
+          
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-2xl p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
             <div className="text-center mb-6 md:mb-8">
               
@@ -124,7 +124,7 @@ const RegisterPage = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
               
-              {/* Full Name */}
+             
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Full Name *
@@ -140,7 +140,7 @@ const RegisterPage = () => {
                 />
               </div>
 
-              {/* Email */}
+            
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Enter Email *
@@ -156,7 +156,7 @@ const RegisterPage = () => {
                 />
               </div>
 
-              {/* Phone Number */}
+             
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Phone no.
@@ -171,7 +171,7 @@ const RegisterPage = () => {
                 />
               </div>
 
-              {/* Password */}
+             
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Passcode *
@@ -198,7 +198,7 @@ const RegisterPage = () => {
                 </button>
               </div>
 
-              {/* Confirm Password */}
+            
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Confirm Passcode *
@@ -225,7 +225,7 @@ const RegisterPage = () => {
                 </button>
               </div>
 
-              {/* Terms and Conditions */}
+              
               <div className="flex items-start space-x-2 md:space-x-3 pt-2">
                 <input
                   type="checkbox"
@@ -247,7 +247,7 @@ const RegisterPage = () => {
                 </label>
               </div>
 
-              {/* Signup Button */}
+             
               <button
                 type="submit"
                 className="w-full h-10 md:h-12 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg text-sm md:text-base"
@@ -256,7 +256,7 @@ const RegisterPage = () => {
               </button>
             </form>
 
-            {/* Already have account */}
+           
             <div className="text-center mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-200">
               <p className="text-gray-600 text-sm md:text-base">
                 Already have account yet?{" "}
@@ -266,7 +266,7 @@ const RegisterPage = () => {
               </p>
             </div>
 
-            {/* Social Signup */}
+           
             <div className="mt-6 md:mt-8">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -299,7 +299,7 @@ const RegisterPage = () => {
         </div>
       </div>
 
-      {/* ব্যাকগ্রাউন্ড ডেকোরেশন */}
+     
       <img
         src={images.decorativeImage1}
         alt="Background"
