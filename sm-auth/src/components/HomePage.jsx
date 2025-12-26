@@ -31,7 +31,7 @@ const HomePage = () => {
     },
   ];
 
-  // Why Choose Us Features
+
   const features = [
     {
       id: 1,
