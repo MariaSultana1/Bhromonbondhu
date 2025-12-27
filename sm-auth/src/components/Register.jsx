@@ -72,7 +72,7 @@ const RegisterPage = () => {
       </div>
 
       {/* Signup form on RIGHT */}
-      <main className="absolute top-[301px] left-[760px] w-[472px] h-[540px] bg-[#f1eeee] rounded-xl border shadow-md px-10 py-6">
+      <main className="absolute top-[295px] left-[760px] w-[472px] h-[555px] bg-[#f1eeee] rounded-xl border shadow-md px-10 py-6">
         <h1 className="text-4xl text-center mt-2 font-serif">REGISTER</h1>
         <p className="text-center mt-2 text-lg font-serif">
           Create your account to join the Bhromonbondhu community

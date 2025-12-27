@@ -14,7 +14,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/signup" element={<RegisterPage />} />
-          <Route path="/AdminPage" element={<AdminPage />} />
+          <Route path="/adminPage" element={<AdminPage />} />
         {/* Alternative: Use AuthPages for both login/signup */}
        
       </Routes>
