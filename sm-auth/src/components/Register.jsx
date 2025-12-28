@@ -35,21 +35,21 @@ const RegisterPage = () => {
         <div className="absolute top-[57px] left-[71px] text-2xl font-light">Bhromonbondhu</div>
       </header>
 
-      {/* Background illustration */}
+      
       <img
         className="absolute top-[892px] left-[692px] w-[748px] h-[711px] object-cover"
         alt="Background"
         src="/images/image 187.png"
       />
 
-      {/* Sun */}
+     
       <img
         className="absolute top-[124px] left-[108px] w-[157px] h-[151px] object-cover"
         alt="Sun"
         src="/images/image 188.png"
       />
 
-      {/* White card */}
+      
       <div className="absolute top-[243px] left-[124px] w-[1192px] h-[618px] bg-white rounded-[15px] shadow-md" />
 
       <img
@@ -57,12 +57,12 @@ const RegisterPage = () => {
         alt="Globe"
         src="/images/image 174.png"
       />
-      {/* Signup button */}
+     
       <button className="absolute top-[262px] left-[1187px] w-[98px] h-[29px] bg-[#d9d9d9] rounded-xl">
         Login
       </button>
 
-      {/* LEFT SIDE TRAVEL IMAGE */}
+    
       <div className="absolute top-[320px] left-[237px] w-[430px] h-[540px] bg-white rounded-xl flex flex-col items-center p-6">
         <img
           src="/images/TRAVEL.png"

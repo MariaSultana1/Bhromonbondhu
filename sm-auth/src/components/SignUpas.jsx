@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ✅ Component name must start with UPPERCASE
 const SignUpas = () => {
   const [selectedUserType, setSelectedUserType] = useState(null);
   const navigate = useNavigate();
@@ -26,7 +25,7 @@ const SignUpas = () => {
   const handleUserTypeClick = (userTypeId) => {
     setSelectedUserType(userTypeId);
     
-    // রেজিস্টার পেজে রিডাইরেক্ট করবে userType সহ
+
     navigate(`/register?userType=${userTypeId}`);
   };
 
@@ -111,5 +110,4 @@ const SignUpas = () => {
   );
 };
 
-// ✅ Export with UPPERCASE name
 export default SignUpas;
