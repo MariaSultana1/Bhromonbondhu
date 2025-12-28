@@ -133,7 +133,7 @@ const quickActions = [
 
 const AdminPage = () => {
 
-  {
+{
   return (
      <div className="bg-white overflow-hidden w-full min-w-[1440px] min-h-[1603px] relative">
       
@@ -404,7 +404,7 @@ const AdminPage = () => {
           src={user.image}
           onError={(e) => {
             e.target.onerror = null;
-            e.target.src = "/images/default-user.png"; // fallback image
+            e.target.src = "/images/default-user.png"; 
           }}
         />
       </div>
