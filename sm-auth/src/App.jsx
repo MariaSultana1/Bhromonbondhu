@@ -30,10 +30,11 @@
 
 
 import { useState, useEffect } from 'react';
-import { AuthPage } from './components/AuthPage';
+//import { AuthPage } from './components/AuthPage';
 import { TravelerDashboard } from './components/TravelerDashboard';
 import { HostDashboard } from './components/HostDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
+import {Auth} from './components/Auth';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -62,7 +63,7 @@ function App() {
   };
 
   if (!isAuthenticated || !currentUser) {
-    return <AuthPage onLogin={handleLogin} />;
+    return <Auth onLogin={handleLogin} />;
   }
 
   return (
