@@ -1,111 +1,110 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
-const SignUpas = () => {
+const SignUpas = ({ selectTraveller, selectHost, goLogin }) => {
   const [selectedUserType, setSelectedUserType] = useState(null);
-  const navigate = useNavigate();
 
   const userTypeOptions = [
     {
       id: "traveller",
       title: "Traveller",
       description: "Explore & book trips",
-      image: "/images/image-31.png",
+      image: "/images/image 31.png",
       imageAlt: "Traveller icon with backpack",
+      action: () => {
+        setSelectedUserType("traveller");
+        selectTraveller();
+      },
     },
     {
       id: "host",
       title: "Host",
       description: "Offer stays & tours",
-      image: "/images/image-34.png",
+      image: "/images/image 34.png",
       imageAlt: "Host icon with house",
+      action: () => {
+        setSelectedUserType("host");
+        selectHost();
+      },
     },
   ];
 
-  const handleUserTypeClick = (userTypeId) => {
-    setSelectedUserType(userTypeId);
-    
-
-    navigate(`/register?userType=${userTypeId}`);
-  };
-
-  const handleKeyDown = (event, userTypeId) => {
+  const handleKeyDown = (event, option) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      handleUserTypeClick(userTypeId);
+      option.action();
     }
   };
 
   return (
-    <main className="bg-[#e9ffd9] border border-solid border-transparent w-full min-w-[1440px] min-h-[1461px] relative">
+    <main className="bg-[#e9ffd9] w-full min-h-screen relative overflow-x-hidden">
+      {/* Background image */}
       <img
-        className="absolute top-[78px] left-0 w-[1440px] h-[1310px] aspect-[1.15]"
-        alt="Decorative background illustration with travel elements"
-        src="/images/image-314.png"
+        className="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"
+        alt="Decorative background"
+        src="/images/image 314.png"
         aria-hidden="true"
       />
 
-      <section className="relative z-10" aria-labelledby="signup-heading">
-        <h1
-          id="signup-heading"
-          className="absolute top-[317px] left-[481px] w-[509px] [font-family:'Holtwood_One_SC-Regular',Helvetica] font-normal text-black text-[64px] tracking-[0] leading-[normal] whitespace-nowrap"
-        >
-          Sign up as
-        </h1>
+      {/* Heading */}
+      <h1 className="absolute top-[100px] left-[301px] sm:left-[45%] sm:-translate-x-1/2 text-[64px] font-serif text-black whitespace-nowrap">
+        Sign up as
+      </h1>
 
-        <div className="absolute top-[478px] left-[469px] w-[455px] space-y-[44px]">
-          {userTypeOptions.map((option, index) => {
-            const topPosition = index === 0 ? "top-[478px]" : "top-[667px]";
-            const height = index === 0 ? "h-[145px]" : "h-[131px]";
-            const imageTop = index === 0 ? "top-[490px]" : "top-[678px]";
-            const imageLeft = index === 0 ? "left-[516px]" : "left-[526px]";
-            const imageSize =
-              index === 0 ? "w-[118px] h-[118px]" : "w-[97px] h-[97px]";
-            const titleTop = index === 0 ? "top-[510px]" : "top-[692px]";
-            const titleLeft = index === 0 ? "left-[671px]" : "left-[686px]";
-            const descTop = index === 0 ? "top-[564px]" : "top-[731px]";
-            const descLeft = index === 0 ? "left-[679px]" : "left-[686px]";
+      {/* Options */}
+      <div className="absolute top-[230px] left-[469px] sm:left-[50%] sm:-translate-x-1/2 w-[455px] flex flex-col gap-[44px] sm:flex-col">
+        {userTypeOptions.map((option, index) => (
+          <div key={option.id} className="relative">
+            <button
+              className={`w-[455px] bg-[#faca84] rounded-[20px] shadow-[0px_4px_4px_#00000040] cursor-pointer transition-transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-black focus:ring-opacity-50 active:scale-95 ${
+                selectedUserType === option.id
+                  ? "ring-4 ring-black ring-opacity-70"
+                  : ""
+              }`}
+              onClick={option.action}
+              onKeyDown={(e) => handleKeyDown(e, option)}
+              aria-label={`Sign up as ${option.title}: ${option.description}`}
+              aria-pressed={selectedUserType === option.id}
+              type="button"
+              style={{
+                height: index === 0 ? "145px" : "131px",
+              }}
+            />
 
-            return (
-              <div key={option.id}>
-                <button
-                  className={`${topPosition} ${height} absolute left-[469px] w-[455px] bg-[#faca84] rounded-[20px] shadow-[0px_4px_4px_#00000040] cursor-pointer transition-transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-black focus:ring-opacity-50 active:scale-95 ${
-                    selectedUserType === option.id
-                      ? "ring-4 ring-black ring-opacity-70"
-                      : ""
-                  }`}
-                  onClick={() => handleUserTypeClick(option.id)}
-                  onKeyDown={(e) => handleKeyDown(e, option.id)}
-                  aria-label={`Sign up as ${option.title}: ${option.description}`}
-                  aria-pressed={selectedUserType === option.id}
-                  type="button"
-                />
+            <img
+              className={`absolute mix-blend-multiply aspect-[1] object-cover pointer-events-none`}
+              alt={option.imageAlt}
+              src={option.image}
+              style={{
+                top: index === 0 ? "12px" : "17px",
+                left: index === 0 ? "47px" : "57px",
+                width: index === 0 ? "118px" : "97px",
+                height: index === 0 ? "118px" : "97px",
+              }}
+            />
 
-                <img
-                  className={`absolute ${imageTop} ${imageLeft} ${imageSize} mix-blend-multiply aspect-[1] object-cover pointer-events-none`}
-                  alt={option.imageAlt}
-                  src={option.image}
-                  aria-hidden="true"
-                />
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                top: index === 0 ? "32px" : "14px",
+                left: index === 0 ? "202px" : "217px",
+              }}
+            >
+              <h2 className="font-normal text-black text-[32px] mb-[7px]">
+                {option.title}
+              </h2>
+              <p className="font-normal text-black text-lg">{option.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
 
-                <div
-                  className={`absolute ${titleTop} ${titleLeft} [font-family:'Inter-Regular',Helvetica] font-normal text-black text-[32px] tracking-[0] leading-[normal] pointer-events-none`}
-                  aria-hidden="true"
-                >
-                  {option.title}
-                </div>
-
-                <div
-                  className={`absolute ${descTop} ${descLeft} [font-family:'Inter-Regular',Helvetica] font-normal text-black text-lg tracking-[0] leading-[normal] pointer-events-none`}
-                  aria-hidden="true"
-                >
-                  {option.description}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      {/* Login link */}
+      <p className="absolute top-[580px] left-[400px] sm:left-[49%] sm:-translate-x-1/2 text-center text-lg">
+        Already have an account?{" "}
+        <button onClick={goLogin} className="text-[#047ba3] underline">
+          Login now!
+        </button>
+      </p>
     </main>
   );
 };
