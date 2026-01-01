@@ -174,3 +174,4 @@ export default function TravelerDashboard({ user, onLogout }) {
     </div>
   );
 }
+

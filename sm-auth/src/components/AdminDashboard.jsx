@@ -268,3 +268,4 @@ export function AdminDashboard({ user, onLogout }) {
     </div>
   );
 }
+export default AdminDashboard;
