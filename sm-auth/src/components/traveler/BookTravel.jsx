@@ -1,6 +1,126 @@
 import { useState } from 'react';
 import { Plane, Train, Bus, Home, Search, Filter, Star, MapPin, Languages, Shield, Calendar, X, Check, CreditCard, Users, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
 
+const hosts = [
+  {
+    id: 1,
+    name: 'Fatima Khan',
+    location: 'Cox\'s Bazar',
+    rating: 4.9,
+    reviews: 124,
+    verified: true,
+    languages: ['Bengali', 'English'],
+    price: 2500,
+    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fatima',
+    propertyImage: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    services: ['Local Guide', 'Meals', 'Transportation'],
+    available: true
+  },
+  {
+    id: 2,
+    name: 'Rafiq Ahmed',
+    location: 'Sylhet',
+    rating: 4.8,
+    reviews: 98,
+    verified: true,
+    languages: ['Bengali', 'English', 'Hindi'],
+    price: 2000,
+    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rafiq',
+    propertyImage: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    services: ['Local Guide', 'Photography', 'Trekking'],
+    available: true
+  },
+  {
+    id: 3,
+    name: 'Shahana Begum',
+    location: 'Dhaka',
+    rating: 4.7,
+    reviews: 156,
+    verified: true,
+    languages: ['Bengali', 'English'],
+    price: 1800,
+    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shahana',
+    propertyImage: 'https://images.unsplash.com/photo-1513563326940-e76e4641069e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5JTIwc2t5bGluZSUyMG5pZ2h0fGVufDF8fHx8MTc2NTQ3NTIxMXww&ixlib=rb-4.1.0&q=80&w=1080',
+    services: ['City Tour', 'Shopping Guide', 'Food Tour'],
+    available: true
+  }
+];
+
+const tickets = {
+  flight: [
+    {
+      id: 1,
+      from: 'Dhaka',
+      to: 'Cox\'s Bazar',
+      airline: 'Biman Bangladesh',
+      departure: '10:00 AM',
+      arrival: '11:15 AM',
+      duration: '1h 15m',
+      price: 4500,
+      seats: 12
+    },
+    {
+      id: 2,
+      from: 'Dhaka',
+      to: 'Sylhet',
+      airline: 'US-Bangla',
+      departure: '2:30 PM',
+      arrival: '3:30 PM',
+      duration: '1h',
+      price: 3800,
+      seats: 8
+    }
+  ],
+  train: [
+    {
+      id: 1,
+      from: 'Dhaka',
+      to: 'Chittagong',
+      train: 'Suborno Express',
+      departure: '7:00 AM',
+      arrival: '1:30 PM',
+      duration: '6h 30m',
+      price: 800,
+      seats: 25
+    },
+    {
+      id: 2,
+      from: 'Dhaka',
+      to: 'Sylhet',
+      train: 'Parabat Express',
+      departure: '9:00 PM',
+      arrival: '5:30 AM',
+      duration: '8h 30m',
+      price: 650,
+      seats: 18
+    }
+  ],
+  bus: [
+    {
+      id: 1,
+      from: 'Dhaka',
+      to: 'Cox\'s Bazar',
+      operator: 'Green Line',
+      departure: '11:00 PM',
+      arrival: '8:00 AM',
+      duration: '9h',
+      price: 1200,
+      seats: 15
+    },
+    {
+      id: 2,
+      from: 'Dhaka',
+      to: 'Bandarban',
+      operator: 'Shyamoli',
+      departure: '10:30 PM',
+      arrival: '7:00 AM',
+      duration: '8h 30m',
+      price: 1000,
+      seats: 20
+    }
+  ]
+};
+
 export function BookTravel() {
   const [bookingType, setBookingType] = useState('hosts');
   const [ticketType, setTicketType] = useState('flight');
@@ -33,126 +153,6 @@ export function BookTravel() {
     passengers: 1,
     seatClass: 'Economy'
   });
-
-  const hosts = [
-    {
-      id: 1,
-      name: 'Fatima Khan',
-      location: 'Cox\'s Bazar',
-      rating: 4.9,
-      reviews: 124,
-      verified: true,
-      languages: ['Bengali', 'English'],
-      price: 2500,
-      image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fatima',
-      propertyImage: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      services: ['Local Guide', 'Meals', 'Transportation'],
-      available: true
-    },
-    {
-      id: 2,
-      name: 'Rafiq Ahmed',
-      location: 'Sylhet',
-      rating: 4.8,
-      reviews: 98,
-      verified: true,
-      languages: ['Bengali', 'English', 'Hindi'],
-      price: 2000,
-      image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rafiq',
-      propertyImage: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      services: ['Local Guide', 'Photography', 'Trekking'],
-      available: true
-    },
-    {
-      id: 3,
-      name: 'Shahana Begum',
-      location: 'Dhaka',
-      rating: 4.7,
-      reviews: 156,
-      verified: true,
-      languages: ['Bengali', 'English'],
-      price: 1800,
-      image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shahana',
-      propertyImage: 'https://images.unsplash.com/photo-1513563326940-e76e4641069e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5JTIwc2t5bGluZSUyMG5pZ2h0fGVufDF8fHx8MTc2NTQ3NTIxMXww&ixlib=rb-4.1.0&q=80&w=1080',
-      services: ['City Tour', 'Shopping Guide', 'Food Tour'],
-      available: true
-    }
-  ];
-
-  const tickets = {
-    flight: [
-      {
-        id: 1,
-        from: 'Dhaka',
-        to: 'Cox\'s Bazar',
-        airline: 'Biman Bangladesh',
-        departure: '10:00 AM',
-        arrival: '11:15 AM',
-        duration: '1h 15m',
-        price: 4500,
-        seats: 12
-      },
-      {
-        id: 2,
-        from: 'Dhaka',
-        to: 'Sylhet',
-        airline: 'US-Bangla',
-        departure: '2:30 PM',
-        arrival: '3:30 PM',
-        duration: '1h',
-        price: 3800,
-        seats: 8
-      }
-    ],
-    train: [
-      {
-        id: 1,
-        from: 'Dhaka',
-        to: 'Chittagong',
-        train: 'Suborno Express',
-        departure: '7:00 AM',
-        arrival: '1:30 PM',
-        duration: '6h 30m',
-        price: 800,
-        seats: 25
-      },
-      {
-        id: 2,
-        from: 'Dhaka',
-        to: 'Sylhet',
-        train: 'Parabat Express',
-        departure: '9:00 PM',
-        arrival: '5:30 AM',
-        duration: '8h 30m',
-        price: 650,
-        seats: 18
-      }
-    ],
-    bus: [
-      {
-        id: 1,
-        from: 'Dhaka',
-        to: 'Cox\'s Bazar',
-        operator: 'Green Line',
-        departure: '11:00 PM',
-        arrival: '8:00 AM',
-        duration: '9h',
-        price: 1200,
-        seats: 15
-      },
-      {
-        id: 2,
-        from: 'Dhaka',
-        to: 'Bandarban',
-        operator: 'Shyamoli',
-        departure: '10:30 PM',
-        arrival: '7:00 AM',
-        duration: '8h 30m',
-        price: 1000,
-        seats: 20
-      }
-    ]
-  };
 
   const handleHostBooking = (host) => {
     setSelectedHost(host);
