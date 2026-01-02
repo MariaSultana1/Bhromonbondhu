@@ -48,7 +48,7 @@ export function AdminDashboard({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar */}
+      
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -59,6 +59,11 @@ export function AdminDashboard({ user, onLogout }) {
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
+               <img
+        className="fixed top-[18px] left-[100px] w-[27px] h-[27px] aspect-[1] object-cover"
+        alt="Image"
+        src="./images/image 5_white.png"
+      />
               <div>
                 <h1 className="text-xl">ভ্রমণবন্ধু</h1>
                 <p className="text-xs text-purple-600">Admin Dashboard</p>
@@ -74,7 +79,7 @@ export function AdminDashboard({ user, onLogout }) {
               </button>
               <div className="flex items-center gap-2">
                 <img
-                  src={user?.avatar}
+                  src="./images/image 143.png"
                   alt={user?.name}
                   className="w-8 h-8 rounded-full"
                 />
@@ -93,13 +98,13 @@ export function AdminDashboard({ user, onLogout }) {
       </nav>
 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Header */}
+        
         <div className="mb-6">
           <h2 className="text-2xl mb-2">Platform Overview</h2>
           <p className="text-gray-600">Monitor and manage Bhromonbondhu</p>
         </div>
 
-        {/* Stats Grid */}
+       
         <div className="grid md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-2">

@@ -54,13 +54,18 @@ export default function TravelerDashboard({ user, onLogout }) {
                   <Menu className="w-6 h-6" />
                 )}
               </button>
+                <img
+        className="fixed top-[18px] left-[100px] w-[27px] h-[27px] aspect-[1] object-cover"
+        alt="Image"
+        src="./images/image 5_white.png"
+      />
               <div>
                 <h1 className="text-xl">ভ্রমণবন্ধু</h1>
                 <p className="text-xs text-gray-500">Bhromonbondhu</p>
               </div>
             </div>
 
-            {/* Search */}
+            
             <div className="hidden md:flex flex-1 max-w-md mx-8">
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -72,7 +77,7 @@ export default function TravelerDashboard({ user, onLogout }) {
               </div>
             </div>
 
-            {/* User Menu */}
+            
             <div className="flex items-center gap-4">
               <button className="relative">
                 <Bell className="w-5 h-5 text-gray-600" />
@@ -83,7 +88,7 @@ export default function TravelerDashboard({ user, onLogout }) {
 
               <div className="flex items-center gap-2">
                 <img
-                  src={user.avatar}
+                  src="./images/Ellipse 22.png"
                   alt={user.name}
                   className="w-8 h-8 rounded-full"
                 />
@@ -105,7 +110,7 @@ export default function TravelerDashboard({ user, onLogout }) {
       </nav>
 
       <div className="flex max-w-7xl mx-auto">
-        {/* Sidebar */}
+       
         <aside
           className={`
             fixed lg:sticky top-16 left-0
