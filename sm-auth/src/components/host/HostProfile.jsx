@@ -11,24 +11,25 @@ export function HostProfile({ user }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div>
         <h2 className="text-2xl mb-2">Host Profile</h2>
         <p className="text-gray-600">Manage your profile and verification</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Card */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
-                <img src={user.avatar} alt={user.name} className="w-24 h-24 rounded-full" />
+                <img src="./images/man 3.png" alt={user.name} className="w-24 h-24 rounded-full" />
                 <button className="absolute bottom-0 right-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
+              
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-xl">{user.name}</h3>

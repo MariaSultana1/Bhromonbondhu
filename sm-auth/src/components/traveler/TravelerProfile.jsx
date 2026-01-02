@@ -3,21 +3,21 @@ import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Ca
 export function TravelerProfile({ user }) {
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div>
         <h2 className="text-2xl mb-2">Profile</h2>
         <p className="text-gray-600">Manage your account and verification</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Profile */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Card */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
                 <img
-                  src={user.avatar}
+                  src="./images/Ellipse 22.png"
                   alt={user.name}
                   className="w-24 h-24 rounded-full"
                 />

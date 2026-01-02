@@ -41,6 +41,11 @@ export default function HostDashboard({ user, onLogout }) {
             >
               {mobileMenuOpen ? <X /> : <Menu />}
             </button>
+               <img
+        className="fixed top-[18px] left-[100px] w-[27px] h-[27px] aspect-[1] object-cover"
+        alt="Image"
+        src="./images/image 5_white.png"
+      />
             <div>
               <h1 className="text-xl">ভ্রমণবন্ধু</h1>
               <p className="text-xs text-green-600">Host Dashboard</p>
@@ -57,7 +62,7 @@ export default function HostDashboard({ user, onLogout }) {
 
             <div className="flex items-center gap-2">
               <img
-                src={user.avatar}
+                src="./images/man 1.png"
                 alt={user.name}
                 className="w-8 h-8 rounded-full"
               />
@@ -72,7 +77,7 @@ export default function HostDashboard({ user, onLogout }) {
       </nav>
 
       <div className="flex max-w-7xl mx-auto">
-        {/* Sidebar */}
+        
         <aside
           className={`
             fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] w-64
