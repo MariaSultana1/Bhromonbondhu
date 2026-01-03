@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Calendar, MapPin, User, ArrowLeft, Filter, Search, Cloud } from 'lucide-react';
-
+import { Calendar, MapPin, ArrowLeft, Search, Cloud } from 'lucide-react';
+import { TripDetails } from './TripDetails';
 const allTrips = [
   {
     id: 1,
@@ -75,17 +75,35 @@ const allTrips = [
     services: ['Boat Tour', 'Meals']
   }
 ];
-
 export function AllTrips({ onBack }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTrip, setSelectedTrip] = useState(null);
 
-  const filteredTrips = allTrips.filter(trip => {
+  // Enhanced trip data with default values for TripDetails
+ const enhancedTrips = allTrips.map(trip => ({
+  ...trip,
+  bookingId: `BK202400${trip.id}`,
+  checkIn: '2:00 PM',
+  checkOut: '11:00 AM',
+  guests: 2,
+  nights: 3,
+  totalAmount: 12500,
+  location: trip.destination,
+  hostRating: 4.5,
+  description: `Enjoy your stay at ${trip.destination}`
+}));
+
+  const filteredTrips = enhancedTrips.filter(trip => {
     const matchesStatus = filterStatus === 'all' || trip.status === filterStatus;
     const matchesSearch = trip.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           trip.host.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
+
+  if (selectedTrip) {
+    return <TripDetails trip={selectedTrip} onBack={() => setSelectedTrip(null)} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -126,7 +144,7 @@ export function AllTrips({ onBack }) {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {status.charAt(0).toUpperCase() + status.slice(1)} ({status==='all'? allTrips.length : allTrips.filter(t => t.status===status).length})
+                {status.charAt(0).toUpperCase() + status.slice(1)} ({status==='all'? enhancedTrips.length : enhancedTrips.filter(t => t.status===status).length})
               </button>
             ))}
           </div>
@@ -185,7 +203,10 @@ export function AllTrips({ onBack }) {
                   </span>
                 ))}
               </div>
-              <button className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md">
+              <button
+                className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md"
+                onClick={() => setSelectedTrip(trip)}
+              >
                 View Details
               </button>
             </div>

@@ -188,7 +188,7 @@ export function MyHosts() {
                               <Users className="w-4 h-4 text-gray-500" />
                               <span className="text-sm">{booking.guests} {booking.guests === 1 ? 'guest' : 'guests'}</span>
                             </div>
-                            {booking.services.length > 0 && (
+                            {booking.services && booking.services.length > 0 && (
                               <div className="flex flex-wrap gap-2">
                                 {booking.services.map((service, idx) => (
                                   <span

@@ -1,9 +1,101 @@
-import { Calendar, Cloud, Camera, Heart, TrendingUp, Star, MapPin } from 'lucide-react';
+
+import { Calendar, Cloud, Camera, Heart, TrendingUp, Star, MapPin, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { AllTrips } from './AllTrips';
 import { MagicMemoryAlbum } from './MagicMemoryAlbum';
 import { Community } from './Community';
 import { Wishlist } from './Wishlist';
+
+const upcomingTrips = [
+  {
+    id: 1,
+    destination: 'Cox\'s Bazar',
+    date: 'Dec 20, 2024',
+    host: 'Fatima Khan',
+    image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    weather: '28°C, Sunny',
+    checkIn: '2:00 PM',
+    checkOut: '11:00 AM',
+    nights: 3,
+    guests: 2,
+    totalAmount: 12500,
+    services: ['Accommodation', 'Local Guide', 'Meals'],
+    status: 'confirmed',
+    bookingId: 'BK2024001'
+  },
+  {
+    id: 2,
+    destination: 'Sylhet',
+    date: 'Jan 5, 2025',
+    host: 'Pending',
+    image: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    weather: '18°C, Cloudy',
+    checkIn: '3:00 PM',
+    checkOut: '10:00 AM',
+    nights: 2,
+    guests: 1,
+    totalAmount: 8000,
+    services: ['Accommodation', 'Transportation'],
+    status: 'pending',
+    bookingId: 'BK2024002'
+  }
+];
+
+const memoryAlbums = [
+  {
+    id: 1,
+    title: 'Dhaka Adventures',
+    photos: 24,
+    date: 'Nov 2024',
+    cover: 'https://images.unsplash.com/photo-1513563326940-e76e4641069e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5JTIwc2t5bGluZSUyMG5pZ2h0fGVufDF8fHx8MTc2NTQ3NTIxMXww&ixlib=rb-4.1.0&q=80&w=1080'
+  },
+  {
+    id: 2,
+    title: 'Sundarbans Trip',
+    photos: 42,
+    date: 'Oct 2024',
+    cover: 'https://images.unsplash.com/photo-1708943081020-2082b47e21ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYW5nbGFkZXNoJTIwdHJhdmVsfGVufDF8fHx8MTc2NTUxNTMyMHww&ixlib=rb-4.1.0&q=80&w=1080'
+  }
+];
+
+const communityPosts = [
+  {
+    id: 1,
+    author: 'Aisha Rahman',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=aisha',
+    content: 'Just had the most amazing experience in Rangamati! The lake views are breathtaking 🌊',
+    likes: 45,
+    comments: 12,
+    time: '2h ago',
+    image: 'https://images.unsplash.com/photo-1664834681908-7ee473dfdec4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmF2ZWwlMjBkZXN0aW5hdGlvbiUyMGxhbmRzY2FwZXxlbnwxfHx8fDE3NjU0MzQwNzN8MA&ixlib=rb-4.1.0&q=80&w=1080'
+  },
+  {
+    id: 2,
+    author: 'Mehedi Hassan',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mehedi',
+    content: 'Pro tip: Visit Ratargul in the monsoon season. The swamp forest is magical! ⭐️',
+    likes: 67,
+    comments: 23,
+    time: '5h ago'
+  }
+];
+
+const wishlistItems = [
+  {
+    id: 1,
+    destination: 'Bandarban',
+    image: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    estimatedCost: '৳15,000',
+    bestTime: 'Nov - Feb'
+  },
+  {
+    id: 2,
+    destination: 'Kuakata',
+    image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    estimatedCost: '৳8,000',
+    bestTime: 'Oct - Mar'
+  }
+];
 
 export function TravelerHome({ user }) {
   const [view, setView] = useState('home');
@@ -45,24 +137,7 @@ export function TravelerHome({ user }) {
               <button className="text-sm text-blue-500 hover:underline" onClick={() => setView('allTrips')}>View All</button>
             </div>
             <div className="space-y-4">
-              {[
-                {
-                  id: 1,
-                  destination: 'Cox\'s Bazar',
-                  date: 'Dec 20, 2024',
-                  host: 'Fatima Khan',
-                  image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-                  weather: '28°C, Sunny'
-                },
-                {
-                  id: 2,
-                  destination: 'Sylhet',
-                  date: 'Jan 5, 2025',
-                  host: 'Pending',
-                  image: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-                  weather: '18°C, Cloudy'
-                }
-              ].map((trip) => (
+              {upcomingTrips.map((trip) => (
                 <div key={trip.id} className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                   <img
                     src={trip.image}
@@ -98,22 +173,7 @@ export function TravelerHome({ user }) {
               <button className="text-sm text-blue-500 hover:underline" onClick={() => setView('albums')}>Manage</button>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              {[
-                {
-                  id: 1,
-                  title: 'Dhaka Adventures',
-                  photos: 24,
-                  date: 'Nov 2024',
-                  cover: 'https://images.unsplash.com/photo-1513563326940-e76e4641069e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5JTIwc2t5bGluZSUyMG5pZ2h0fGVufDF8fHx8MTc2NTQ3NTIxMXww&ixlib=rb-4.1.0&q=80&w=1080'
-                },
-                {
-                  id: 2,
-                  title: 'Sundarbans Trip',
-                  photos: 42,
-                  date: 'Oct 2024',
-                  cover: 'https://images.unsplash.com/photo-1708943081020-2082b47e21ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYW5nbGFkZXNoJTIwdHJhdmVsfGVufDF8fHx8MTc2NTUxNTMyMHww&ixlib=rb-4.1.0&q=80&w=1080'
-                }
-              ].map((album) => (
+              {memoryAlbums.map((album) => (
                 <div key={album.id} className="relative group cursor-pointer" onClick={() => setView('albums')}>
                   <img
                     src={album.cover}
@@ -141,27 +201,7 @@ export function TravelerHome({ user }) {
               <button className="text-sm text-blue-500 hover:underline" onClick={() => setView('community')}>See All</button>
             </div>
             <div className="space-y-4">
-              {[
-                {
-                  id: 1,
-                  author: 'Aisha Rahman',
-                  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=aisha',
-                  content: 'Just had the most amazing experience in Rangamati! The lake views are breathtaking 🌊',
-                  likes: 45,
-                  comments: 12,
-                  time: '2h ago',
-                  image: 'https://images.unsplash.com/photo-1664834681908-7ee473dfdec4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmF2ZWwlMjBkZXN0aW5hdGlvbiUyMGxhbmRzY2FwZXxlbnwxfHx8fDE3NjU0MzQwNzN8MA&ixlib=rb-4.1.0&q=80&w=1080'
-                },
-                {
-                  id: 2,
-                  author: 'Mehedi Hassan',
-                  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mehedi',
-                  content: 'Pro tip: Visit Ratargul in the monsoon season. The swamp forest is magical! ⭐️',
-                  likes: 67,
-                  comments: 23,
-                  time: '5h ago'
-                }
-              ].map((post) => (
+              {communityPosts.map((post) => (
                 <div key={post.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
                   <div className="flex items-center gap-3 mb-3">
                     <img
@@ -232,22 +272,7 @@ export function TravelerHome({ user }) {
               <button className="text-sm text-blue-500 hover:underline" onClick={() => setView('wishlist')}>Edit</button>
             </div>
             <div className="space-y-3">
-              {[
-                {
-                  id: 1,
-                  destination: 'Bandarban',
-                  image: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-                  estimatedCost: '৳15,000',
-                  bestTime: 'Nov - Feb'
-                },
-                {
-                  id: 2,
-                  destination: 'Kuakata',
-                  image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-                  estimatedCost: '৳8,000',
-                  bestTime: 'Oct - Mar'
-                }
-              ].map((item) => (
+              {wishlistItems.map((item) => (
                 <div key={item.id} className="relative group cursor-pointer">
                   <img
                     src={item.image}
