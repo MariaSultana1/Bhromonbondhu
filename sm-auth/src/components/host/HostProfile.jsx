@@ -1,39 +1,36 @@
-import React, { useState } from "react";
 import { CheckCircle, AlertCircle, Shield, Camera, Edit, Phone, Mail, MapPin, Languages, Award } from 'lucide-react';
 
 export function HostProfile({ user }) {
-  const [autoAccept, setAutoAccept] = useState(false);
-  const [notifications, setNotifications] = useState({
-    booking: true,
-    message: true,
-    review: true
-  });
-
   return (
     <div className="space-y-6">
-     
+      {/* Header */}
       <div>
         <h2 className="text-2xl mb-2">Host Profile</h2>
         <p className="text-gray-600">Manage your profile and verification</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        
+        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          
+          {/* Profile Card */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
-                <img src="./images/man 3.png" alt={user.name} className="w-24 h-24 rounded-full" />
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="w-24 h-24 rounded-full"
+                />
                 <button className="absolute bottom-0 right-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
-              
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-xl">{user.name}</h3>
-                  {user.verified && <CheckCircle className="w-5 h-5 text-green-500" title="Verified Host" />}
+                  {user.verified && (
+                    <CheckCircle className="w-5 h-5 text-green-500" title="Verified Host" />
+                  )}
                 </div>
                 <p className="text-gray-600 mb-1">{user.email}</p>
                 <div className="flex items-center gap-2 mb-3">
@@ -74,21 +71,21 @@ export function HostProfile({ user }) {
                   <label className="block text-sm text-gray-600 mb-2">Phone</label>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{user.phone || '+880 1XXX-XXXXXX'}</span>
+                    <span className="text-sm">+880 1XXX-XXXXXX</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Location</label>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{user.location || "Cox's Bazar, Bangladesh"}</span>
+                    <span className="text-sm">Cox's Bazar, Bangladesh</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Languages</label>
                   <div className="flex items-center gap-2">
                     <Languages className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{user.languages || "Bengali, English, Hindi"}</span>
+                    <span className="text-sm">Bengali, English, Hindi</span>
                   </div>
                 </div>
               </div>
@@ -99,60 +96,77 @@ export function HostProfile({ user }) {
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Verification Requirements</h3>
             <div className="space-y-4">
-              {[
-                { title: "Identity Verification", desc: "National ID card verified and approved", date: "Jan 15, 2024" },
-                { title: "Police Background Check", desc: "Clean record verified by local authorities", date: "Jan 20, 2024" },
-                { title: "Host Training", desc: "Completed platform safety and hospitality training", date: "Jan 25, 2024" },
-                { title: "Bank Account Verification", desc: "Bank details verified for payouts", date: "Jan 28, 2024" }
-              ].map((v) => (
-                <div key={v.title} className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h4 className="text-sm mb-1">{v.title}</h4>
-                    <p className="text-xs text-gray-600 mb-2">{v.desc}</p>
-                    <span className="text-xs text-green-600">Completed on {v.date}</span>
-                  </div>
+              <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h4 className="text-sm mb-1">Identity Verification</h4>
+                  <p className="text-xs text-gray-600 mb-2">
+                    National ID card verified and approved
+                  </p>
+                  <span className="text-xs text-green-600">Completed on Jan 15, 2024</span>
                 </div>
-              ))}
+              </div>
+
+              <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h4 className="text-sm mb-1">Police Background Check</h4>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Clean record verified by local authorities
+                  </p>
+                  <span className="text-xs text-green-600">Completed on Jan 20, 2024</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h4 className="text-sm mb-1">Host Training</h4>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Completed platform safety and hospitality training
+                  </p>
+                  <span className="text-xs text-green-600">Completed on Jan 25, 2024</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h4 className="text-sm mb-1">Bank Account Verification</h4>
+                  <p className="text-xs text-gray-600 mb-2">
+                    Bank details verified for payouts
+                  </p>
+                  <span className="text-xs text-green-600">Completed on Jan 28, 2024</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Settings / Preferences */}
+          {/* Settings */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Preferences</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2">Notification Settings</label>
                 <div className="space-y-2">
-                  {[
-                    { id: "booking", label: "New booking notifications" },
-                    { id: "message", label: "Message notifications" },
-                    { id: "review", label: "Review notifications" }
-                  ].map((n) => (
-                    <div key={n.id} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={notifications[n.id]}
-                        onChange={() =>
-                          setNotifications({ ...notifications, [n.id]: !notifications[n.id] })
-                        }
-                        className="w-4 h-4"
-                      />
-                      <label className="text-sm">{n.label}</label>
-                    </div>
-                  ))}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="booking-notif" className="w-4 h-4" defaultChecked />
+                    <label htmlFor="booking-notif" className="text-sm">New booking notifications</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="message-notif" className="w-4 h-4" defaultChecked />
+                    <label htmlFor="message-notif" className="text-sm">Message notifications</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="review-notif" className="w-4 h-4" defaultChecked />
+                    <label htmlFor="review-notif" className="text-sm">Review notifications</label>
+                  </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm mb-2">Auto-Accept Bookings</label>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={autoAccept}
-                    onChange={() => setAutoAccept(!autoAccept)}
-                  />
+                  <input type="checkbox" className="sr-only peer" />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                   <span className="ml-3 text-sm text-gray-600">Automatically accept qualifying bookings</span>
                 </label>
@@ -169,52 +183,78 @@ export function HostProfile({ user }) {
               <Shield className="w-5 h-5 text-green-500" />
               <h3>Verification Status</h3>
             </div>
-            {["Identity", "Police Check", "Training", "Bank Details"].map((v) => (
-              <div key={v} className="flex items-center justify-between mb-1">
-                <span className="text-sm">{v}</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Identity</span>
                 <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
-            ))}
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Police Check</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Training</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Bank Details</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+            </div>
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">✓ All verifications complete! You're a trusted host.</p>
+              <p className="text-sm text-green-800">
+                ✓ All verifications complete! You're a trusted host.
+              </p>
             </div>
           </div>
 
           {/* Host Stats */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Host Performance</h3>
-            {[
-              { label: "Overall Rating", value: "4.9/5.0", color: "text-yellow-600" },
-              { label: "Total Guests", value: "124", color: "text-blue-600" },
-              { label: "Response Rate", value: "98%", color: "text-green-600" },
-              { label: "Member Since", value: "Jan 2024", color: "text-gray-600" }
-            ].map((s) => (
-              <div key={s.label} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{s.label}</span>
-                <span className={`text-lg ${s.color}`}>{s.value}</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Overall Rating</span>
+                <span className="text-lg text-yellow-600">4.9/5.0</span>
               </div>
-            ))}
-          </div>
-
-          {/* Host Badges */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Host Badges</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { icon: "🏆", label: "Superhost", bg: "bg-yellow-50" },
-                { icon: "⭐", label: "Top Rated", bg: "bg-blue-50" },
-                { icon: "✓", label: "Verified", bg: "bg-green-50" },
-                { icon: "💬", label: "Quick Responder", bg: "bg-purple-50" }
-              ].map((b) => (
-                <div key={b.label} className={`text-center p-3 ${b.bg} rounded-lg`}>
-                  <div className="text-2xl mb-1">{b.icon}</div>
-                  <p className="text-xs">{b.label}</p>
-                </div>
-              ))}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Total Guests</span>
+                <span className="text-lg text-blue-600">124</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Response Rate</span>
+                <span className="text-lg text-green-600">98%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Member Since</span>
+                <span className="text-sm text-gray-600">Jan 2024</span>
+              </div>
             </div>
           </div>
 
-          {/* Help Section */}
+          {/* Badges */}
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <h3 className="mb-4">Host Badges</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                <div className="text-2xl mb-1">🏆</div>
+                <p className="text-xs">Superhost</p>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-2xl mb-1">⭐</div>
+                <p className="text-xs">Top Rated</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-2xl mb-1">✓</div>
+                <p className="text-xs">Verified</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                <div className="text-2xl mb-1">💬</div>
+                <p className="text-xs">Quick Responder</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Help */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <h4 className="mb-3">Need Help?</h4>
             <p className="text-sm text-gray-700 mb-3">
