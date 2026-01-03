@@ -9,7 +9,6 @@ export function TripDetails({ trip, onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -22,7 +21,6 @@ export function TripDetails({ trip, onBack }) {
         <p className="text-blue-100">Booking ID: {trip.bookingId}</p>
       </div>
 
-      {/* Trip Image & Info */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
         <div className="relative h-96">
           <img
@@ -42,7 +40,6 @@ export function TripDetails({ trip, onBack }) {
         </div>
 
         <div className="p-8">
-          {/* Location & Description */}
           <div className="mb-6">
             <div className="flex items-center gap-2 text-gray-600 mb-3">
               <MapPin className="w-5 h-5" />
@@ -51,7 +48,6 @@ export function TripDetails({ trip, onBack }) {
             <p className="text-gray-700">{trip.description}</p>
           </div>
 
-          {/* Quick Info Cards */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="text-sm text-gray-600 mb-1">Check-in</div>
@@ -77,7 +73,6 @@ export function TripDetails({ trip, onBack }) {
             </div>
           </div>
 
-          {/* Host Information */}
           <div className="p-6 border-2 border-gray-200 rounded-xl mb-6">
             <h3 className="mb-4">Host Information</h3>
             <div className="flex items-center justify-between">
@@ -115,7 +110,7 @@ export function TripDetails({ trip, onBack }) {
             </div>
           </div>
 
-          {/* Services Included */}
+
           <div className="mb-6">
             <h3 className="mb-4">Services Included</h3>
             <div className="flex flex-wrap gap-3">
@@ -128,7 +123,7 @@ export function TripDetails({ trip, onBack }) {
             </div>
           </div>
 
-          {/* Price Breakdown */}
+    
           <div className="p-6 bg-gray-50 rounded-xl mb-6">
             <h3 className="mb-4">Price Breakdown</h3>
             <div className="space-y-3 text-sm">
@@ -151,7 +146,7 @@ export function TripDetails({ trip, onBack }) {
             </div>
           </div>
 
-          {/* Action Buttons */}
+        
           <div className="flex flex-wrap gap-3">
             {trip.status === 'upcoming' && (
               <>
@@ -190,7 +185,7 @@ export function TripDetails({ trip, onBack }) {
         </div>
       </div>
 
-      {/* Modify Booking Modal */}
+     
       {showModifyBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -260,7 +255,7 @@ export function TripDetails({ trip, onBack }) {
         </div>
       )}
 
-      {/* Cancel Booking Modal */}
+     
       {showCancelBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -316,7 +311,7 @@ export function TripDetails({ trip, onBack }) {
         </div>
       )}
 
-      {/* Contact Host Modal */}
+   
       {showContactHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -379,7 +374,6 @@ export function TripDetails({ trip, onBack }) {
         </div>
       )}
 
-      {/* Write Review Modal */}
       {showReview && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">

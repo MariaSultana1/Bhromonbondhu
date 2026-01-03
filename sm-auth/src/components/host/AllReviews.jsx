@@ -96,7 +96,7 @@ export function AllReviews({ onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div className="bg-gradient-to-r from-yellow-600 to-yellow-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -110,7 +110,7 @@ export function AllReviews({ onBack }) {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Reviews */}
+       
         <div className="lg:col-span-2 space-y-4">
           {reviews.map((review) => (
             <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all">
@@ -195,9 +195,9 @@ export function AllReviews({ onBack }) {
           ))}
         </div>
 
-        {/* Sidebar Stats */}
+       
         <div className="space-y-6">
-          {/* Overall Rating */}
+         
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="mb-4">Overall Rating</h3>
             <div className="text-center mb-6">
@@ -232,7 +232,7 @@ export function AllReviews({ onBack }) {
             </div>
           </div>
 
-          {/* Response Rate */}
+          
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="mb-4">Response Stats</h3>
             <div className="space-y-3">
@@ -253,7 +253,7 @@ export function AllReviews({ onBack }) {
             </div>
           </div>
 
-          {/* Tips */}
+         
           <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-100 rounded-2xl p-6">
             <h4 className="text-yellow-900 mb-3">💡 Review Tips</h4>
             <ul className="space-y-2 text-sm text-yellow-800">
@@ -276,7 +276,7 @@ export function AllReviews({ onBack }) {
             </ul>
           </div>
 
-          {/* Keywords */}
+         
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="mb-4">Common Keywords</h3>
             <div className="flex flex-wrap gap-2">

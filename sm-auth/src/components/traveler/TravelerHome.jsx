@@ -118,16 +118,13 @@ export function TravelerHome({ user }) {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-6 text-white">
         <h2 className="text-2xl mb-2">Welcome back, {user.name}! 👋</h2>
         <p>Ready for your next adventure?</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Smart Calendar */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -163,7 +160,7 @@ export function TravelerHome({ user }) {
             </div>
           </section>
 
-          {/* Magic Memory Album */}
+
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -194,7 +191,7 @@ export function TravelerHome({ user }) {
             </div>
           </section>
 
-          {/* Community Posts */}
+
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>Community</h3>
@@ -237,9 +234,8 @@ export function TravelerHome({ user }) {
           </section>
         </div>
 
-        {/* Sidebar */}
+
         <div className="space-y-6">
-          {/* Quick Stats */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Your Stats</h3>
             <div className="space-y-3">
@@ -262,7 +258,7 @@ export function TravelerHome({ user }) {
             </div>
           </section>
 
-          {/* Wishlist */}
+        
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -294,7 +290,7 @@ export function TravelerHome({ user }) {
             </button>
           </section>
 
-          {/* Trending Destinations */}
+          
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-green-500" />

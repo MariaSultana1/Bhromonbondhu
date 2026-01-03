@@ -89,7 +89,7 @@ export function HostHome({ user }) {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
+      
       <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
         <h2 className="text-2xl mb-2">
           Welcome back, {user.name}! 👋
@@ -97,7 +97,7 @@ export function HostHome({ user }) {
         <p>You have 3 upcoming bookings and 2 new messages</p>
       </div>
 
-      {/* Stats Grid */}
+     
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -138,9 +138,9 @@ export function HostHome({ user }) {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Column */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Earnings Chart */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Earnings Overview</h3>
             <div style={{ width: '100%', height: 300 }}>
@@ -181,7 +181,7 @@ export function HostHome({ user }) {
             </div>
           </div>
 
-          {/* Upcoming Bookings */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h3>Upcoming Bookings</h3>
@@ -228,7 +228,7 @@ export function HostHome({ user }) {
             ))}
           </div>
 
-          {/* Reviews */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between mb-4">
               <h3>Recent Reviews</h3>
@@ -275,7 +275,7 @@ export function HostHome({ user }) {
           </div>
         </div>
 
-        {/* Sidebar */}
+      
         <div className="space-y-6">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Verification Status</h3>

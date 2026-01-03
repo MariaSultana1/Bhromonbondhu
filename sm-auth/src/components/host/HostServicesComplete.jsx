@@ -57,7 +57,7 @@ export function HostServicesComplete() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl mb-2">My Services</h2>
@@ -73,7 +73,7 @@ export function HostServicesComplete() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Services List */}
+        
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Active Services</h3>
@@ -137,9 +137,9 @@ export function HostServicesComplete() {
           </div>
         </div>
 
-        {/* Sidebar */}
+      
         <div className="space-y-6">
-          {/* Calendar */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>Availability</h3>
@@ -170,7 +170,7 @@ export function HostServicesComplete() {
             </div>
           </div>
 
-          {/* Stats */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Service Stats</h3>
             <div className="space-y-3">
@@ -201,7 +201,7 @@ export function HostServicesComplete() {
             </div>
           </div>
 
-          {/* Tips */}
+         
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <h4 className="mb-3">💡 Service Tips</h4>
             <ul className="space-y-2 text-sm text-gray-700">
@@ -222,7 +222,7 @@ export function HostServicesComplete() {
         </div>
       </div>
 
-      {/* Add Service Modal */}
+      
       {showAddService && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -328,7 +328,7 @@ export function HostServicesComplete() {
         </div>
       )}
 
-      {/* Edit Service Modal */}
+     
       {showEditService && selectedService && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -393,7 +393,7 @@ export function HostServicesComplete() {
         </div>
       )}
 
-      {/* Calendar Modal */}
+      
       {showCalendar && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">

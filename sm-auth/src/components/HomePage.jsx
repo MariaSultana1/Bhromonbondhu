@@ -1,8 +1,6 @@
-
 import React from "react";
-import { Link } from "react-router-dom";
 
-const HomePage = () => {
+const HomePage = ({ goLogin, goSignup }) => {
 
   const featuredDestinations = [
     {
@@ -99,33 +97,35 @@ const HomePage = () => {
               alt="Bhromonbondhu Logo" 
               className="w-10 h-10 md:w-12 md:h-12"
             />
-            {/* */}
+            
             <div className="flex flex-col">
-              <h1 className="text-2xl md:text-3xl font-serif text-gray-800">ভ্রমণবন্ধু</h1>
-              <p className="text-sm md:text-lg font-light text-gray-600">Bhromonbondhu</p>
-            </div>
-          </div>
+  <h1 className="text-2xl md:text-3xl font-serif text-gray-800">
+    ভ্রমণবন্ধু
+  </h1>
+  <p className="text-sm md:text-lg font-light text-gray-600">
+    Bhromonbondhu
+  </p>
+</div>
+</div>
 
-         
-          
+<div className="flex items-center gap-3">
+  <button
+    onClick={goLogin}
+    className="text-blue-600 hover:text-blue-800 font-medium transition-colors text-sm md:text-base"
+  >
+    Login
+  </button>
 
-          
-          <div className="flex items-center gap-3">
-            <Link 
-              to="/login" 
-              className="text-blue-600 hover:text-blue-800 font-medium transition-colors text-sm md:text-base"
-            >
-              Login
-            </Link>
-            <Link 
-              to="/signup" 
-              className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-4 py-2 md:px-6 md:py-2 rounded-full hover:from-cyan-500 hover:to-blue-600 transition-all shadow-md hover:shadow-lg text-sm md:text-base"
-            >
-              Register
-            </Link>
-          </div>
-        </div>
-      </header>
+  <button
+    onClick={goSignup}
+    className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-4 py-2 md:px-6 md:py-2 rounded-full hover:from-cyan-500 hover:to-blue-600 transition-all shadow-md hover:shadow-lg text-sm md:text-base"
+  >
+    Register
+  </button>
+</div>
+</div>
+</header>
+
 
       
       <section className="py-12 md:py-20 px-4 md:px-8">
@@ -137,12 +137,18 @@ const HomePage = () => {
             <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
               Discover amazing destinations and connect with local hosts for authentic travel experiences
             </p>
-            <Link 
-              to="/destinations" 
-              className="inline-flex items-center justify-center bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-3 rounded-full hover:from-cyan-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl text-lg font-medium"
-            >
-              Start your Journey
-            </Link>
+           <button
+  onClick={goSignup}
+  className="inline-flex items-center justify-center 
+             bg-gradient-to-r from-cyan-500 to-blue-600 
+             text-white px-8 py-3 rounded-full 
+             hover:from-cyan-600 hover:to-blue-700 
+             transition-all shadow-lg hover:shadow-xl 
+             text-lg font-medium"
+>
+  Start your Journey
+</button>
+
           </div>
         </div>
       </section>

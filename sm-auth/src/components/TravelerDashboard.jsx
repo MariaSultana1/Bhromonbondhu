@@ -38,11 +38,11 @@ export default function TravelerDashboard({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
+      
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -155,7 +155,7 @@ export default function TravelerDashboard({ user, onLogout }) {
           </nav>
         </aside>
 
-        {/* Main Content */}
+      
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           {activeTab === 'home' && <TravelerHome user={user} />}
           {activeTab === 'book' && <BookTravel />}
@@ -169,7 +169,7 @@ export default function TravelerDashboard({ user, onLogout }) {
         </main>
       </div>
 
-      {/* Mobile overlay */}
+     
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"

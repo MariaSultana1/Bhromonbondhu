@@ -3,16 +3,16 @@ import { CheckCircle, AlertCircle, Shield, Camera, Edit, Phone, Mail, MapPin, La
 export function HostProfile({ user }) {
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div>
         <h2 className="text-2xl mb-2">Host Profile</h2>
         <p className="text-gray-600">Manage your profile and verification</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Card */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
@@ -46,7 +46,7 @@ export function HostProfile({ user }) {
               </div>
             </div>
 
-            {/* Bio */}
+           
             <div className="border-t pt-6 mb-6">
               <h4 className="mb-3">About Me</h4>
               <p className="text-sm text-gray-700 mb-3">
@@ -56,7 +56,7 @@ export function HostProfile({ user }) {
               <button className="text-sm text-blue-500 hover:underline">Edit Bio</button>
             </div>
 
-            {/* Contact Information */}
+           
             <div className="border-t pt-6">
               <h4 className="mb-4">Contact Information</h4>
               <div className="grid md:grid-cols-2 gap-4">
@@ -92,7 +92,7 @@ export function HostProfile({ user }) {
             </div>
           </div>
 
-          {/* Verification Requirements */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Verification Requirements</h3>
             <div className="space-y-4">
@@ -142,7 +142,7 @@ export function HostProfile({ user }) {
             </div>
           </div>
 
-          {/* Settings */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Preferences</h3>
             <div className="space-y-4">
@@ -175,9 +175,9 @@ export function HostProfile({ user }) {
           </div>
         </div>
 
-        {/* Sidebar */}
+        
         <div className="space-y-6">
-          {/* Verification Status */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5 text-green-500" />
@@ -208,7 +208,7 @@ export function HostProfile({ user }) {
             </div>
           </div>
 
-          {/* Host Stats */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Host Performance</h3>
             <div className="space-y-3">
@@ -231,7 +231,7 @@ export function HostProfile({ user }) {
             </div>
           </div>
 
-          {/* Badges */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Host Badges</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -254,7 +254,7 @@ export function HostProfile({ user }) {
             </div>
           </div>
 
-          {/* Help */}
+          
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <h4 className="mb-3">Need Help?</h4>
             <p className="text-sm text-gray-700 mb-3">

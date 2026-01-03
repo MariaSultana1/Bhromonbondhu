@@ -93,7 +93,7 @@ export function TravelAI() {
         <p>Powered by artificial intelligence to plan your perfect journey</p>
       </div>
 
-      {/* Tool Selection */}
+     
       <div className="grid md:grid-cols-3 gap-4">
         <button
           onClick={() => setActiveTool('mood')}
@@ -133,7 +133,7 @@ export function TravelAI() {
         </button>
       </div>
 
-      {/* Tool Content */}
+  
       <div className="bg-white rounded-xl p-6 shadow-sm">
         {activeTool === 'mood' && (
           <div className="space-y-6">
@@ -235,7 +235,7 @@ export function TravelAI() {
               </button>
             </div>
 
-            {/* Sample Itinerary */}
+   
             <div className="border-t pt-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -301,7 +301,6 @@ export function TravelAI() {
               </button>
             </div>
 
-            {/* Risk Analysis Results */}
             <div className="border-t pt-6">
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">

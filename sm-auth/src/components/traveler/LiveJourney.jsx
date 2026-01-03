@@ -53,22 +53,21 @@ export function LiveJourney() {
 
   const handleSOS = () => {
     setSosActive(true);
-    // In a real app, this would trigger emergency protocols
     alert('SOS Activated! Emergency contacts have been notified and your location is being shared.');
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+    
       <div>
         <h2 className="text-2xl mb-2">Live Journey</h2>
         <p className="text-gray-600">Track your trip in real-time</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Current Journey Status */}
+        
           <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -95,11 +94,11 @@ export function LiveJourney() {
             </div>
           </div>
 
-          {/* Map Placeholder */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Real-Time Location</h3>
             <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '400px' }}>
-              {/* Mock map */}
+              
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <MapPin className="w-12 h-12 text-blue-500 mx-auto mb-2" />
@@ -107,7 +106,7 @@ export function LiveJourney() {
                   <p className="text-sm text-gray-500">Showing route from Dhaka to Cox's Bazar</p>
                 </div>
               </div>
-              {/* Mock route markers */}
+              
               <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3">
                 <div className="flex items-center gap-2 text-sm">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
@@ -131,7 +130,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          {/* Journey Timeline */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Journey Timeline</h3>
             <div className="space-y-4">
@@ -171,7 +170,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          {/* AI Challenges */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -226,9 +225,9 @@ export function LiveJourney() {
           </div>
         </div>
 
-        {/* Sidebar */}
+       
         <div className="space-y-6">
-          {/* SOS Button */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4 text-center">Emergency SOS</h3>
             <button
@@ -259,7 +258,7 @@ export function LiveJourney() {
             </p>
           </div>
 
-          {/* Emergency Contacts */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Phone className="w-5 h-5 text-blue-500" />
@@ -279,7 +278,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          {/* Device Status */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Device Status</h3>
             <div className="space-y-3">
@@ -307,7 +306,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          {/* Quick Actions */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Quick Actions</h3>
             <div className="space-y-2">

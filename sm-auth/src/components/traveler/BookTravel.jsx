@@ -132,14 +132,14 @@ export function BookTravel() {
     languages: []
   });
 
-  // Booking modal states
+  
   const [showHostModal, setShowHostModal] = useState(false);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedHost, setSelectedHost] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
 
-  // Host booking form
+  
   const [hostBookingForm, setHostBookingForm] = useState({
     checkIn: '',
     checkOut: '',
@@ -147,7 +147,7 @@ export function BookTravel() {
     selectedServices: []
   });
 
-  // Ticket booking form
+  
   const [ticketBookingForm, setTicketBookingForm] = useState({
     date: '',
     passengers: 1,
@@ -253,13 +253,13 @@ export function BookTravel() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <h2 className="text-3xl mb-2">Discover Bangladesh</h2>
         <p className="text-blue-100">Book authentic experiences with verified local hosts and convenient travel tickets</p>
       </div>
 
-      {/* Booking Type Toggle */}
+      
       <div className="bg-white rounded-xl shadow-sm p-2 inline-flex gap-2">
         <button
           onClick={() => setBookingType('hosts')}
@@ -327,7 +327,6 @@ export function BookTravel() {
         </div>
       )}
 
-      {/* Search and Filters */}
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -350,7 +349,7 @@ export function BookTravel() {
         </button>
       </div>
 
-      {/* Filters Panel */}
+     
       {showFilters && bookingType === 'hosts' && (
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
           <div className="grid md:grid-cols-3 gap-6">
@@ -391,7 +390,7 @@ export function BookTravel() {
         </div>
       )}
 
-      {/* Results */}
+      
       <div className="space-y-4">
         {bookingType === 'hosts' ? (
           <>
@@ -520,7 +519,7 @@ export function BookTravel() {
         )}
       </div>
 
-      {/* Booking Info */}
+     
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -536,7 +535,7 @@ export function BookTravel() {
         </div>
       </div>
 
-      {/* Host Booking Modal */}
+      
       {showHostModal && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
@@ -573,7 +572,7 @@ export function BookTravel() {
                   </div>
                 </div>
 
-                {/* Booking Form */}
+             
                 <div>
                   <label className="block text-sm mb-3 text-gray-700">Select Your Dates</label>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -651,7 +650,6 @@ export function BookTravel() {
                   </div>
                 </div>
 
-                {/* Price Summary */}
                 <div className="border-t-2 border-gray-200 pt-6">
                   <h4 className="mb-4">Price Breakdown</h4>
                   <div className="space-y-3 mb-5">
@@ -685,7 +683,7 @@ export function BookTravel() {
         </div>
       )}
 
-      {/* Ticket Booking Modal */}
+     
       {showTicketModal && selectedTicket && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
@@ -701,7 +699,7 @@ export function BookTravel() {
 
             <div className="overflow-y-auto max-h-[calc(90vh-88px)]">
               <div className="p-6 space-y-6">
-                {/* Ticket Info */}
+               
                 <div className="p-5 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -743,7 +741,7 @@ export function BookTravel() {
                   </div>
                 </div>
 
-                {/* Booking Form */}
+                
                 <div>
                   <label className="block text-sm mb-3 text-gray-700">Travel Date</label>
                   <div className="relative">
@@ -815,7 +813,7 @@ export function BookTravel() {
                   </div>
                 )}
 
-                {/* Price Summary */}
+                
                 <div className="border-t-2 border-gray-200 pt-6">
                   <h4 className="mb-4">Price Breakdown</h4>
                   <div className="space-y-3 mb-5">
@@ -849,7 +847,7 @@ export function BookTravel() {
         </div>
       )}
 
-      {/* Confirmation Toast */}
+      
       {showConfirmation && (
         <div className="fixed bottom-8 right-8 bg-white border-2 border-green-200 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-50 animate-slide-up max-w-md">
           <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">

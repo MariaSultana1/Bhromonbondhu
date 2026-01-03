@@ -6,7 +6,7 @@ import { AllReviews } from './AllReviews';
 export function HostDashboardWrapper({ user, activeTab }) {
   const [view, setView] = useState('home');
 
-  // Reset view when tab changes
+  
   if (activeTab !== 'home' && view !== 'home') {
     setView('home');
   }

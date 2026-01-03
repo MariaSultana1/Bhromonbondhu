@@ -63,7 +63,7 @@ export function AllBookings({ onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -76,7 +76,6 @@ export function AllBookings({ onBack }) {
         <p className="text-blue-100">Manage your guest bookings</p>
       </div>
 
-      {/* Bookings List */}
       <div className="space-y-4">
         {allBookings.map((booking) => (
           <div key={booking.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
@@ -194,7 +193,7 @@ export function AllBookings({ onBack }) {
         ))}
       </div>
 
-      {/* View Details Modal */}
+      
       {selectedBooking && !showReceipt && !showReviewRequest && !showModify && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -275,7 +274,7 @@ export function AllBookings({ onBack }) {
         </div>
       )}
 
-      {/* View Receipt Modal */}
+      
       {showReceipt && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
@@ -349,7 +348,7 @@ export function AllBookings({ onBack }) {
         </div>
       )}
 
-      {/* Review Request Modal */}
+      
       {showReviewRequest && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -382,7 +381,7 @@ export function AllBookings({ onBack }) {
         </div>
       )}
 
-      {/* Modify Booking Modal */}
+      
       {showModify && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">

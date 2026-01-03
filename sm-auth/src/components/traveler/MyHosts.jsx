@@ -56,7 +56,7 @@ export function MyHosts() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -74,7 +74,7 @@ export function MyHosts() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
+  
       <div className="bg-white rounded-xl shadow-sm p-2 inline-flex gap-2">
         <button
           onClick={() => setActiveTab('hosts')}
@@ -114,7 +114,7 @@ export function MyHosts() {
         </button>
       </div>
 
-      {/* Host Bookings */}
+
       {activeTab === 'hosts' && (
         <div className="space-y-4">
           {hostBookings.length === 0 ? (
@@ -249,7 +249,7 @@ export function MyHosts() {
         </div>
       )}
 
-      {/* Ticket Bookings */}
+
       {activeTab === 'tickets' && (
         <div className="space-y-4">
           {ticketBookings.length === 0 ? (
@@ -365,7 +365,7 @@ export function MyHosts() {
         </div>
       )}
 
-      {/* Info Box */}
+      
       {(hostBookings.length > 0 || ticketBookings.length > 0) && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
           <div className="flex items-start gap-4">

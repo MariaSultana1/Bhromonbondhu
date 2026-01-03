@@ -91,7 +91,7 @@ export function Wishlist({ onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="bg-gradient-to-r from-red-600 to-pink-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -115,7 +115,7 @@ export function Wishlist({ onBack }) {
         </div>
       </div>
 
-      {/* Stats */}
+ 
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-3">
@@ -158,7 +158,7 @@ export function Wishlist({ onBack }) {
         </div>
       </div>
 
-      {/* Wishlist Grid */}
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map((item) => (
           <div key={item.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group">
@@ -255,7 +255,6 @@ export function Wishlist({ onBack }) {
         </div>
       )}
 
-      {/* Trip Planning Helper */}
       {items.length > 0 && (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
           <h4 className="text-blue-900 mb-3">Trip Planning Helper</h4>
@@ -279,7 +278,7 @@ export function Wishlist({ onBack }) {
         </div>
       )}
 
-      {/* Add Modal */}
+ 
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl">

@@ -80,7 +80,7 @@ export function AllTrips({ onBack }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrip, setSelectedTrip] = useState(null);
 
-  // Enhanced trip data with default values for TripDetails
+ 
  const enhancedTrips = allTrips.map(trip => ({
   ...trip,
   bookingId: `BK202400${trip.id}`,
@@ -107,7 +107,7 @@ export function AllTrips({ onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -120,7 +120,7 @@ export function AllTrips({ onBack }) {
         <p className="text-blue-100">Your complete travel history</p>
       </div>
 
-      {/* Filters */}
+     
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
@@ -151,7 +151,7 @@ export function AllTrips({ onBack }) {
         </div>
       </div>
 
-      {/* Trips Grid */}
+      
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrips.map((trip) => (
           <div key={trip.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">

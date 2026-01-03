@@ -103,7 +103,7 @@ export function Community({ onBack }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -117,9 +117,9 @@ export function Community({ onBack }) {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Feed */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Create Post */}
+          
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex gap-3">
               <img
@@ -149,7 +149,7 @@ export function Community({ onBack }) {
             </div>
           </div>
 
-          {/* Posts */}
+          
           {posts.map((post) => (
             <div key={post.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
               <div className="p-6">
@@ -205,9 +205,9 @@ export function Community({ onBack }) {
           ))}
         </div>
 
-        {/* Sidebar */}
+        
         <div className="space-y-6">
-          {/* Trending Topics */}
+          
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-green-500" />
@@ -229,7 +229,7 @@ export function Community({ onBack }) {
             </div>
           </div>
 
-          {/* Community Guidelines */}
+          
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-100 rounded-2xl p-6">
             <h4 className="text-green-900 mb-3">Community Guidelines</h4>
             <ul className="space-y-2 text-sm text-green-800">
@@ -252,7 +252,7 @@ export function Community({ onBack }) {
             </ul>
           </div>
 
-          {/* Suggested Travelers */}
+         
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="mb-4">Suggested Travelers</h3>
             <div className="space-y-3">

@@ -1,60 +1,3 @@
-
-// import { useState, useEffect } from 'react';
-// import TravelerDashboard from './components/TravelerDashboard';
-// import AuthPage from './components/AuthPage';
-// import HostDashboard from './components/HostDashboard';
-// import { AdminDashboard } from './components/AdminDashboard';
-
-// function App() {
-//   const [currentUser, setCurrentUser] = useState(null);
-//   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-//   useEffect(() => {
-    
-//     const storedUser = localStorage.getItem('bhromonbondhu_user');
-//     if (storedUser) {
-//       const user = JSON.parse(storedUser);
-//       setCurrentUser(user);
-//       setIsAuthenticated(true);
-//     }
-//   }, []);
-
-//   const handleLogin = (user) => {
-//     setCurrentUser(user);
-//     setIsAuthenticated(true);
-//     localStorage.setItem('bhromonbondhu_user', JSON.stringify(user));
-//   };
-
-//   const handleLogout = () => {
-//     setCurrentUser(null);
-//     setIsAuthenticated(false);
-//     localStorage.removeItem('bhromonbondhu_user');
-//   };
-
-//   if (!isAuthenticated || !currentUser) {
-//     return <AuthPage onLogin={handleLogin} />;
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-gray-50">
-//       {currentUser.type === 'traveler' && (
-//         <TravelerDashboard user={currentUser} onLogout={handleLogout} />
-//       )}
-//       {currentUser.type === 'host' && (
-//         <HostDashboard user={currentUser} onLogout={handleLogout} />
-//       )}
-//       {currentUser.type === 'admin' && (
-//         <AdminDashboard user={currentUser} onLogout={handleLogout} />
-//       )}
-//     </div>
-//   );
-// }
-
-// export default App;
-
-
-
-
 import { useState, useEffect } from 'react';
 import TravelerDashboard from './components/TravelerDashboard';
 import AuthPage from './components/AuthPage';
@@ -91,13 +34,13 @@ function App() {
     let user;
     switch (type) {
       case "traveler":
-        user = { type: "traveler", name: "Demo Traveler" };
+        user = { type: "traveler", name: "Traveler_Name" };
         break;
       case "host":
-        user = { type: "host", name: "Demo Host" };
+        user = { type: "host", name: "Host_Name" };
         break;
       case "admin":
-        user = { type: "admin", name: "Demo Admin" };
+        user = { type: "admin", name: "Admin_Name" };
         break;
       default:
         return;
@@ -106,9 +49,9 @@ function App() {
   };
 
   const demoButtons = [
-    { id: "traveler", label: "TravelerDashboard", top: "900px" },
-    { id: "host", label: "HostDashboard", top: "950px" },
-    { id: "admin", label: "AdminDashboard", top: "1000px" },
+    { id: "traveler", label: "TravelerDashboard", top: "1050px" },
+    { id: "host", label: "HostDashboard", top: "1100px" },
+    { id: "admin", label: "AdminDashboard", top: "1150px" },
   ];
 
  

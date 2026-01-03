@@ -132,16 +132,13 @@ export function TravelerHomeComplete({ user }) {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-6 text-white">
         <h2 className="text-2xl mb-2">Welcome back, {user.name}! 👋</h2>
         <p>Ready for your next adventure?</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Smart Calendar */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -211,7 +208,6 @@ export function TravelerHomeComplete({ user }) {
             </div>
           </section>
 
-          {/* Magic Memory Album */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -242,7 +238,6 @@ export function TravelerHomeComplete({ user }) {
             </div>
           </section>
 
-          {/* Community Posts */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>Community</h3>
@@ -285,9 +280,7 @@ export function TravelerHomeComplete({ user }) {
           </section>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Stats */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Your Stats</h3>
             <div className="space-y-3">
@@ -310,7 +303,6 @@ export function TravelerHomeComplete({ user }) {
             </div>
           </section>
 
-          {/* Wishlist */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -342,7 +334,6 @@ export function TravelerHomeComplete({ user }) {
             </button>
           </section>
 
-          {/* Trending Destinations */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-green-500" />
@@ -384,7 +375,6 @@ export function TravelerHomeComplete({ user }) {
         </div>
       </div>
 
-      {/* Trip Details Modal */}
       {showTripDetails && selectedTrip && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -420,7 +410,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               </div>
 
-              {/* Booking Info */}
               <div className="grid md:grid-cols-2 gap-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                 <div>
                   <div className="text-sm text-gray-600 mb-1">Booking ID</div>
@@ -435,7 +424,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               </div>
 
-              {/* Check-in/out Details */}
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="p-4 border-2 border-gray-200 rounded-xl">
                   <div className="text-sm text-gray-600 mb-1">Check-in</div>
@@ -454,7 +442,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               </div>
 
-              {/* Host Information */}
               {selectedTrip.host !== 'Pending' && (
                 <div className="p-4 border-2 border-gray-200 rounded-xl">
                   <h3 className="mb-3">Host Information</h3>
@@ -484,7 +471,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               )}
 
-              {/* Services Included */}
               <div>
                 <h3 className="mb-3">Services Included</h3>
                 <div className="flex flex-wrap gap-2">
@@ -497,7 +483,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               </div>
 
-              {/* Price Breakdown */}
               <div className="p-4 bg-gray-50 rounded-xl">
                 <h3 className="mb-3">Price Breakdown</h3>
                 <div className="space-y-2 text-sm">
@@ -520,7 +505,6 @@ export function TravelerHomeComplete({ user }) {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 {selectedTrip.status === 'confirmed' && (
                   <>
@@ -557,7 +541,6 @@ export function TravelerHomeComplete({ user }) {
         </div>
       )}
 
-      {/* Modify Booking Modal */}
       {showModifyBooking && selectedTrip && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -620,7 +603,6 @@ export function TravelerHomeComplete({ user }) {
         </div>
       )}
 
-      {/* Cancel Booking Modal */}
       {showCancelBooking && selectedTrip && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -676,7 +658,6 @@ export function TravelerHomeComplete({ user }) {
         </div>
       )}
 
-      {/* Contact Host Modal */}
       {showContactHost && selectedTrip && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">

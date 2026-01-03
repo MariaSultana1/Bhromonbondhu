@@ -37,7 +37,7 @@ const SignUpas = ({ selectTraveller, selectHost, goLogin }) => {
 
   return (
     <main className="bg-[#e9ffd9] w-full min-h-screen relative overflow-x-hidden">
-      {/* Background image */}
+
       <img
         className="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"
         alt="Decorative background"
@@ -45,12 +45,12 @@ const SignUpas = ({ selectTraveller, selectHost, goLogin }) => {
         aria-hidden="true"
       />
 
-      {/* Heading */}
+
       <h1 className="absolute top-[100px] left-[301px] sm:left-[45%] sm:-translate-x-1/2 text-[64px] font-serif text-black whitespace-nowrap">
         Sign up as
       </h1>
 
-      {/* Options */}
+
       <div className="absolute top-[230px] left-[469px] sm:left-[50%] sm:-translate-x-1/2 w-[455px] flex flex-col gap-[44px] sm:flex-col">
         {userTypeOptions.map((option, index) => (
           <div key={option.id} className="relative">
@@ -98,7 +98,7 @@ const SignUpas = ({ selectTraveller, selectHost, goLogin }) => {
         ))}
       </div>
 
-      {/* Login link */}
+     
       <p className="absolute top-[580px] left-[400px] sm:left-[49%] sm:-translate-x-1/2 text-center text-lg">
         Already have an account?{" "}
         <button onClick={goLogin} className="text-[#047ba3] underline">
