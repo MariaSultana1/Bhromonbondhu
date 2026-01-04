@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 
 const Login = ({ goSignupAs }) => {
-  const [username, setUsername] = useState("Mim");
-  const [password, setPassword] = useState("ab1234");
+  const [username, setUsername] = useState(" ");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
  
