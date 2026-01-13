@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, Navigation, AlertCircle, Phone, Trophy, Camera, MessageCircle, Clock, Battery, Wifi } from 'lucide-react';
+import { MapPin, Navigation, AlertCircle, Phone, Trophy, Camera, MessageCircle, Clock, Battery, Wifi, X, Send, Image, MapPinned } from 'lucide-react';
 
 const currentJourney = {
   destination: 'Cox\'s Bazar',
@@ -50,24 +50,27 @@ const aiChallenges = [
 export function LiveJourney() {
   const [sosActive, setSosActive] = useState(false);
   const [showChallenges, setShowChallenges] = useState(false);
+  const [showMessageHost, setShowMessageHost] = useState(false);
+  const [showShareUpdate, setShowShareUpdate] = useState(false);
 
   const handleSOS = () => {
     setSosActive(true);
+    // In a real app, this would trigger emergency protocols
     alert('SOS Activated! Emergency contacts have been notified and your location is being shared.');
   };
 
   return (
     <div className="space-y-6">
-    
+      {/* Header */}
       <div>
         <h2 className="text-2xl mb-2">Live Journey</h2>
         <p className="text-gray-600">Track your trip in real-time</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        
+        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-        
+          {/* Current Journey Status */}
           <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -94,11 +97,11 @@ export function LiveJourney() {
             </div>
           </div>
 
-          
+          {/* Map Placeholder */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Real-Time Location</h3>
             <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ height: '400px' }}>
-              
+              {/* Mock map */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <MapPin className="w-12 h-12 text-blue-500 mx-auto mb-2" />
@@ -106,7 +109,7 @@ export function LiveJourney() {
                   <p className="text-sm text-gray-500">Showing route from Dhaka to Cox's Bazar</p>
                 </div>
               </div>
-              
+              {/* Mock route markers */}
               <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3">
                 <div className="flex items-center gap-2 text-sm">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
@@ -130,7 +133,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-         
+          {/* Journey Timeline */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Journey Timeline</h3>
             <div className="space-y-4">
@@ -170,7 +173,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          
+          {/* AI Challenges */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -225,9 +228,9 @@ export function LiveJourney() {
           </div>
         </div>
 
-       
+        {/* Sidebar */}
         <div className="space-y-6">
-         
+          {/* SOS Button */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4 text-center">Emergency SOS</h3>
             <button
@@ -258,7 +261,7 @@ export function LiveJourney() {
             </p>
           </div>
 
-         
+          {/* Emergency Contacts */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Phone className="w-5 h-5 text-blue-500" />
@@ -278,7 +281,7 @@ export function LiveJourney() {
             </div>
           </div>
 
-          
+          {/* Device Status */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Device Status</h3>
             <div className="space-y-3">
@@ -306,15 +309,21 @@ export function LiveJourney() {
             </div>
           </div>
 
-         
+          {/* Quick Actions */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
+              <button
+                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+                onClick={() => setShowMessageHost(!showMessageHost)}
+              >
                 <MessageCircle className="w-4 h-4" />
                 Message Host
               </button>
-              <button className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
+              <button
+                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
+                onClick={() => setShowShareUpdate(!showShareUpdate)}
+              >
                 <Camera className="w-4 h-4" />
                 Share Update
               </button>
@@ -322,6 +331,167 @@ export function LiveJourney() {
           </div>
         </div>
       </div>
+
+      {/* Message Host Modal */}
+      {showMessageHost && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl mb-1">Message {currentJourney.host}</h3>
+                <p className="text-blue-100 text-sm">Send an update to your host</p>
+              </div>
+              <button onClick={() => setShowMessageHost(false)} className="p-2 hover:bg-white/20 rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Host Info */}
+              <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <div className="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center">
+                  {currentJourney.host.charAt(0)}
+                </div>
+                <div>
+                  <div className="mb-1">{currentJourney.host}</div>
+                  <div className="text-sm text-gray-600">{currentJourney.destination}</div>
+                </div>
+              </div>
+
+              {/* Quick Messages */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Quick Messages</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-left">
+                    ✅ I'm on my way
+                  </button>
+                  <button className="p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-left">
+                    🚗 Slight delay
+                  </button>
+                  <button className="p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-left">
+                    📍 Just passed checkpoint
+                  </button>
+                  <button className="p-3 border-2 border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-left">
+                    ⏰ Arriving soon
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Message */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Custom Message</label>
+                <textarea
+                  placeholder="Type your message here..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={4}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowMessageHost(false)}
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMessageHost(false);
+                    alert('Message sent to ' + currentJourney.host);
+                  }}
+                  className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Update Modal */}
+      {showShareUpdate && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl mb-1">Share Journey Update</h3>
+                <p className="text-purple-100 text-sm">Share your experience with others</p>
+              </div>
+              <button onClick={() => setShowShareUpdate(false)} className="p-2 hover:bg-white/20 rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Current Location */}
+              <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPinned className="w-5 h-5 text-purple-600" />
+                  <span className="text-sm">Current Location</span>
+                </div>
+                <div className="text-purple-900">Chittagong, Bangladesh</div>
+                <div className="text-sm text-purple-700 mt-1">{currentJourney.progress}% of journey complete</div>
+              </div>
+
+              {/* Upload Photo */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Add Photos (Optional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 cursor-pointer">
+                  <Image className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-1">Click to upload photos</p>
+                  <p className="text-xs text-gray-500">JPG, PNG up to 10MB</p>
+                </div>
+              </div>
+
+              {/* Update Text */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">What's happening?</label>
+                <textarea
+                  placeholder="Share your journey experience..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  rows={4}
+                />
+              </div>
+
+              {/* Visibility */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Share with</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="visibility" defaultChecked className="w-4 h-4" />
+                    <span className="text-sm">Host Only</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="visibility" className="w-4 h-4" />
+                    <span className="text-sm">Public</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowShareUpdate(false)}
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowShareUpdate(false);
+                    alert('Update shared successfully!');
+                  }}
+                  className="flex-1 py-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 flex items-center justify-center gap-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  Share Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
