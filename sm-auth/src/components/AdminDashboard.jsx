@@ -1,18 +1,8 @@
 import { useState } from 'react';
-import { User } from '../App';
-import { 
-  Users, Calendar, DollarSign, AlertTriangle, LogOut, Bell, Menu, X, TrendingUp, Shield
-} from 'lucide-react';
+import { Users, Calendar, DollarSign, AlertTriangle, LogOut, Bell, Menu, X, TrendingUp, Shield} from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AllUsers } from './admin/AllUsers';
 import { AllDisputes } from './admin/AllDisputes';
-
-interface AdminDashboardProps {
-  user: User;
-  onLogout: () => void;
-}
-
-type ViewType = 'dashboard' | 'allUsers' | 'allDisputes';
 
 const platformStats = {
   totalUsers: 1248,
@@ -53,7 +43,7 @@ const disputes = [
   { id: 2, booking: 'B-1235', traveler: 'Mehedi Hassan', host: 'Shahana Begum', issue: 'Payment issue', status: 'resolved' }
 ];
 
-export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
+export function AdminDashboard({ user, onLogout }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [view, setView] = useState('dashboard');
 
@@ -140,11 +130,6 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
-                <img
-        className="fixed top-[18px] left-[100px] w-[27px] h-[27px] aspect-[1] object-cover"
-        alt="Image"
-        src="./images/image 5_white.png"
-      />
               <div>
                 <h1 className="text-xl">ভ্রমণবন্ধু</h1>
                 <p className="text-xs text-purple-600">Admin Dashboard</p>
@@ -160,10 +145,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               </button>
               <div className="flex items-center gap-2">
                 <img
-                  
-                  src="./images/Ellipse 21.png"
+                  src={user.avatar || './images/Ellipse 21.png'}
                   alt={user.name}
-                  className="w-8 h-8 rounded-full"
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { e.target.src = './images/Ellipse 21.png'; }}
                 />
                 <span className="hidden sm:inline text-sm">{user.name}</span>
               </div>
