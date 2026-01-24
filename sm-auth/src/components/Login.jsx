@@ -7,19 +7,37 @@ const Login = ({ goSignupAs }) => {
 
  
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    console.log("Login attempted with:", { username, password });
-  };
+const handleLogin = async (e) => {
+  e.preventDefault();
 
-  const handleGoogleLogin = () => {
-    console.log("Google login attempted");
-  };
+  try {
+    const res = await fetch("http://localhost/backend/login.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    });
 
-  const handleDemoLogin = (role) => {
-    console.log(`Demo login as ${role}`);
-   
-  };
+    const data = await res.json();
+
+    if (data.status === "success") {
+      alert("Login successful 🎉");
+      // navigate dashboard
+    } else if (data.status === "wrong_password") {
+      alert("Wrong password ❌");
+    } else {
+      alert("User not found ❌");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Server error");
+  }
+};
+
 
   return (
     <div className="bg-[#e1f3f7] overflow-hidden w-full min-w-[1440px] min-h-[1603px] relative">
