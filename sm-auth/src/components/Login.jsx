@@ -7,8 +7,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     setError("");
 
     if (!username.trim() || !password.trim()) {
@@ -30,13 +29,11 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Store token and user data in localStorage
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         
         console.log("✅ Login successful:", data.user);
         
-        // Call success callback to navigate to dashboard
         if (onLoginSuccess) {
           onLoginSuccess(data.user);
         }
@@ -53,7 +50,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !isLoading) {
-      handleLogin(e);
+      handleLogin();
     }
   };
 
@@ -74,7 +71,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
 
       <button
         type="button"
-        onClick={goSignupAs}
+        onClick={() => goSignupAs && goSignupAs()}
         className="absolute top-[262px] left-[1187px] w-[98px] h-[29px] bg-[#d9d9d9] rounded-xl hover:bg-[#c9c9c9] transition-colors disabled:opacity-50"
         disabled={isLoading}
       >
@@ -88,7 +85,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         </p>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm text-center animate-shake">
+          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm text-center">
             {error}
           </div>
         )}
@@ -101,7 +98,6 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
             onKeyPress={handleKeyPress}
             placeholder="Username or Email"
             className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-            required
             disabled={isLoading}
             autoComplete="username"
           />
@@ -114,7 +110,6 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
               onKeyPress={handleKeyPress}
               placeholder="Password"
               className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-              required
               disabled={isLoading}
               autoComplete="current-password"
             />
@@ -123,7 +118,6 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute top-[10px] right-[12px] w-[25px] h-[25px] hover:opacity-70 transition-opacity disabled:opacity-30"
               disabled={isLoading}
-              tabIndex={-1}
             >
               <img src="/images/image 238.png" alt="toggle password visibility" />
             </button>
@@ -133,7 +127,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
             Don't have any account yet?{" "}
             <button 
               type="button" 
-              onClick={goSignupAs} 
+              onClick={() => goSignupAs && goSignupAs()} 
               className="text-[#047ba3] underline hover:text-[#035a7a] transition-colors disabled:opacity-50"
               disabled={isLoading}
             >
@@ -142,8 +136,8 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
           </p>
 
           <button
-            type="submit"
-            onClick={handleLogin}
+            type="button"
+            onClick={() => handleLogin()}
             className="w-full h-9 bg-[#82c98f] rounded-[20px] text-white hover:bg-[#72b97f] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center"
             disabled={isLoading}
           >
