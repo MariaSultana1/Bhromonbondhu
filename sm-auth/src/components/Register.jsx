@@ -1,6 +1,16 @@
 import React, { useState } from "react";
 
 const Register = ({ userType, goLogin, onRegisterSuccess }) => {
+  // Debug props on mount
+  React.useEffect(() => {
+    console.log("🔍 Register component mounted with props:");
+    console.log("- userType:", userType);
+    console.log("- userType type:", typeof userType);
+    if (userType && typeof userType === 'object') {
+      console.log("- userType keys:", Object.keys(userType));
+    }
+  }, [userType]);
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -14,6 +24,9 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const validateForm = () => {
+    // Clear previous errors
+    setError("");
+
     if (!formData.fullName.trim()) {
       setError("Please enter your full name");
       return false;
@@ -46,29 +59,54 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
   };
 
   const handleSubmit = async () => {
-    setError("");
-
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
+    setError("");
 
     try {
-      // Generate username from email (part before @)
+      // Generate username from email
       const username = formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // Create clean request body
+      // Handle userType safely
+      let safeRole = "tourist"; // Default role
+      
+      // Debug userType
+      console.log("🔍 Processing userType:", userType);
+      
+      if (userType) {
+        if (typeof userType === 'string') {
+          safeRole = userType.toLowerCase();
+        } else if (typeof userType === 'object' && userType !== null) {
+          // Extract role from object properties
+          if (userType.role && typeof userType.role === 'string') {
+            safeRole = userType.role.toLowerCase();
+          } else if (userType.type && typeof userType.type === 'string') {
+            safeRole = userType.type.toLowerCase();
+          } else if (userType.userType && typeof userType.userType === 'string') {
+            safeRole = userType.userType.toLowerCase();
+          } else {
+            // If it's an object but we can't extract role, use default
+            console.warn("⚠️ Could not extract role from userType object, using 'tourist'");
+          }
+        }
+      }
+      
+      console.log("✅ Final role being used:", safeRole);
+
+      // Create clean request body with only string values
       const payload = {
-        username: username,
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-        password: formData.password,
-        role: userType || "tourist",
+        username: String(username),
+        fullName: String(formData.fullName.trim()),
+        email: String(formData.email.trim().toLowerCase()),
+        phone: String(formData.phone.trim()),
+        password: String(formData.password),
+        role: String(safeRole),
       };
 
-      console.log("📤 Sending registration request");
+      console.log("📤 Sending registration request:", payload);
 
       const response = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
@@ -78,27 +116,61 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      // Parse response
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error("❌ Failed to parse response as JSON");
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
 
-      console.log("📥 Registration response:", data);
+      console.log("📥 Server response:", responseData);
 
-      if (response.ok && data.success) {
-        // Store token and user data in localStorage
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+      if (response.ok) {
+        if (responseData.success) {
+          // Store user data
+          if (responseData.token) {
+            localStorage.setItem("token", responseData.token);
+          }
+          if (responseData.user) {
+            localStorage.setItem("user", JSON.stringify(responseData.user));
+          }
 
-        console.log("✅ Registration successful:", data.user);
-
-        // Call success callback to navigate to dashboard
-        if (onRegisterSuccess) {
-          onRegisterSuccess(data.user);
+          console.log("✅ Registration successful!");
+          
+          // Show success message
+          setError(""); // Clear any errors
+          
+          // Call success callback after a short delay
+          if (onRegisterSuccess) {
+            setTimeout(() => {
+              onRegisterSuccess(responseData.user);
+            }, 1000);
+          }
+        } else {
+          // Server returned success: false
+          setError(responseData.message || "Registration failed on server.");
         }
       } else {
-        setError(data.message || "Registration failed. Please try again.");
+        // HTTP error (400, 500, etc.)
+        setError(responseData.message || `Server error: ${response.status}`);
+        console.error("❌ Server error response:", responseData);
       }
     } catch (err) {
-      setError("Unable to connect to server. Please check your connection.");
-      console.error("❌ Registration error:", err);
+      // Network or other errors
+      const errorMessage = err.message || "Network error";
+      
+      if (errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
+        setError("Cannot connect to server. Please check your internet connection and ensure the backend is running.");
+        console.error("🌐 Network error - Is backend running on http://localhost:5000?");
+      } else if (errorMessage.includes("500")) {
+        setError("Server error. Please try again later or contact support.");
+      } else {
+        setError(`Error: ${errorMessage}`);
+      }
+      
+      console.error("❌ Registration error:", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +232,7 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
         </p>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm text-center">
+          <div className={`mt-4 p-3 rounded-lg text-sm text-center ${error.includes("successful") ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'}`}>
             {error}
           </div>
         )}
@@ -171,9 +243,10 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             value={formData.fullName}
             onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
             className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-            placeholder="Full Name"
+            placeholder="Full Name *"
             disabled={isLoading}
             autoComplete="name"
+            required
           />
           
           <input
@@ -181,9 +254,10 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-            placeholder="Email"
+            placeholder="Email *"
             disabled={isLoading}
             autoComplete="email"
+            required
           />
           
           <input
@@ -202,15 +276,18 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-              placeholder="Password (min 6 characters)"
+              placeholder="Password (min 6 characters) *"
               disabled={isLoading}
               autoComplete="new-password"
+              required
+              minLength={6}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute top-[10px] right-[12px] w-[25px] h-[25px] hover:opacity-70 transition-opacity disabled:opacity-30"
               disabled={isLoading}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               <img src="/images/image 238.png" alt="toggle password visibility" />
             </button>
@@ -222,15 +299,17 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-              placeholder="Confirm Password"
+              placeholder="Confirm Password *"
               disabled={isLoading}
               autoComplete="new-password"
+              required
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute top-[10px] right-[12px] w-[25px] h-[25px] hover:opacity-70 transition-opacity disabled:opacity-30"
               disabled={isLoading}
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               <img src="/images/image 238.png" alt="toggle password visibility" />
             </button>
@@ -238,22 +317,37 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
 
           <button
             type="button"
-            onClick={() => handleSubmit()}
-            className="w-full h-9 bg-[#82c98f] rounded-[20px] text-white hover:bg-[#72b97f] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+            onClick={handleSubmit}
+            className="w-full h-12 bg-[#82c98f] rounded-xl text-white hover:bg-[#72b97f] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
             disabled={isLoading}
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating Account...
+              </span>
+            ) : (
+              "Create Account"
+            )}
           </button>
 
-          <p className="text-sm text-center">
+          <p className="text-sm text-center mt-4">
             Already have an account?{" "}
             <span
-              onClick={() => goLogin && goLogin()}
-              className="text-[#047ba3] underline cursor-pointer hover:text-[#035a7a] transition-colors"
+              onClick={() => !isLoading && goLogin && goLogin()}
+              className={`text-[#047ba3] underline cursor-pointer hover:text-[#035a7a] transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               Login now!
             </span>
           </p>
+          
+          <div className="text-xs text-gray-500 text-center mt-4">
+            <p>Fields marked with * are required</p>
+            <p className="mt-1">Default role: Tourist</p>
+          </div>
         </div>
       </main>
     </div>
