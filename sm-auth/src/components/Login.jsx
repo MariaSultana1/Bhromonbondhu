@@ -53,7 +53,6 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
       handleLogin();
     }
   };
-
   return (
     <div className="bg-[#e1f3f7] overflow-hidden w-full min-w-[1440px] min-h-[1603px] relative">
       <header className="absolute top-0 left-0 w-full h-[97px] bg-[#cde5f9] border backdrop-blur">
