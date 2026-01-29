@@ -32,7 +32,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         
-        console.log("✅ Login successful:", data.user);
+        console.log(" Login successful:", data.user);
         
         if (onLoginSuccess) {
           onLoginSuccess(data.user);
@@ -42,7 +42,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
       }
     } catch (err) {
       setError("Unable to connect to server. Please check your connection.");
-      console.error("❌ Login error:", err);
+      console.error(" Login error:", err);
     } finally {
       setIsLoading(false);
     }

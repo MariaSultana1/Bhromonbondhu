@@ -1,15 +1,18 @@
-// App.js - Main Application with Role-Based Routing
+// App.js - Updated with SignUpas page
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
+import SignUpas from './components/SignUpas'; // ADD THIS
 import Register from './components/Register';
+import HomePage from './components/HomePage';
 import TravelerDashboard from './components/TravelerDashboard';
 import HostDashboard from './components/HostDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 
 function App() {
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'register', 'dashboard'
+  // Add 'signupas' to the possible views
+  const [currentView, setCurrentView] = useState('home'); // 'home', 'signupas', 'login', 'register', 'dashboard'
   const [user, setUser] = useState(null);
-  const [userType, setUserType] = useState('tourist'); // For registration: 'tourist', 'guide', 'host', 'admin'
+  const [userType, setUserType] = useState('tourist'); // Default type
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if user is already logged in on app mount
@@ -20,7 +23,6 @@ function App() {
 
       if (token && storedUser) {
         try {
-          // Verify token with backend
           const response = await fetch('http://localhost:5000/api/auth/me', {
             method: 'GET',
             headers: {
@@ -34,13 +36,10 @@ function App() {
             if (data.success) {
               setUser(data.user);
               setCurrentView('dashboard');
-              console.log('✅ Auto-login successful:', data.user);
             } else {
-              // Token invalid, clear storage
               handleClearAuth();
             }
           } else {
-            // Token expired or invalid
             handleClearAuth();
           }
         } catch (error) {
@@ -59,7 +58,25 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    setCurrentView('home');
+  };
+
+  // Navigation functions
+  const goToHome = () => {
+    setCurrentView('home');
+  };
+
+  const goToLogin = () => {
     setCurrentView('login');
+  };
+
+  const goToSignUpAs = () => {
+    setCurrentView('signupas');
+  };
+
+  const goToRegister = (type = 'tourist') => {
+    setUserType(type);
+    setCurrentView('register');
   };
 
   const handleLoginSuccess = (userData) => {
@@ -78,7 +95,6 @@ function App() {
     try {
       const token = localStorage.getItem('token');
       
-      // Call logout endpoint
       await fetch('http://localhost:5000/api/auth/logout', {
         method: 'POST',
         headers: {
@@ -95,36 +111,24 @@ function App() {
     }
   };
 
-  const goToLogin = () => {
-    setCurrentView('login');
-  };
-
-  const goToRegister = (type = 'tourist') => {
-    setUserType(type);
-    setCurrentView('register');
-  };
-
   // Render appropriate dashboard based on user role
   const renderDashboard = () => {
     if (!user) return null;
 
     const dashboardProps = {
       user: user,
-      onLogout: handleLogout
+      onLogout: handleLogout,
+      goHome: goToHome
     };
 
-    // Route based on user role
     switch (user.role) {
       case 'tourist':
         return <TravelerDashboard {...dashboardProps} />;
-      
       case 'guide':
       case 'host':
         return <HostDashboard {...dashboardProps} />;
-      
       case 'admin':
         return <AdminDashboard {...dashboardProps} />;
-      
       default:
         console.warn(`Unknown role: ${user.role}, defaulting to TravelerDashboard`);
         return <TravelerDashboard {...dashboardProps} />;
@@ -153,21 +157,44 @@ function App() {
 
   return (
     <div className="App min-h-screen">
-      {currentView === 'login' && (
-        <Login 
-          goSignupAs={goToRegister} 
-          onLoginSuccess={handleLoginSuccess} 
+      {/* Home Page */}
+      {currentView === 'home' && (
+        <HomePage 
+          goLogin={goToLogin}
+          goSignup={goToSignUpAs} // Now goes to SignUpas page
         />
       )}
       
+      {/* SignUpas Page */}
+      {currentView === 'signupas' && (
+        <SignUpas 
+          selectTraveller={() => goToRegister('tourist')} // Maps to 'tourist' role
+          selectHost={() => goToRegister('host')} // Maps to 'host' role
+          goLogin={goToLogin}
+          goHome={goToHome} // Add goHome prop
+        />
+      )}
+      
+      {/* Login Page */}
+      {currentView === 'login' && (
+        <Login 
+          goSignupAs={goToSignUpAs} // Changed to goToSignUpAs
+          onLoginSuccess={handleLoginSuccess} 
+          goHome={goToHome}
+        />
+      )}
+      
+      {/* Registration Page */}
       {currentView === 'register' && (
         <Register 
           userType={userType}
           goLogin={goToLogin}
           onRegisterSuccess={handleRegisterSuccess}
+          goHome={goToHome}
         />
       )}
       
+      {/* Dashboard */}
       {currentView === 'dashboard' && user && renderDashboard()}
     </div>
   );
