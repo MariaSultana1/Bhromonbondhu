@@ -58,13 +58,13 @@ export function HostBookings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div>
         <h2 className="text-2xl mb-2">Bookings Management</h2>
         <p className="text-gray-600">Manage your guest bookings</p>
       </div>
 
-      {/* Filter Tabs */}
+     
       <div className="flex gap-4 border-b border-gray-200">
         <button className="pb-3 px-4 border-b-2 border-green-500 text-green-600">
           All Bookings
@@ -80,7 +80,7 @@ export function HostBookings() {
         </button>
       </div>
 
-      {/* Bookings List */}
+     
       <div className="space-y-4">
         {bookings.map((booking) => (
           <div key={booking.id} className="bg-white rounded-xl p-6 shadow-sm">
@@ -132,7 +132,7 @@ export function HostBookings() {
               </div>
             </div>
 
-            {/* Booking Details */}
+           
             <div className="grid md:grid-cols-2 gap-4 py-4 border-t border-b border-gray-200">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Check-in</p>
@@ -144,7 +144,7 @@ export function HostBookings() {
               </div>
             </div>
 
-            {/* Actions */}
+           
             <div className="flex items-center gap-3 mt-4">
               {booking.status === 'pending' ? (
                 <>
@@ -195,7 +195,7 @@ export function HostBookings() {
         ))}
       </div>
 
-      {/* Info Box */}
+     
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <h4 className="mb-2">Booking Guidelines</h4>
         <ul className="space-y-1 text-sm text-gray-700">

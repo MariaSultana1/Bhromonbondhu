@@ -67,13 +67,13 @@ export function HostEarnings() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div>
         <h2 className="text-2xl mb-2">Earnings Dashboard</h2>
         <p className="text-gray-600">Track your income and payouts</p>
       </div>
 
-      {/* Stats Cards */}
+      
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -113,9 +113,9 @@ export function HostEarnings() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+       
         <div className="lg:col-span-2 space-y-6">
-          {/* Monthly Earnings Chart */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>Monthly Earnings</h3>
@@ -137,7 +137,7 @@ export function HostEarnings() {
             </div>
           </div>
 
-          {/* Transaction History */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Transaction History</h3>
             <div className="overflow-x-auto">
@@ -181,9 +181,9 @@ export function HostEarnings() {
           </div>
         </div>
 
-        {/* Sidebar */}
+       
         <div className="space-y-6">
-          {/* Earnings Breakdown */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Earnings by Service</h3>
             <div style={{ width: '100%', height: 200 }}>
@@ -222,7 +222,7 @@ export function HostEarnings() {
             </div>
           </div>
 
-          {/* Payout Settings */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Payout Settings</h3>
             <div className="space-y-3 mb-4">
@@ -253,7 +253,7 @@ export function HostEarnings() {
             </button>
           </div>
 
-          {/* Platform Fee Info */}
+          
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <h4 className="mb-3">Platform Fee Breakdown</h4>
             <div className="space-y-2 text-sm">
@@ -275,7 +275,7 @@ export function HostEarnings() {
             </p>
           </div>
 
-          {/* Tax Information */}
+       
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-3">Tax Documents</h3>
             <button className="w-full py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm mb-2">
@@ -288,7 +288,7 @@ export function HostEarnings() {
         </div>
       </div>
 
-      {/* Request Payout Modal */}
+      
       {showPayoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -355,7 +355,7 @@ export function HostEarnings() {
         </div>
       )}
 
-      {/* Update Settings Modal */}
+     
       {showSettingsModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">

@@ -42,7 +42,7 @@ export function TravelerProfile({ user }) {
               </div>
             </div>
 
-            {/* Contact Information */}
+
             <div className="border-t pt-6">
               <h4 className="mb-4">Contact Information</h4>
               <div className="grid md:grid-cols-2 gap-4">
@@ -78,7 +78,7 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-          {/* Security Settings */}
+
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Security Settings</h3>
             <div className="space-y-4">
@@ -110,7 +110,6 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-          {/* Preferences */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Preferences</h3>
             <div className="space-y-4">
@@ -142,9 +141,8 @@ export function TravelerProfile({ user }) {
           </div>
         </div>
 
-        {/* Sidebar */}
+
         <div className="space-y-6">
-          {/* Verification Status */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5 text-blue-500" />
@@ -182,7 +180,7 @@ export function TravelerProfile({ user }) {
             )}
           </div>
 
-          {/* Travel Stats */}
+
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Travel Stats</h3>
             <div className="space-y-3">
@@ -205,7 +203,7 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-          {/* Badges */}
+
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Badges & Achievements</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -230,7 +228,7 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-          {/* Danger Zone */}
+
           <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-red-200">
             <h3 className="text-red-600 mb-4">Danger Zone</h3>
             <div className="space-y-2">

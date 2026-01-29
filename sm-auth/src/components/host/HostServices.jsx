@@ -51,16 +51,16 @@ const availability = [
 export function HostServices() {
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div>
         <h2 className="text-2xl mb-2">Services & Availability</h2>
         <p className="text-gray-600">Manage your offerings and calendar</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+       
         <div className="lg:col-span-2 space-y-6">
-          {/* Services List */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>My Services</h3>
@@ -136,7 +136,7 @@ export function HostServices() {
             </div>
           </div>
 
-          {/* Service Guidelines */}
+          
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="mb-3">Service Guidelines</h4>
             <ul className="space-y-2 text-sm text-gray-700">
@@ -160,9 +160,9 @@ export function HostServices() {
           </div>
         </div>
 
-        {/* Sidebar */}
+        
         <div className="space-y-6">
-          {/* Calendar/Availability */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3>Availability</h3>
@@ -207,7 +207,7 @@ export function HostServices() {
             </button>
           </div>
 
-          {/* Quick Stats */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Service Stats</h3>
             <div className="space-y-3">
@@ -230,7 +230,7 @@ export function HostServices() {
             </div>
           </div>
 
-          {/* Location Info */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Service Location</h3>
             <div className="flex items-start gap-2 mb-3">
@@ -245,7 +245,7 @@ export function HostServices() {
             </button>
           </div>
 
-          {/* Popular Services */}
+        
           <div className="bg-green-50 border border-green-200 rounded-xl p-4">
             <h4 className="mb-3">💡 Tips</h4>
             <p className="text-sm text-gray-700 mb-2">

@@ -8,21 +8,21 @@ export function HostProfileComplete({ user }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+     
       <div>
         <h2 className="text-2xl mb-2">Host Profile</h2>
         <p className="text-gray-600">Manage your profile and verification</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Content */}
+        
         <div className="lg:col-span-2 space-y-6">
-          {/* Profile Card */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
                 <img
-                  src={user.avatar}
+                  src="./images/man 2.png"
                   alt={user.name}
                   className="w-24 h-24 rounded-full"
                 />
@@ -54,7 +54,7 @@ export function HostProfileComplete({ user }) {
               </div>
             </div>
 
-            {/* Bio */}
+            
             <div className="border-t pt-6 mb-6">
               <h4 className="mb-3">About Me</h4>
               <p className="text-sm text-gray-700 mb-3">
@@ -69,7 +69,7 @@ export function HostProfileComplete({ user }) {
               </button>
             </div>
 
-            {/* Contact Information */}
+            
             <div className="border-t pt-6">
               <h4 className="mb-4">Contact Information</h4>
               <div className="grid md:grid-cols-2 gap-4">
@@ -105,7 +105,7 @@ export function HostProfileComplete({ user }) {
             </div>
           </div>
 
-          {/* Verification Status */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Verification Status</h3>
             <div className="space-y-4">
@@ -156,9 +156,9 @@ export function HostProfileComplete({ user }) {
           </div>
         </div>
 
-        {/* Sidebar */}
+       
         <div className="space-y-6">
-          {/* Performance Stats */}
+         
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Performance</h3>
             <div className="space-y-3">
@@ -192,7 +192,7 @@ export function HostProfileComplete({ user }) {
             </div>
           </div>
 
-          {/* Support */}
+          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Need Help?</h3>
             <button
@@ -204,7 +204,7 @@ export function HostProfileComplete({ user }) {
             </button>
           </div>
 
-          {/* Safety Tips */}
+        
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="w-5 h-5 text-blue-600" />
@@ -228,7 +228,7 @@ export function HostProfileComplete({ user }) {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
+      
       {showEditProfile && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -289,7 +289,7 @@ export function HostProfileComplete({ user }) {
         </div>
       )}
 
-      {/* Edit Bio Modal */}
+      
       {showEditBio && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
@@ -317,7 +317,7 @@ export function HostProfileComplete({ user }) {
         </div>
       )}
 
-      {/* Contact Support Modal */}
+      
       {showContactSupport && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">

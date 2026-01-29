@@ -76,7 +76,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
 
     return (
       <div className="space-y-6">
-        {/* Header */}
+       
         <div className="bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl p-8 text-white">
           <button
             onClick={() => setSelectedAlbum(null)}
@@ -114,7 +114,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
           </div>
         </div>
 
-        {/* AI Insights */}
+       
         <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-100 rounded-2xl p-6">
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -134,7 +134,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
           </div>
         </div>
 
-        {/* Photo Grid */}
+        
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {selectedAlbum.photos.map((photo) => (
             <div
@@ -160,7 +160,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
           ))}
         </div>
 
-        {/* Lightbox */}
+        
         {lightboxPhoto && (
           <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
             <button
@@ -211,7 +211,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div className="bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl p-8 text-white">
         <button
           onClick={onBack}
@@ -232,7 +232,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
         </div>
       </div>
 
-      {/* Stats */}
+     
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-3">
@@ -275,7 +275,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
         </div>
       </div>
 
-      {/* Albums Grid */}
+      
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {albums.map((album) => (
           <div
@@ -319,7 +319,7 @@ export function MagicMemoryAlbum({ onBack, selectedAlbumId }) {
         ))}
       </div>
 
-      {/* AI Info Banner */}
+     
       <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-100 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0">

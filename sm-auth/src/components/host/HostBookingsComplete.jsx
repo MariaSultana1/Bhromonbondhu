@@ -102,13 +102,13 @@ export function HostBookingsComplete() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
       <div>
         <h2 className="text-2xl mb-2">Bookings Management</h2>
         <p className="text-gray-600">Manage your guest bookings</p>
       </div>
 
-      {/* Filter Tabs */}
+    
       <div className="flex gap-4 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setFilterType('all')}
@@ -152,7 +152,7 @@ export function HostBookingsComplete() {
         </button>
       </div>
 
-      {/* Bookings List */}
+     
       <div className="space-y-4">
         {filteredBookings.map((booking) => (
           <div key={booking.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -204,7 +204,7 @@ export function HostBookingsComplete() {
               </div>
             </div>
 
-            {/* Booking Details */}
+           
             <div className="grid md:grid-cols-2 gap-4 py-4 border-t border-b border-gray-200">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Check-in</p>
@@ -216,7 +216,7 @@ export function HostBookingsComplete() {
               </div>
             </div>
 
-            {/* Actions */}
+           
             <div className="flex flex-wrap items-center gap-3 mt-4">
               {booking.status === 'pending' ? (
                 <>
@@ -328,7 +328,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* View Details Modal */}
+     
       {showViewDetails && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -337,7 +337,7 @@ export function HostBookingsComplete() {
               <p className="text-blue-100 text-sm">ID: {selectedBooking.bookingId}</p>
             </div>
             <div className="p-6 space-y-6">
-              {/* Guest Information */}
+              
               <div className="p-4 bg-gray-50 rounded-xl">
                 <h4 className="mb-3">Guest Information</h4>
                 <div className="flex items-center gap-4 mb-4">
@@ -362,7 +362,7 @@ export function HostBookingsComplete() {
                 </div>
               </div>
 
-              {/* Booking Information */}
+            
               <div>
                 <h4 className="mb-3">Booking Information</h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -406,7 +406,7 @@ export function HostBookingsComplete() {
                 </div>
               </div>
 
-              {/* Special Requests */}
+              
               {selectedBooking.specialRequests && (
                 <div>
                   <h4 className="mb-3">Special Requests</h4>
@@ -416,7 +416,7 @@ export function HostBookingsComplete() {
                 </div>
               )}
 
-              {/* Payment Summary */}
+           
               <div className="p-4 bg-gray-50 rounded-xl">
                 <h4 className="mb-3">Payment Summary</h4>
                 <div className="space-y-2 text-sm">
@@ -449,7 +449,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* Accept Booking Modal */}
+     
       {showAcceptModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -503,7 +503,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* Decline Booking Modal */}
+    
       {showDeclineModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -552,7 +552,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* Modify Booking Modal */}
+      
       {showModify && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -605,7 +605,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* Message Guest Modal */}
+      
       {showMessageGuest && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
@@ -660,7 +660,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* View Receipt Modal */}
+      
       {showReceipt && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -739,7 +739,7 @@ export function HostBookingsComplete() {
         </div>
       )}
 
-      {/* Request Review Modal */}
+      
       {showRequestReview && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
