@@ -1567,6 +1567,545 @@ app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
   }
 });
 
+// ==================== COMMUNITY ROUTES ====================
+
+// Community Post Schema
+const communityPostSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  content: {
+    type: String,
+    required: [true, 'Post content is required'],
+    maxlength: [1000, 'Post cannot exceed 1000 characters']
+  },
+  image: {
+    type: String
+  },
+  location: {
+    type: String
+  },
+  likes: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }],
+  comments: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    content: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  shares: {
+    type: Number,
+    default: 0
+  },
+  trending: {
+    type: Boolean,
+    default: false
+  },
+  tags: [{
+    type: String
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+const CommunityPost = mongoose.model('CommunityPost', communityPostSchema);
+
+// Create a new post (Protected)
+app.post('/api/community/posts', authenticate, async (req, res) => {
+  try {
+    const { content, image, location, tags } = req.body;
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Post content cannot be empty'
+      });
+    }
+
+    const post = new CommunityPost({
+      userId: req.user._id,
+      content: content.trim(),
+      image: image || null,
+      location: location || null,
+      tags: tags || [],
+      likes: [],
+      comments: [],
+      shares: 0
+    });
+
+    await post.save();
+
+    // Populate user details
+    await post.populate({
+      path: 'userId',
+      select: 'username fullName'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Post created successfully',
+      post: {
+        _id: post._id,
+        content: post.content,
+        image: post.image,
+        location: post.location,
+        author: {
+          id: post.userId._id,
+          name: post.userId.fullName,
+          username: post.userId.username
+        },
+        likes: post.likes.length,
+        comments: post.comments.length,
+        shares: post.shares,
+        liked: false,
+        createdAt: post.createdAt,
+        timeAgo: 'Just now'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating post',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get all community posts (with pagination)
+app.get('/api/community/posts', authenticate, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, sort = 'newest', userId } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let query = {};
+    if (userId) {
+      query.userId = userId;
+    }
+
+    let sortOptions = {};
+    if (sort === 'popular') {
+      sortOptions = { likes: -1, createdAt: -1 };
+    } else {
+      sortOptions = { createdAt: -1 };
+    }
+
+    const posts = await CommunityPost.find(query)
+      .populate({
+        path: 'userId',
+        select: 'username fullName'
+      })
+      .populate({
+        path: 'likes.userId',
+        select: '_id'
+      })
+      .populate({
+        path: 'comments.userId',
+        select: 'username fullName'
+      })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Format posts for frontend
+    const formattedPosts = posts.map(post => ({
+      _id: post._id,
+      content: post.content,
+      image: post.image,
+      location: post.location,
+      author: {
+        id: post.userId._id,
+        name: post.userId.fullName,
+        username: post.userId.username,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.userId.username}`
+      },
+      likes: post.likes.length,
+      comments: post.comments.length,
+      shares: post.shares,
+      liked: post.likes.some(like => like.userId?._id?.toString() === req.user._id.toString()),
+      tags: post.tags,
+      createdAt: post.createdAt,
+      timeAgo: getTimeAgo(post.createdAt)
+    }));
+
+    const total = await CommunityPost.countDocuments(query);
+
+    res.json({
+      success: true,
+      posts: formattedPosts,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalPosts: total,
+        hasMore: skip + posts.length < total
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get posts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching posts',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Like/Unlike a post
+app.post('/api/community/posts/:id/like', authenticate, async (req, res) => {
+  try {
+    const post = await CommunityPost.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    const alreadyLiked = post.likes.find(like => 
+      like.userId.toString() === req.user._id.toString()
+    );
+
+    if (alreadyLiked) {
+      // Unlike
+      post.likes = post.likes.filter(like => 
+        like.userId.toString() !== req.user._id.toString()
+      );
+    } else {
+      // Like
+      post.likes.push({ userId: req.user._id });
+    }
+
+    await post.save();
+
+    res.json({
+      success: true,
+      message: alreadyLiked ? 'Post unliked' : 'Post liked',
+      likes: post.likes.length,
+      liked: !alreadyLiked
+    });
+  } catch (error) {
+    console.error('❌ Like post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating like',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Add comment to post
+app.post('/api/community/posts/:id/comments', authenticate, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment cannot be empty'
+      });
+    }
+
+    const post = await CommunityPost.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    const comment = {
+      userId: req.user._id,
+      content: content.trim()
+    };
+
+    post.comments.push(comment);
+    await post.save();
+
+    // Populate user for the new comment
+    await post.populate({
+      path: 'comments.userId',
+      select: 'username fullName'
+    });
+
+    const newComment = post.comments[post.comments.length - 1];
+
+    res.status(201).json({
+      success: true,
+      message: 'Comment added successfully',
+      comment: {
+        id: newComment._id,
+        content: newComment.content,
+        author: {
+          id: newComment.userId._id,
+          name: newComment.userId.fullName,
+          username: newComment.userId.username,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newComment.userId.username}`
+        },
+        createdAt: newComment.createdAt,
+        timeAgo: 'Just now'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Add comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding comment',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Share a post
+app.post('/api/community/posts/:id/share', authenticate, async (req, res) => {
+  try {
+    const post = await CommunityPost.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    post.shares += 1;
+    await post.save();
+
+    res.json({
+      success: true,
+      message: 'Post shared',
+      shares: post.shares
+    });
+  } catch (error) {
+    console.error('❌ Share post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sharing post',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get trending topics
+app.get('/api/community/trending', async (req, res) => {
+  try {
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    // Extract trending topics from tags in recent posts
+    const posts = await CommunityPost.find({
+      createdAt: { $gte: lastWeek }
+    });
+
+    const tagCounts = {};
+    posts.forEach(post => {
+      post.tags.forEach(tag => {
+        const cleanTag = tag.toLowerCase();
+        tagCounts[cleanTag] = (tagCounts[cleanTag] || 0) + 1;
+      });
+    });
+
+    const trendingTopics = Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag, count]) => ({
+        tag: `#${tag.charAt(0).toUpperCase() + tag.slice(1)}`,
+        posts: count
+      }));
+
+    res.json({
+      success: true,
+      trendingTopics
+    });
+  } catch (error) {
+    console.error('❌ Get trending topics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching trending topics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get suggested users to follow
+app.get('/api/community/suggested-users', authenticate, async (req, res) => {
+  try {
+    const users = await User.find({
+      _id: { $ne: req.user._id },
+      isActive: true
+    })
+    .select('username fullName createdAt')
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+    // Count trips for each user
+    const usersWithTripCount = await Promise.all(
+      users.map(async (user) => {
+        const tripCount = await Trip.countDocuments({ userId: user._id });
+        return {
+          id: user._id,
+          name: user.fullName,
+          username: user.username,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`,
+          trips: tripCount,
+          joined: getTimeAgo(user.createdAt)
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      users: usersWithTripCount
+    });
+  } catch (error) {
+    console.error('❌ Get suggested users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching suggested users',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Helper function to calculate time ago
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  
+  let interval = Math.floor(seconds / 31536000);
+  if (interval >= 1) return interval + 'y ago';
+  
+  interval = Math.floor(seconds / 2592000);
+  if (interval >= 1) return interval + 'mo ago';
+  
+  interval = Math.floor(seconds / 86400);
+  if (interval >= 1) return interval + 'd ago';
+  
+  interval = Math.floor(seconds / 3600);
+  if (interval >= 1) return interval + 'h ago';
+  
+  interval = Math.floor(seconds / 60);
+  if (interval >= 1) return interval + 'm ago';
+  
+  return 'Just now';
+}
+
+// Delete a post (only by author)
+app.delete('/api/community/posts/:id', authenticate, async (req, res) => {
+  try {
+    const post = await CommunityPost.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found or unauthorized'
+      });
+    }
+
+    await post.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'Post deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Delete post error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting post',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Seed sample community posts (development only)
+app.post('/api/community/seed', authenticate, async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      success: false,
+      message: 'Seed endpoint disabled in production'
+    });
+  }
+
+  try {
+    // Clear existing posts
+    await CommunityPost.deleteMany({});
+
+    const samplePosts = [
+      {
+        userId: req.user._id,
+        content: 'Just had the most amazing experience in Rangamati! The lake views are breathtaking and the local culture is so rich. Highly recommend staying with a local host to get the authentic experience 🌊✨',
+        location: 'Rangamati',
+        image: 'https://images.unsplash.com/photo-1664834681908-7ee473dfdec4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmF2ZWwlMjBkZXN0aW5hdGlvbiUyMGxhbmRzY2FwZXxlbnwxfHx8fDE3NjU0MzQwNzN8MA&ixlib=rb-4.1.0&q=80&w=1080',
+        tags: ['rangamati', 'lake', 'culture'],
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
+      },
+      {
+        userId: req.user._id,
+        content: 'Pro tip: Visit Ratargul in the monsoon season. The swamp forest is magical! Don\'t forget to bring waterproof bags for your electronics. The boat ride through the forest is unforgettable ⭐️🚣',
+        location: 'Ratargul',
+        tags: ['ratargul', 'monsoon', 'swampforest'],
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000) // 5 hours ago
+      },
+      {
+        userId: req.user._id,
+        content: 'Sunset at Cox\'s Bazar never gets old! 🌅 Best time to visit is early morning or evening to avoid crowds. The seafood here is incredible - try the grilled prawns at the beach market!',
+        location: 'Cox\'s Bazar',
+        image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
+        tags: ['coxsbazar', 'sunset', 'seafood'],
+        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000) // 8 hours ago
+      }
+    ];
+
+    // Add likes and comments to some posts
+    samplePosts[0].likes = [{ userId: req.user._id }];
+    samplePosts[2].likes = [{ userId: req.user._id }];
+    samplePosts[0].comments = [
+      {
+        userId: req.user._id,
+        content: 'This looks amazing! Planning to visit next month.'
+      }
+    ];
+
+    const createdPosts = await CommunityPost.insertMany(samplePosts);
+
+    res.status(201).json({
+      success: true,
+      message: 'Sample community posts seeded successfully',
+      count: createdPosts.length,
+      posts: createdPosts
+    });
+  } catch (error) {
+    console.error('❌ Seed community error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error seeding community posts',
+      error: error.message
+    });
+  }
+});
+
 // ==================== SEED DATA ROUTES ====================
 
 // Seed sample hosts (Development only)
