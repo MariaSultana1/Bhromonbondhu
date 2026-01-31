@@ -294,6 +294,91 @@ const transportationSchema = new mongoose.Schema({
 
 const Transportation = mongoose.model('Transportation', transportationSchema);
 
+
+// Message Schema
+const messageSchema = new mongoose.Schema({
+  conversationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation',
+    required: true
+  },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  receiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  content: {
+    type: String,
+    required: [true, 'Message content is required'],
+    trim: true
+  },
+  type: {
+    type: String,
+    enum: ['text', 'payment', 'system'],
+    default: 'text'
+  },
+  read: {
+    type: Boolean,
+    default: false
+  },
+  attachments: [{
+    url: String,
+    type: {
+      type: String,
+      enum: ['image', 'document', 'audio', 'video']
+    }
+  }],
+  metadata: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed
+  }
+}, {
+  timestamps: true
+});
+
+const Message = mongoose.model('Message', messageSchema);
+
+// Conversation Schema
+const conversationSchema = new mongoose.Schema({
+  participants: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }],
+  tripId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trip'
+  },
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking'
+  },
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
+  unreadCount: {
+    type: Number,
+    default: 0
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  timestamps: true
+});
+
+conversationSchema.index({ participants: 1 });
+conversationSchema.index({ updatedAt: -1 });
+
+const Conversation = mongoose.model('Conversation', conversationSchema);
+
 // Host Schema
 const hostSchema = new mongoose.Schema({
   name: {
@@ -1566,6 +1651,456 @@ app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
     });
   }
 });
+
+// ==================== MESSAGE ROUTES ====================
+
+// Get conversations for current user (Protected)
+app.get('/api/messages/conversations', authenticate, async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      participants: req.user._id,
+      isActive: true
+    })
+    .populate({
+      path: 'participants',
+      select: 'username fullName email'
+    })
+    .populate({
+      path: 'lastMessage',
+      select: 'content type createdAt'
+    })
+    .sort({ updatedAt: -1 });
+
+    // Format conversations
+    const formattedConversations = await Promise.all(
+      conversations.map(async (conv) => {
+        const otherParticipant = conv.participants.find(
+          p => p._id.toString() !== req.user._id.toString()
+        );
+
+        if (!otherParticipant) {
+          return null;
+        }
+
+        const unreadMessages = await Message.countDocuments({
+          conversationId: conv._id,
+          receiverId: req.user._id,
+          read: false
+        });
+
+        // Get host info if available
+        let hostInfo = {};
+        const host = await Host.findOne({ userId: otherParticipant._id });
+        if (host) {
+          hostInfo = {
+            hostName: host.name,
+            location: host.location,
+            rating: host.rating,
+            propertyImage: host.propertyImage
+          };
+        }
+
+        return {
+          _id: conv._id,
+          participantId: otherParticipant._id,
+          hostName: otherParticipant.fullName,
+          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.username}`,
+          lastMessage: conv.lastMessage?.content || 'No messages yet',
+          time: formatTimeAgo(conv.lastMessage?.createdAt || conv.updatedAt),
+          unread: unreadMessages,
+          online: false, // This would require WebSocket implementation
+          hostInfo
+        };
+      })
+    );
+
+    const filteredConversations = formattedConversations.filter(conv => conv !== null);
+
+    res.json({
+      success: true,
+      conversations: filteredConversations
+    });
+  } catch (error) {
+    console.error('❌ Get conversations error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching conversations'
+    });
+  }
+});
+
+// Get messages for a conversation (Protected)
+app.get('/api/messages/conversations/:conversationId', authenticate, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { limit = 50, before } = req.query;
+
+    // Verify user is participant
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: req.user._id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    let query = { conversationId };
+    if (before) {
+      query.createdAt = { $lt: new Date(before) };
+    }
+
+    const messages = await Message.find(query)
+      .populate('senderId', 'username fullName')
+      .populate('receiverId', 'username fullName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit) + 1);
+
+    const hasMore = messages.length > parseInt(limit);
+    if (hasMore) {
+      messages.pop(); // Remove extra message used to check hasMore
+    }
+
+    // Mark messages as read
+    await Message.updateMany(
+      {
+        conversationId,
+        receiverId: req.user._id,
+        read: false
+      },
+      { read: true }
+    );
+
+    // Format messages for frontend
+    const formattedMessages = messages.reverse().map(msg => ({
+      id: msg._id,
+      sender: msg.senderId._id.toString() === req.user._id.toString() ? 'me' : 'host',
+      text: msg.content,
+      time: formatTime(msg.createdAt),
+      type: msg.type,
+      read: msg.read
+    }));
+
+    const otherParticipant = conversation.participants.find(
+      p => p.toString() !== req.user._id.toString()
+    );
+
+    // Get host info
+    const host = await Host.findOne({ userId: otherParticipant });
+    const user = await User.findById(otherParticipant);
+
+    res.json({
+      success: true,
+      messages: formattedMessages,
+      conversationInfo: {
+        id: conversation._id,
+        hostName: user?.fullName || 'Unknown',
+        hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'default'}`,
+        hostRating: host?.rating || 0,
+        hostReviews: host?.reviews || 0,
+        hostLocation: host?.location || '',
+        hostVerified: host?.verified || false
+      },
+      pagination: {
+        hasMore,
+        nextCursor: hasMore ? messages[messages.length - 1]?.createdAt : null
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get messages error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching messages'
+    });
+  }
+});
+
+// Send message (Protected)
+app.post('/api/messages/send', authenticate, async (req, res) => {
+  try {
+    const { conversationId, receiverId, content, type = 'text', metadata } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content cannot be empty'
+      });
+    }
+
+    let conversation;
+    
+    if (conversationId) {
+      // Existing conversation
+      conversation = await Conversation.findOne({
+        _id: conversationId,
+        participants: req.user._id
+      });
+    } else if (receiverId) {
+      // Find or create conversation
+      conversation = await Conversation.findOne({
+        participants: { $all: [req.user._id, receiverId] },
+        isActive: true
+      });
+
+      if (!conversation) {
+        // Create new conversation
+        conversation = new Conversation({
+          participants: [req.user._id, receiverId]
+        });
+        await conversation.save();
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Either conversationId or receiverId is required'
+      });
+    }
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    // Create message
+    const message = new Message({
+      conversationId: conversation._id,
+      senderId: req.user._id,
+      receiverId: receiverId || conversation.participants.find(
+        p => p.toString() !== req.user._id.toString()
+      ),
+      content: content.trim(),
+      type,
+      metadata: metadata || {}
+    });
+
+    await message.save();
+
+    // Update conversation last message
+    conversation.lastMessage = message._id;
+    conversation.unreadCount += 1;
+    await conversation.save();
+
+    // Populate message
+    await message.populate('senderId', 'username fullName');
+    await message.populate('receiverId', 'username fullName');
+
+    res.status(201).json({
+      success: true,
+      message: {
+        id: message._id,
+        sender: message.senderId._id.toString() === req.user._id.toString() ? 'me' : 'host',
+        text: message.content,
+        time: formatTime(message.createdAt),
+        type: message.type,
+        read: message.read
+      }
+    });
+  } catch (error) {
+    console.error('❌ Send message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending message'
+    });
+  }
+});
+
+// Send payment message (System message)
+app.post('/api/messages/send-payment', authenticate, async (req, res) => {
+  try {
+    const { conversationId, amount, description } = req.body;
+
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: req.user._id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    const paymentMessage = new Message({
+      conversationId,
+      senderId: req.user._id,
+      receiverId: conversation.participants.find(
+        p => p.toString() !== req.user._id.toString()
+      ),
+      content: `Payment of ৳${amount.toLocaleString()}${description ? ` for ${description}` : ''}`,
+      type: 'payment',
+      metadata: {
+        amount,
+        description,
+        timestamp: new Date()
+      }
+    });
+
+    await paymentMessage.save();
+
+    // Update conversation
+    conversation.lastMessage = paymentMessage._id;
+    await conversation.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Payment message sent successfully'
+    });
+  } catch (error) {
+    console.error('❌ Send payment message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending payment message'
+    });
+  }
+});
+
+// Mark messages as read (Protected)
+app.put('/api/messages/read/:conversationId', authenticate, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    await Message.updateMany(
+      {
+        conversationId,
+        receiverId: req.user._id,
+        read: false
+      },
+      { read: true }
+    );
+
+    // Update conversation unread count
+    await Conversation.findByIdAndUpdate(conversationId, {
+      $set: { unreadCount: 0 }
+    });
+
+    res.json({
+      success: true,
+      message: 'Messages marked as read'
+    });
+  } catch (error) {
+    console.error('❌ Mark messages as read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating message status'
+    });
+  }
+});
+
+// Delete conversation (Soft delete)
+app.delete('/api/messages/conversations/:conversationId', authenticate, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const conversation = await Conversation.findOneAndUpdate(
+      {
+        _id: conversationId,
+        participants: req.user._id
+      },
+      { isActive: false },
+      { new: true }
+    );
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Conversation deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Delete conversation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting conversation'
+    });
+  }
+});
+
+// Get unread count
+app.get('/api/messages/unread-count', authenticate, async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      participants: req.user._id,
+      isActive: true
+    });
+
+    let totalUnread = 0;
+    for (const conv of conversations) {
+      const unread = await Message.countDocuments({
+        conversationId: conv._id,
+        receiverId: req.user._id,
+        read: false
+      });
+      totalUnread += unread;
+    }
+
+    res.json({
+      success: true,
+      unreadCount: totalUnread
+    });
+  } catch (error) {
+    console.error('❌ Get unread count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching unread count'
+    });
+  }
+});
+
+// Helper functions
+function formatTime(date) {
+  const messageDate = new Date(date);
+  const now = new Date();
+  const diffMs = now - messageDate;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return messageDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+function formatTimeAgo(date) {
+  const messageDate = new Date(date);
+  const now = new Date();
+  const diffMs = now - messageDate;
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffDays === 0) {
+    return messageDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return messageDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+}
 
 // ==================== COMMUNITY ROUTES ====================
 
