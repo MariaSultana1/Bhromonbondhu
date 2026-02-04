@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock, User } from 'lucide-react';
 
 export function TravelerProfile({ user: initialUser }) {
   const [user, setUser] = useState(initialUser);
@@ -8,6 +8,10 @@ export function TravelerProfile({ user: initialUser }) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Reference for file input
+  const fileInputRef = useRef(null);
 
   // Edit Profile Form State
   const [editForm, setEditForm] = useState({
@@ -70,6 +74,82 @@ export function TravelerProfile({ user: initialUser }) {
       });
     }
   }, [initialUser]);
+
+  // Handle profile picture upload
+  const handleProfilePictureClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Image = event.target.result;
+
+        const token = getAuthToken();
+        if (!token) {
+          setError('Please login to update your profile picture');
+          setUploadingImage(false);
+          return;
+        }
+
+        // Send to backend
+        const response = await fetch('http://localhost:5000/api/auth/profile-picture', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            profilePicture: base64Image
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setUser(data.user);
+          setSuccess('Profile picture updated successfully!');
+          setTimeout(() => setSuccess(''), 3000);
+        } else {
+          setError(data.message || 'Failed to upload profile picture');
+        }
+
+        setUploadingImage(false);
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setUploadingImage(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading profile picture:', err);
+      setError('Failed to upload profile picture. Please try again.');
+      setUploadingImage(false);
+    }
+  };
 
   // Handle Edit Profile Submit
   const handleEditProfile = async (e) => {
@@ -205,6 +285,13 @@ export function TravelerProfile({ user: initialUser }) {
     }));
   };
 
+  // Format joined date
+  const formatJoinedDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -244,13 +331,38 @@ export function TravelerProfile({ user: initialUser }) {
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
-                <img
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || 'default'}`}
-                  alt={user.fullName || user.username}
-                  className="w-24 h-24 rounded-full"
+                {/* Profile Picture or Default Icon */}
+                {user.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt={user.fullName || user.username}
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+                    <User className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Camera Button with Upload Functionality */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
                 />
-                <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600">
-                  <Camera className="w-4 h-4" />
+                <button 
+                  onClick={handleProfilePictureClick}
+                  disabled={uploadingImage}
+                  className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Change profile picture"
+                >
+                  {uploadingImage ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
                 </button>
               </div>
               <div className="flex-1">
@@ -301,7 +413,7 @@ export function TravelerProfile({ user: initialUser }) {
                   <label className="block text-sm text-gray-600 mb-2">Member Since</label>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <span>{new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                    <span>{formatJoinedDate(user.createdAt)}</span>
                   </div>
                 </div>
               </div>
