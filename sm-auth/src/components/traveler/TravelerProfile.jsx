@@ -1,6 +1,221 @@
-import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock } from 'lucide-react';
 
-export function TravelerProfile({ user }) {
+export function TravelerProfile({ user: initialUser }) {
+  const [user, setUser] = useState(initialUser);
+  const [loading, setLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Edit Profile Form State
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    phone: ''
+  });
+
+  // Change Password Form State
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // Fetch user profile from backend
+  const fetchUserProfile = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to view your profile');
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setEditForm({
+          fullName: data.user.fullName || '',
+          phone: data.user.phone || ''
+        });
+      } else {
+        setError(data.message || 'Failed to fetch profile');
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError('Failed to load profile data');
+    }
+  };
+
+  // Load user profile on component mount
+  useEffect(() => {
+    if (!initialUser) {
+      fetchUserProfile();
+    } else {
+      setEditForm({
+        fullName: initialUser.fullName || '',
+        phone: initialUser.phone || ''
+      });
+    }
+  }, [initialUser]);
+
+  // Handle Edit Profile Submit
+  const handleEditProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to update your profile');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fullName: editForm.fullName,
+          phone: editForm.phone
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setSuccess('Profile updated successfully!');
+        setTimeout(() => {
+          setShowEditModal(false);
+          setSuccess('');
+        }, 2000);
+      } else {
+        setError(data.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError('Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Change Password Submit
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    // Validation
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setError('Please fill in all password fields');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('New passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to change your password');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Password changed successfully!');
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setSuccess('');
+        }, 2000);
+      } else {
+        setError(data.message || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error('Error changing password:', err);
+      setError('Failed to change password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle input changes
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePasswordFormChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       
@@ -9,16 +224,29 @@ export function TravelerProfile({ user }) {
         <p className="text-gray-600">Manage your account and verification</p>
       </div>
 
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-6">
         
         <div className="lg:col-span-2 space-y-6">
           
+          {/* Profile Card */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
                 <img
-                  src="./images/Ellipse 22.png"
-                  alt={user.name}
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || 'default'}`}
+                  alt={user.fullName || user.username}
                   className="w-24 h-24 rounded-full"
                 />
                 <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600">
@@ -27,21 +255,23 @@ export function TravelerProfile({ user }) {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl">{user.name}</h3>
+                  <h3 className="text-xl">{user.username}</h3>
                   {user.verified && (
                     <CheckCircle className="w-5 h-5 text-blue-500" title="Verified User" />
                   )}
                 </div>
                 <p className="text-gray-600 mb-3">{user.fullName}</p>
                 <div className="flex gap-2">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <button 
+                    onClick={() => setShowEditModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
                     <Edit className="w-4 h-4" />
                     Edit Profile
                   </button>
                 </div>
               </div>
             </div>
-
 
             <div className="border-t pt-6">
               <h4 className="mb-4">Contact Information</h4>
@@ -57,7 +287,7 @@ export function TravelerProfile({ user }) {
                   <label className="block text-sm text-gray-600 mb-2">Phone</label>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{user.phone}</span>
+                    <span>{user.phone || 'Not provided'}</span>
                   </div>
                 </div>
                 <div>
@@ -71,14 +301,14 @@ export function TravelerProfile({ user }) {
                   <label className="block text-sm text-gray-600 mb-2">Member Since</label>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <span>Jan 2024</span>
+                    <span>{new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-
+          {/* Security Settings */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Security Settings</h3>
             <div className="space-y-4">
@@ -104,12 +334,16 @@ export function TravelerProfile({ user }) {
                 </label>
               </div>
 
-              <button className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button 
+                onClick={() => setShowPasswordModal(true)}
+                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
                 Change Password
               </button>
             </div>
           </div>
 
+          {/* Preferences */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Preferences</h3>
             <div className="space-y-4">
@@ -140,8 +374,9 @@ export function TravelerProfile({ user }) {
           </div>
         </div>
 
-
+        {/* Sidebar */}
         <div className="space-y-6">
+          {/* Verification Status */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Shield className="w-5 h-5 text-blue-500" />
@@ -154,7 +389,11 @@ export function TravelerProfile({ user }) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Phone</span>
-                <CheckCircle className="w-5 h-5 text-green-500" />
+                {user.phone ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-yellow-500" />
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Identity (KYC)</span>
@@ -179,7 +418,7 @@ export function TravelerProfile({ user }) {
             )}
           </div>
 
-
+          {/* Travel Stats */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Travel Stats</h3>
             <div className="space-y-3">
@@ -202,7 +441,7 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-
+          {/* Badges & Achievements */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Badges & Achievements</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -227,7 +466,7 @@ export function TravelerProfile({ user }) {
             </div>
           </div>
 
-
+          {/* Danger Zone */}
           <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-red-200">
             <h3 className="text-red-600 mb-4">Danger Zone</h3>
             <div className="space-y-2">
@@ -241,6 +480,213 @@ export function TravelerProfile({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Profile</h3>
+              <button 
+                onClick={() => {
+                  setShowEditModal(false);
+                  setError('');
+                  setSuccess('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
+              </div>
+            )}
+
+            <form onSubmit={handleEditProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Full Name</label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={editForm.fullName}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Phone</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={editForm.phone}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="+880 1XXX-XXXXXX"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Email (cannot be changed)</label>
+                <input
+                  type="email"
+                  value={user.email}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-blue-500" />
+                <h3 className="text-xl font-semibold">Change Password</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setError('');
+                  setSuccess('');
+                  setPasswordForm({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: ''
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Current Password</label>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  value={passwordForm.currentPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Enter current password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">New Password</label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Enter new password (min. 6 characters)"
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordForm.confirmPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Re-enter new password"
+                  minLength={6}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  • Password must be at least 6 characters long<br />
+                  • Make sure your new passwords match
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setError('');
+                    setSuccess('');
+                    setPasswordForm({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
