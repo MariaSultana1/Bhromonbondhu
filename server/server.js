@@ -1,15 +1,17 @@
-// server.js - Complete Backend with MongoDB Atlas Integration
+// server.js - Complete Backend with MongoDB Atlas Integration + Profile Picture Upload
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
@@ -31,7 +33,7 @@ const connectDB = async () => {
 
 connectDB();
 
-// User Schema
+// User Schema - UPDATED with profilePicture field
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -62,6 +64,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
+  },
+  profilePicture: {
+    type: String,
+    default: '' // Empty string means no profile picture, will show default icon
   },
   role: {
     type: String,
@@ -238,7 +244,7 @@ const transportationSchema = new mongoose.Schema({
     required: [true, 'Operator/airline/train name is required']
   },
   departure: {
-    type: String, // Store as "10:00 AM" format
+    type: String,
     required: [true, 'Departure time is required']
   },
   arrival: {
@@ -246,7 +252,7 @@ const transportationSchema = new mongoose.Schema({
     required: [true, 'Arrival time is required']
   },
   departureDate: {
-    type: String, // Store as "Dec 20, 2024"
+    type: String,
     required: true
   },
   duration: {
@@ -293,7 +299,6 @@ const transportationSchema = new mongoose.Schema({
 });
 
 const Transportation = mongoose.model('Transportation', transportationSchema);
-
 
 // Message Schema
 const messageSchema = new mongoose.Schema({
@@ -552,6 +557,7 @@ bookingSchema.pre('save', function(next) {
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
+
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
 const JWT_EXPIRE = '7d';
@@ -612,7 +618,7 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-
+// Health Check
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true,
@@ -660,14 +666,15 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Create new user
+    // Create new user (profilePicture will be empty by default)
     const user = new User({
       username: username.toLowerCase(),
       fullName,
       email: email.toLowerCase(),
       phone: phone || '',
       password,
-      role: role || 'tourist'
+      role: role || 'tourist',
+      profilePicture: '' // Empty by default
     });
 
     await user.save();
@@ -688,6 +695,7 @@ app.post('/api/auth/register', async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        profilePicture: user.profilePicture,
         createdAt: user.createdAt
       }
     });
@@ -762,7 +770,7 @@ app.post('/api/auth/login', async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    console.log(` User logged in: ${user.email} (Role: ${user.role})`);
+    console.log(`✅ User logged in: ${user.email} (Role: ${user.role})`);
 
     res.json({
       success: true,
@@ -775,11 +783,13 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        lastLogin: user.lastLogin
+        profilePicture: user.profilePicture,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
-    console.error(' Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({ 
       success: false,
       message: 'An error occurred during login. Please try again.',
@@ -800,6 +810,7 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
         email: req.user.email,
         phone: req.user.phone,
         role: req.user.role,
+        profilePicture: req.user.profilePicture,
         createdAt: req.user.createdAt,
         lastLogin: req.user.lastLogin
       }
@@ -814,7 +825,7 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 
 // Logout Route (Protected)
 app.post('/api/auth/logout', authenticate, (req, res) => {
-  console.log(` User logged out: ${req.user.email}`);
+  console.log(`✅ User logged out: ${req.user.email}`);
   res.json({ 
     success: true,
     message: 'Logged out successfully' 
@@ -842,14 +853,109 @@ app.put('/api/auth/profile', authenticate, async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
-        role: user.role
+        role: user.role,
+        profilePicture: user.profilePicture,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
-    console.error(' Profile update error:', error);
+    console.error('❌ Profile update error:', error);
     res.status(500).json({ 
       success: false,
       message: 'Error updating profile' 
+    });
+  }
+});
+
+// Upload Profile Picture (Protected Route) - NEW ENDPOINT
+app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
+  try {
+    const { profilePicture } = req.body;
+
+    if (!profilePicture) {
+      return res.status(400).json({
+        success: false,
+        message: 'No profile picture provided'
+      });
+    }
+
+    // Validate base64 image format
+    if (!profilePicture.startsWith('data:image/')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format. Please upload a valid image file.'
+      });
+    }
+
+    // Check file size (limit to 5MB in base64)
+    const sizeInBytes = (profilePicture.length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+    
+    if (sizeInMB > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Image size too large. Maximum size is 5MB.'
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    user.profilePicture = profilePicture;
+    await user.save();
+
+    console.log(`✅ Profile picture updated for user: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Profile picture updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Profile picture upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading profile picture',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Delete Profile Picture (Protected Route) - NEW ENDPOINT
+app.delete('/api/auth/profile-picture', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.profilePicture = ''; // Set back to empty
+    await user.save();
+
+    console.log(`✅ Profile picture deleted for user: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Profile picture deleted successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Profile picture delete error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting profile picture'
     });
   }
 });
@@ -891,7 +997,7 @@ app.put('/api/auth/change-password', authenticate, async (req, res) => {
       message: 'Password changed successfully'
     });
   } catch (error) {
-    console.error(' Password change error:', error);
+    console.error('❌ Password change error:', error);
     res.status(500).json({
       success: false,
       message: 'Error changing password'
