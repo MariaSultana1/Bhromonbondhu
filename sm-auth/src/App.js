@@ -1,7 +1,7 @@
-// App.js - Updated with SignUpas page
+// App.js 
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
-import SignUpas from './components/SignUpas'; // ADD THIS
+import SignUpas from './components/SignUpas'; 
 import Register from './components/Register';
 import HomePage from './components/HomePage';
 import TravelerDashboard from './components/TravelerDashboard';
@@ -9,7 +9,7 @@ import HostDashboard from './components/HostDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 
 function App() {
-  // Add 'signupas' to the possible views
+  // Add 
   const [currentView, setCurrentView] = useState('home'); // 'home', 'signupas', 'login', 'register', 'dashboard'
   const [user, setUser] = useState(null);
   const [userType, setUserType] = useState('tourist'); // Default type

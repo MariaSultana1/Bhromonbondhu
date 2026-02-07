@@ -33,7 +33,107 @@ const connectDB = async () => {
 
 connectDB();
 
-// User Schema - UPDATED with profilePicture field
+
+const BANGLADESH_OPERATORS = [
+  'Grameenphone', 'Robi', 'Banglalink', 'Teletalk', 'Airtel'
+];
+
+const VALID_OPERATOR_PREFIXES = {
+  'Grameenphone': ['017', '013'],
+  'Robi': ['018'],
+  'Banglalink': ['019', '014'],
+  'Teletalk': ['015'],
+  'Airtel': ['016']
+};
+
+const validatePhoneNumber = (phone) => {
+  // Must be exactly 11 digits starting with 01
+  const phoneRegex = /^01[3-9]\d{8}$/;
+  if (!phoneRegex.test(phone)) {
+    return { valid: false, message: 'Phone number must be 11 digits starting with 01' };
+  }
+  return { valid: true };
+};
+
+const validateNID = (nid) => {
+  // NID can be 10, 13, or 17 digits
+  const nidRegex = /^(\d{10}|\d{13}|\d{17})$/;
+  if (!nidRegex.test(nid)) {
+    return { valid: false, message: 'NID must be 10, 13, or 17 digits' };
+  }
+  return { valid: true };
+};
+
+const validatePassport = (passport) => {
+  // Passport format: 2 letters followed by 7 digits
+  const passportRegex = /^[A-Z]{2}\d{7}$/;
+  if (!passportRegex.test(passport)) {
+    return { valid: false, message: 'Passport must be 2 uppercase letters followed by 7 digits (e.g., AB1234567)' };
+  }
+  return { valid: true };
+};
+
+const validateCardNumber = (cardNumber) => {
+  // Remove spaces and check if it's 16 digits
+  const cleaned = cardNumber.replace(/\s+/g, '');
+  const cardRegex = /^\d{16}$/;
+  if (!cardRegex.test(cleaned)) {
+    return { valid: false, message: 'Card number must be exactly 16 digits' };
+  }
+  return { valid: true, cleaned };
+};
+
+const validateCVV = (cvv) => {
+  const cvvRegex = /^\d{3}$/;
+  if (!cvvRegex.test(cvv)) {
+    return { valid: false, message: 'CVV must be exactly 3 digits' };
+  }
+  return { valid: true };
+};
+
+const validateExpiryDate = (expiry) => {
+  // Format: MM/YY
+  const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
+  if (!expiryRegex.test(expiry)) {
+    return { valid: false, message: 'Expiry date must be in MM/YY format' };
+  }
+  
+  // Check if card is not expired
+  const [month, year] = expiry.split('/');
+  const expiryDate = new Date(2000 + parseInt(year), parseInt(month) - 1);
+  const now = new Date();
+  
+  if (expiryDate < now) {
+    return { valid: false, message: 'Card has expired' };
+  }
+  
+  return { valid: true };
+};
+
+const validateBkashNumber = (bkashNumber) => {
+  return validatePhoneNumber(bkashNumber);
+};
+
+const validateOperator = (operator) => {
+  if (!BANGLADESH_OPERATORS.includes(operator)) {
+    return { 
+      valid: false, 
+      message: `Invalid operator. Must be one of: ${BANGLADESH_OPERATORS.join(', ')}` 
+    };
+  }
+  return { valid: true };
+};
+
+const validateAge = (age) => {
+  const ageNum = parseInt(age);
+  if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) {
+    return { valid: false, message: 'Age must be between 0 and 120' };
+  }
+  return { valid: true };
+};
+
+
+// User Schema
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -58,7 +158,14 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     trim: true,
-    default: ''
+    default: '',
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Allow empty
+        return /^01[3-9]\d{8}$/.test(v);
+      },
+      message: 'Phone number must be 11 digits starting with 01'
+    }
   },
   password: {
     type: String,
@@ -67,7 +174,7 @@ const userSchema = new mongoose.Schema({
   },
   profilePicture: {
     type: String,
-    default: '' // Empty string means no profile picture, will show default icon
+    default: ''
   },
   role: {
     type: String,
@@ -84,12 +191,67 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
+  },
+  location: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  languages: [{
+    type: String,
+    default: []
+  }],
+  bio: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 500
+  },
+  hostBadge: {
+    type: String,
+    enum: ['Host', 'Superhost', 'Pro Host'],
+    default: 'Host'
+  },
+  hostRating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  totalGuests: {
+    type: Number,
+    default: 0
+  },
+  responseRate: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 0
+  },
+  idVerifiedAt: {
+    type: Date
+  },
+  bgCheckAt: {
+    type: Date
+  },
+  trainingAt: {
+    type: Date
+  },
+  bankVerifiedAt: {
+    type: Date
+  },
+  kycCompleted: {
+    type: Boolean,
+    default: false
+  },
+  verified: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
 });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
@@ -102,12 +264,10 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove password from JSON response
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
@@ -115,6 +275,160 @@ userSchema.methods.toJSON = function() {
 };
 
 const User = mongoose.model('User', userSchema);
+
+// Transport Ticket Booking Schema (NEW - for storing ticket bookings)
+const transportTicketSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  bookingId: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  pnr: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  transportType: {
+    type: String,
+    enum: ['bus', 'train', 'flight'],
+    required: true
+  },
+  provider: {
+    type: String,
+    required: true
+  },
+  from: {
+    type: String,
+    required: true
+  },
+  to: {
+    type: String,
+    required: true
+  },
+  journeyDate: {
+    type: String,
+    required: true
+  },
+  departureTime: {
+    type: String,
+    required: true
+  },
+  arrivalTime: {
+    type: String,
+    required: true
+  },
+  duration: {
+    type: String,
+    required: true
+  },
+  vehicleNumber: String,
+  trainNumber: String,
+  flightNumber: String,
+  passengers: [{
+    firstName: {
+      type: String,
+      required: true
+    },
+    lastName: {
+      type: String,
+      required: true
+    },
+    age: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 120
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      required: true
+    },
+    nid: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          if (!v) return true;
+          return /^(\d{10}|\d{13}|\d{17})$/.test(v);
+        },
+        message: 'NID must be 10, 13, or 17 digits'
+      }
+    },
+    passport: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          if (!v) return true;
+          return /^[A-Z]{2}\d{7}$/.test(v);
+        },
+        message: 'Passport must be 2 uppercase letters followed by 7 digits'
+      }
+    },
+    seat: {
+      type: String,
+      required: true
+    },
+    ticketNumber: {
+      type: String,
+      required: true
+    },
+    class: String
+  }],
+  contactEmail: {
+    type: String,
+    required: true,
+    match: [/^\S+@\S+\.\S+$/, 'Invalid email format']
+  },
+  contactPhone: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function(v) {
+        return /^01[3-9]\d{8}$/.test(v);
+      },
+      message: 'Phone must be 11 digits starting with 01'
+    }
+  },
+  totalAmount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  pricePerTicket: {
+    type: Number,
+    required: true
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['card', 'bkash', 'cash'],
+    required: true
+  },
+  paymentDetails: {
+    cardNumber: String, // Stored as last 4 digits only for security
+    cardholderName: String,
+    bkashNumber: String,
+    transactionId: String
+  },
+  status: {
+    type: String,
+    enum: ['confirmed', 'pending', 'cancelled'],
+    default: 'confirmed'
+  },
+  bookingDate: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+const TransportTicket = mongoose.model('TransportTicket', transportTicketSchema);
+
 
 // Trip Schema
 const tripSchema = new mongoose.Schema({
@@ -484,29 +798,15 @@ const bookingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Host'
   },
-  transportationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Transportation'
-  },
   checkIn: {
     type: Date
   },
   checkOut: {
     type: Date
   },
-  travelDate: {
-    type: Date
-  },
   guests: {
     type: Number,
     default: 1
-  },
-  passengers: {
-    type: Number,
-    default: 1
-  },
-  seatClass: {
-    type: String
   },
   selectedServices: [{
     type: String
@@ -532,6 +832,17 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'paid', 'refunded'],
     default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['card', 'bkash'],
+    required: true
+  },
+  paymentDetails: {
+    cardNumber: String,
+    cardholderName: String,
+    bkashNumber: String,
+    transactionId: String
   },
   bookingId: {
     type: String,
@@ -562,7 +873,6 @@ const Booking = mongoose.model('Booking', bookingSchema);
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
 const JWT_EXPIRE = '7d';
 
-// Generate JWT Token
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRE });
 };
@@ -633,7 +943,6 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, fullName, email, phone, password, role } = req.body;
 
-    // Validation
     if (!username || !fullName || !email || !password) {
       return res.status(400).json({ 
         success: false,
@@ -648,7 +957,17 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Validate phone if provided
+    if (phone) {
+      const phoneValidation = validatePhoneNumber(phone);
+      if (!phoneValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: phoneValidation.message
+        });
+      }
+    }
+
     const existingUser = await User.findOne({ 
       $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] 
     });
@@ -666,7 +985,6 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Create new user (profilePicture will be empty by default)
     const user = new User({
       username: username.toLowerCase(),
       fullName,
@@ -674,12 +992,11 @@ app.post('/api/auth/register', async (req, res) => {
       phone: phone || '',
       password,
       role: role || 'tourist',
-      profilePicture: '' // Empty by default
+      profilePicture: ''
     });
 
     await user.save();
 
-    // Generate token
     const token = generateToken(user._id);
 
     console.log(`✅ New user registered: ${user.email} (Role: ${user.role})`);
@@ -723,7 +1040,6 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Validation
     if (!username || !password) {
       return res.status(400).json({ 
         success: false,
@@ -731,7 +1047,6 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Find user by username or email
     const user = await User.findOne({
       $or: [
         { username: username.toLowerCase() }, 
@@ -746,7 +1061,6 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Check if account is active
     if (!user.isActive) {
       return res.status(401).json({ 
         success: false,
@@ -754,7 +1068,6 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Verify password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({ 
@@ -763,11 +1076,9 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Update last login
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate token
     const token = generateToken(user._id);
 
     console.log(`✅ User logged in: ${user.email} (Role: ${user.role})`);
@@ -798,7 +1109,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get Current User (Protected Route)
+// Get Current User
 app.get('/api/auth/me', authenticate, async (req, res) => {
   try {
     res.json({
@@ -832,7 +1143,7 @@ app.post('/api/auth/logout', authenticate, (req, res) => {
   });
 });
 
-// Update Profile (Protected Route)
+// Update Profile
 app.put('/api/auth/profile', authenticate, async (req, res) => {
   try {
     const { fullName, phone } = req.body;
@@ -840,7 +1151,18 @@ app.put('/api/auth/profile', authenticate, async (req, res) => {
     const user = await User.findById(req.user._id);
     
     if (fullName) user.fullName = fullName;
-    if (phone !== undefined) user.phone = phone;
+    if (phone !== undefined) {
+      if (phone) {
+        const phoneValidation = validatePhoneNumber(phone);
+        if (!phoneValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: phoneValidation.message
+          });
+        }
+      }
+      user.phone = phone;
+    }
     
     await user.save();
     
@@ -867,7 +1189,7 @@ app.put('/api/auth/profile', authenticate, async (req, res) => {
   }
 });
 
-// Upload Profile Picture (Protected Route) - NEW ENDPOINT
+// Upload Profile Picture
 app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
   try {
     const { profilePicture } = req.body;
@@ -879,7 +1201,6 @@ app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
       });
     }
 
-    // Validate base64 image format
     if (!profilePicture.startsWith('data:image/')) {
       return res.status(400).json({
         success: false,
@@ -887,7 +1208,6 @@ app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
       });
     }
 
-    // Check file size (limit to 5MB in base64)
     const sizeInBytes = (profilePicture.length * 3) / 4;
     const sizeInMB = sizeInBytes / (1024 * 1024);
     
@@ -927,6 +1247,317 @@ app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
     });
   }
 });
+
+// Book Transport Tickets (Store booking in database)
+app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
+  try {
+    const {
+      bookingId,
+      pnr,
+      transportType,
+      provider,
+      from,
+      to,
+      journeyDate,
+      departureTime,
+      arrivalTime,
+      duration,
+      vehicleNumber,
+      trainNumber,
+      flightNumber,
+      passengers,
+      contactEmail,
+      contactPhone,
+      totalAmount,
+      pricePerTicket,
+      paymentMethod,
+      paymentDetails
+    } = req.body;
+
+    // Validation
+    if (!bookingId || !pnr || !transportType || !provider || !from || !to || !journeyDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required booking information'
+      });
+    }
+
+    if (!passengers || passengers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one passenger is required'
+      });
+    }
+
+    // Validate contact email
+    if (!contactEmail || !/^\S+@\S+\.\S+$/.test(contactEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid contact email is required'
+      });
+    }
+
+    // Validate contact phone
+    const phoneValidation = validatePhoneNumber(contactPhone);
+    if (!phoneValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: `Contact ${phoneValidation.message}`
+      });
+    }
+
+    // Validate each passenger
+    for (let i = 0; i < passengers.length; i++) {
+      const passenger = passengers[i];
+      
+      if (!passenger.firstName || !passenger.lastName) {
+        return res.status(400).json({
+          success: false,
+          message: `Passenger ${i + 1}: First name and last name are required`
+        });
+      }
+
+      // Validate age
+      const ageValidation = validateAge(passenger.age);
+      if (!ageValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: `Passenger ${i + 1}: ${ageValidation.message}`
+        });
+      }
+
+      // Validate NID if provided
+      if (passenger.nid) {
+        const nidValidation = validateNID(passenger.nid);
+        if (!nidValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: `Passenger ${i + 1}: ${nidValidation.message}`
+          });
+        }
+      }
+
+      // Validate Passport if provided
+      if (passenger.passport) {
+        const passportValidation = validatePassport(passenger.passport);
+        if (!passportValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: `Passenger ${i + 1}: ${passportValidation.message}`
+          });
+        }
+      }
+
+      // For flights, require either NID or Passport
+      if (transportType === 'flight' && !passenger.nid && !passenger.passport) {
+        return res.status(400).json({
+          success: false,
+          message: `Passenger ${i + 1}: NID or Passport is required for flight bookings`
+        });
+      }
+    }
+
+    // Validate payment details based on method
+    if (paymentMethod === 'card') {
+      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Card number and cardholder name are required for card payment'
+        });
+      }
+
+      // Note: In production, never store full card numbers
+      // Only store last 4 digits for reference
+      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
+      if (!cardValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: cardValidation.message
+        });
+      }
+    } else if (paymentMethod === 'bkash') {
+      if (!paymentDetails?.bkashNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'bKash number is required for bKash payment'
+        });
+      }
+
+      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
+      if (!bkashValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: `bKash ${bkashValidation.message}`
+        });
+      }
+    }
+
+    // Prepare payment details for storage (secure)
+    const securePaymentDetails = {};
+    if (paymentMethod === 'card') {
+      // Only store last 4 digits of card for security
+      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
+      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
+      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
+    } else if (paymentMethod === 'bkash') {
+      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
+    }
+
+    // Generate transaction ID
+    securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+    // Create ticket booking in database
+    const ticketBooking = new TransportTicket({
+      userId: req.user._id,
+      bookingId,
+      pnr,
+      transportType,
+      provider,
+      from,
+      to,
+      journeyDate,
+      departureTime,
+      arrivalTime,
+      duration,
+      vehicleNumber,
+      trainNumber,
+      flightNumber,
+      passengers,
+      contactEmail,
+      contactPhone,
+      totalAmount,
+      pricePerTicket,
+      paymentMethod,
+      paymentDetails: securePaymentDetails,
+      status: 'confirmed'
+    });
+
+    await ticketBooking.save();
+
+    console.log(`✅ Transport ticket booked: ${bookingId} for user: ${req.user.email}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Ticket booking saved successfully',
+      booking: {
+        bookingId: ticketBooking.bookingId,
+        pnr: ticketBooking.pnr,
+        status: ticketBooking.status,
+        transactionId: securePaymentDetails.transactionId
+      }
+    });
+  } catch (error) {
+    console.error('❌ Transport ticket booking error:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'This booking ID or PNR already exists'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error saving ticket booking',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get all transport tickets for user
+app.get('/api/transport-tickets', authenticate, async (req, res) => {
+  try {
+    const { status } = req.query;
+    
+    let query = { userId: req.user._id };
+    if (status) {
+      query.status = status;
+    }
+
+    const tickets = await TransportTicket.find(query)
+      .sort({ bookingDate: -1 });
+
+    res.json({
+      success: true,
+      count: tickets.length,
+      tickets
+    });
+  } catch (error) {
+    console.error('❌ Get transport tickets error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching tickets'
+    });
+  }
+});
+
+// Get single transport ticket by booking ID
+app.get('/api/transport-tickets/:bookingId', authenticate, async (req, res) => {
+  try {
+    const ticket = await TransportTicket.findOne({
+      bookingId: req.params.bookingId,
+      userId: req.user._id
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      ticket
+    });
+  } catch (error) {
+    console.error('❌ Get transport ticket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching ticket'
+    });
+  }
+});
+
+// Cancel transport ticket
+app.put('/api/transport-tickets/:bookingId/cancel', authenticate, async (req, res) => {
+  try {
+    const ticket = await TransportTicket.findOne({
+      bookingId: req.params.bookingId,
+      userId: req.user._id
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    if (ticket.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ticket is already cancelled'
+      });
+    }
+
+    ticket.status = 'cancelled';
+    await ticket.save();
+
+    res.json({
+      success: true,
+      message: 'Ticket cancelled successfully',
+      ticket
+    });
+  } catch (error) {
+    console.error('❌ Cancel transport ticket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cancelling ticket'
+    });
+  }
+});
+
 
 // Delete Profile Picture (Protected Route) - NEW ENDPOINT
 app.delete('/api/auth/profile-picture', authenticate, async (req, res) => {
@@ -1200,7 +1831,7 @@ app.delete('/api/trips/:id', authenticate, async (req, res) => {
 
 // ==================== HOST ROUTES ====================
 
-// Get all hosts (Public - no auth required for browsing)
+// Get all hosts
 app.get('/api/hosts', async (req, res) => {
   try {
     const { location, minRating, verified, limit = 10 } = req.query;
@@ -1229,10 +1860,172 @@ app.get('/api/hosts', async (req, res) => {
       hosts
     });
   } catch (error) {
-    console.error(' Get hosts error:', error);
+    console.error('❌ Get hosts error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching hosts',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Create host booking
+app.post('/api/bookings', authenticate, async (req, res) => {
+  try {
+    const {
+      bookingType,
+      hostId,
+      checkIn,
+      checkOut,
+      guests,
+      selectedServices,
+      notes,
+      paymentMethod,
+      paymentDetails
+    } = req.body;
+
+    if (!bookingType || bookingType !== 'host' || !hostId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid booking data'
+      });
+    }
+
+    const host = await Host.findById(hostId);
+    if (!host || !host.available) {
+      return res.status(400).json({
+        success: false,
+        message: 'Host not available'
+      });
+    }
+
+    if (!checkIn || !checkOut) {
+      return res.status(400).json({
+        success: false,
+        message: 'Check-in and check-out dates required'
+      });
+    }
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (days <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid dates'
+      });
+    }
+
+    if (guests > host.maxGuests) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${host.maxGuests} guests allowed`
+      });
+    }
+
+    const totalAmount = host.price * days;
+    const platformFee = totalAmount * 0.15;
+    const grandTotal = totalAmount + platformFee;
+
+    // Validate payment details
+    if (paymentMethod === 'card') {
+      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Card details are required'
+        });
+      }
+
+      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
+      if (!cardValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: cardValidation.message
+        });
+      }
+    } else if (paymentMethod === 'bkash') {
+      if (!paymentDetails?.bkashNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'bKash number is required'
+        });
+      }
+
+      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
+      if (!bkashValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: `bKash ${bkashValidation.message}`
+        });
+      }
+    }
+
+    // Prepare secure payment details
+    const securePaymentDetails = {};
+    if (paymentMethod === 'card') {
+      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
+      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
+      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
+    } else if (paymentMethod === 'bkash') {
+      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
+    }
+    securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+    const booking = new Booking({
+      userId: req.user._id,
+      bookingType: 'host',
+      hostId,
+      checkIn,
+      checkOut,
+      guests,
+      selectedServices: selectedServices || [],
+      totalAmount,
+      platformFee,
+      grandTotal,
+      notes,
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      paymentMethod,
+      paymentDetails: securePaymentDetails
+    });
+
+    await booking.save();
+
+    // Also create a trip record
+    const trip = new Trip({
+      destination: host.location,
+      date: checkIn,
+      endDate: checkOut,
+      host: host.name,
+      hostAvatar: host.image,
+      image: host.propertyImage,
+      services: selectedServices || [],
+      guests,
+      totalAmount: grandTotal,
+      hostRating: host.rating,
+      description: `Experience ${host.location} with ${host.name}`,
+      userId: req.user._id,
+      status: 'upcoming'
+    });
+
+    await trip.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking created successfully',
+      booking: {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        transactionId: securePaymentDetails.transactionId
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating booking',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -3307,12 +4100,11 @@ app.post('/api/bookings', authenticate, async (req, res) => {
   }
 });
 
-// Get user's bookings (Protected)
+// Get user's bookings
 app.get('/api/bookings', authenticate, async (req, res) => {
   try {
     const bookings = await Booking.find({ userId: req.user._id })
       .populate('hostId', 'name location price propertyImage')
-      .populate('transportationId', 'type from to operator departure arrival duration price')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -3324,8 +4116,92 @@ app.get('/api/bookings', authenticate, async (req, res) => {
     console.error('❌ Get bookings error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching bookings',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error fetching bookings'
+    });
+  }
+});
+
+// Get all trips for user
+app.get('/api/trips', authenticate, async (req, res) => {
+  try {
+    const trips = await Trip.find({ userId: req.user._id })
+      .sort({ date: -1, createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: trips.length,
+      trips
+    });
+  } catch (error) {
+    console.error('❌ Get trips error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching trips'
+    });
+  }
+});
+
+// Create trip
+app.post('/api/trips', authenticate, async (req, res) => {
+  try {
+    const {
+      destination,
+      date,
+      endDate,
+      host,
+      hostAvatar,
+      image,
+      weather,
+      status,
+      services,
+      checkIn,
+      checkOut,
+      guests,
+      nights,
+      totalAmount,
+      hostRating,
+      description
+    } = req.body;
+
+    if (!destination || !date || !endDate || !host) {
+      return res.status(400).json({
+        success: false,
+        message: 'Destination, dates, and host are required'
+      });
+    }
+
+    const trip = new Trip({
+      destination,
+      date,
+      endDate,
+      host,
+      hostAvatar: hostAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.replace(/\s/g, '')}`,
+      image: image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80',
+      weather: weather || '25°C, Pleasant',
+      status: status || 'upcoming',
+      services: services || ['Local Guide'],
+      checkIn: checkIn || '2:00 PM',
+      checkOut: checkOut || '11:00 AM',
+      guests: guests || 2,
+      nights: nights || 3,
+      totalAmount: totalAmount || 12500,
+      hostRating: hostRating || 4.5,
+      description: description || `Enjoy your stay at ${destination}`,
+      userId: req.user._id
+    });
+
+    await trip.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Trip created successfully',
+      trip
+    });
+  } catch (error) {
+    console.error('❌ Create trip error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating trip'
     });
   }
 });
@@ -3780,6 +4656,313 @@ app.delete('/api/messages/conversations/:conversationId', authenticate, async (r
     res.status(500).json({
       success: false,
       message: 'Error deleting conversation'
+    });
+  }
+});
+
+app.put('/api/auth/profile', authenticate, async (req, res) => {
+  try {
+    const { fullName, phone, location, languages, bio } = req.body;
+    
+    const user = await User.findById(req.user._id);
+    
+    if (fullName) user.fullName = fullName;
+    if (phone !== undefined) user.phone = phone;
+    if (location !== undefined) user.location = location;
+    if (bio !== undefined) user.bio = bio;
+    
+    // Handle languages array
+    if (languages) {
+      if (Array.isArray(languages)) {
+        user.languages = languages;
+      } else if (typeof languages === 'string') {
+        // If it comes as a comma-separated string
+        user.languages = languages.split(',').map(lang => lang.trim()).filter(Boolean);
+      }
+    }
+    
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        location: user.location,
+        languages: user.languages,
+        bio: user.bio,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        hostBadge: user.hostBadge,
+        hostRating: user.hostRating,
+        totalGuests: user.totalGuests,
+        responseRate: user.responseRate,
+        verified: user.verified,
+        kycCompleted: user.kycCompleted,
+        createdAt: user.createdAt,
+        idVerifiedAt: user.idVerifiedAt,
+        bgCheckAt: user.bgCheckAt,
+        trainingAt: user.trainingAt,
+        bankVerifiedAt: user.bankVerifiedAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Profile update error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error updating profile' 
+    });
+  }
+});
+
+// Updated GET /api/auth/me route to include new fields
+
+app.get('/api/auth/me', authenticate, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      user: {
+        id: req.user._id,
+        username: req.user.username,
+        fullName: req.user.fullName,
+        email: req.user.email,
+        phone: req.user.phone,
+        location: req.user.location,
+        languages: req.user.languages,
+        bio: req.user.bio,
+        role: req.user.role,
+        profilePicture: req.user.profilePicture,
+        hostBadge: req.user.hostBadge,
+        hostRating: req.user.hostRating,
+        totalGuests: req.user.totalGuests,
+        responseRate: req.user.responseRate,
+        verified: req.user.verified,
+        kycCompleted: req.user.kycCompleted,
+        createdAt: req.user.createdAt,
+        lastLogin: req.user.lastLogin,
+        idVerifiedAt: req.user.idVerifiedAt,
+        bgCheckAt: req.user.bgCheckAt,
+        trainingAt: req.user.trainingAt,
+        bankVerifiedAt: req.user.bankVerifiedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching user data' 
+    });
+  }
+});
+
+// Updated Register Route to include new fields
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, fullName, email, phone, password, role } = req.body;
+
+    // Validation
+    if (!username || !fullName || !email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide all required fields: username, fullName, email, and password' 
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ 
+      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] 
+    });
+
+    if (existingUser) {
+      if (existingUser.email === email.toLowerCase()) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'This email is already registered. Please login or use a different email.' 
+        });
+      }
+      return res.status(400).json({ 
+        success: false,
+        message: 'This username is already taken. Please choose a different username.' 
+      });
+    }
+
+    // Set default verification dates for host role
+    const now = new Date();
+    const isHost = role === 'host';
+
+    // Create new user
+    const user = new User({
+      username: username.toLowerCase(),
+      fullName,
+      email: email.toLowerCase(),
+      phone: phone || '',
+      password,
+      role: role || 'tourist',
+      profilePicture: '',
+      location: isHost ? 'Cox\'s Bazar, Bangladesh' : '',
+      languages: isHost ? ['Bengali', 'English'] : [],
+      bio: isHost ? 'Passionate local guide with years of experience showing travelers the best of Bangladesh.' : '',
+      hostBadge: isHost ? 'Host' : undefined,
+      verified: isHost ? true : false,
+      idVerifiedAt: isHost ? now : undefined,
+      bgCheckAt: isHost ? now : undefined,
+      trainingAt: isHost ? now : undefined,
+      bankVerifiedAt: isHost ? now : undefined,
+      hostRating: isHost ? 4.9 : 0,
+      totalGuests: isHost ? 124 : 0,
+      responseRate: isHost ? 98 : 0
+    });
+
+    await user.save();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    console.log(`✅ New user registered: ${user.email} (Role: ${user.role})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful! Welcome to Bhromonbondhu!',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        location: user.location,
+        languages: user.languages,
+        bio: user.bio,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        hostBadge: user.hostBadge,
+        hostRating: user.hostRating,
+        totalGuests: user.totalGuests,
+        responseRate: user.responseRate,
+        verified: user.verified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ 
+        success: false,
+        message: `This ${field} is already registered. Please use a different ${field}.` 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'An error occurred during registration. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Updated Login Route to return new fields
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validation
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide both username/email and password' 
+      });
+    }
+
+    // Find user by username or email
+    const user = await User.findOne({
+      $or: [
+        { username: username.toLowerCase() }, 
+        { email: username.toLowerCase() }
+      ]
+    });
+
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid username or password. Please check your credentials and try again.' 
+      });
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Your account has been deactivated. Please contact support for assistance.' 
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid username or password. Please check your credentials and try again.' 
+      });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    console.log(`✅ User logged in: ${user.email} (Role: ${user.role})`);
+
+    res.json({
+      success: true,
+      message: 'Login successful! Welcome back!',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        location: user.location,
+        languages: user.languages,
+        bio: user.bio,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        hostBadge: user.hostBadge,
+        hostRating: user.hostRating,
+        totalGuests: user.totalGuests,
+        responseRate: user.responseRate,
+        verified: user.verified,
+        kycCompleted: user.kycCompleted,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        idVerifiedAt: user.idVerifiedAt,
+        bgCheckAt: user.bgCheckAt,
+        trainingAt: user.trainingAt,
+        bankVerifiedAt: user.bankVerifiedAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'An error occurred during login. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
