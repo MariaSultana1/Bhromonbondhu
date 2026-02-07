@@ -8,7 +8,9 @@ const cors = require('cors');
 
 const multer = require('multer');
 require('dotenv').config();
-2063885e177e6a10975383c327dbe1ef0b44fa32
+// Fallback local MongoDB (used when MONGODB_URI is not provided)
+require('dotenv').config(); // Load .env
+require('dotenv').config({ path: '.env.local', override: true }); // Load .env.local (overrides .env)
 
 const app = express();
 
@@ -23,34 +25,39 @@ app.use(cors({
 // MongoDB Atlas Connection
 const connectDB = async () => {
   try {
-    // Check if MONGODB_URI is set
-    if (!process.env.MONGODB_URI) {
-      console.error('❌ MONGODB_URI is not set in .env file');
-      return false;
+    // Respect FORCE_LOCAL to always use local MongoDB (helpful for dev)
+    if (process.env.FORCE_LOCAL === 'true') {
+      console.warn('⚠️  FORCE_LOCAL=true -> forcing connection to local MongoDB');
+      var uri = DEFAULT_LOCAL_MONGO;
+    } else {
+      // Use MONGODB_URI if set, otherwise fall back to local MongoDB
+      var uri = process.env.MONGODB_URI || DEFAULT_LOCAL_MONGO;
+      if (!process.env.MONGODB_URI) {
+        console.warn('⚠️  MONGODB_URI not set; falling back to local MongoDB:', DEFAULT_LOCAL_MONGO);
+      } else {
+        console.log('🔄 Attempting to connect to MongoDB...');
+      }
     }
 
-    console.log('🔄 Attempting to connect to MongoDB...');
-
     // Mask URI for logs (hide password)
-    const maskUri = (uri) => {
+    const maskUri = (u) => {
       try {
-        return uri.replace(/(mongodb(?:\+srv)?:\/\/)([^:@\/]+)(:)([^@]+)(@)/, (m, p1, user, colon, pass, at) => {
+        return u.replace(/(mongodb(?:\+srv)?:\/\/)([^:@\/]+)(:)([^@]+)(@)/, (m, p1, user, colon, pass, at) => {
           return p1 + user + ':' + '***' + at;
         });
       } catch (e) {
-        return 'mongodb://***';
+        return u.startsWith('mongodb') ? 'mongodb://***' : u;
       }
     };
 
-    const uri = process.env.MONGODB_URI;
     console.log('📍 MongoDB URI (masked):', maskUri(uri));
 
     // Check if database name is present in URI
-    const dbNameMatch = uri.match(/mongodb(?:\+srv)?:\/\/[^/]+\/(.+?)\?/);
+    const dbNameMatch = uri.match(/mongodb(?:\+srv)?:\/\/[^/]+\/(.+?)(\?|$)/);
     if (!dbNameMatch) {
-      console.warn('⚠️  The MONGODB_URI does not include an explicit database name.');
+      console.warn('⚠️  The MongoDB URI does not include an explicit database name.');
       console.warn('   Example format: mongodb+srv://user:pass@host/myDatabase?retryWrites=true&w=majority');
-      console.warn('   Not having a db name may still work, but it is recommended to include one (e.g., /bhromonbondhu).');
+      console.warn('   It is recommended to include one (e.g., /bhromonbondhu).');
     } else {
       console.log('📂 Database name in URI:', dbNameMatch[1]);
     }
@@ -68,7 +75,7 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
     });
 
-    console.log('✅ MongoDB Atlas connected successfully');
+    console.log('✅ MongoDB connected successfully');
     return true;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
@@ -94,6 +101,19 @@ const connectDB = async () => {
       console.error('   MONGODB_URI format: mongodb+srv://username:password@host/db');
     }
     
+    // Try fallback to local MongoDB if primary connection fails
+    try {
+      console.log('🔁 Attempting fallback to local MongoDB:', DEFAULT_LOCAL_MONGO);
+      await mongoose.connect(DEFAULT_LOCAL_MONGO, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+      });
+      console.log('✅ Connected to local MongoDB fallback');
+      return true;
+    } catch (fallbackError) {
+      console.error('❌ Local fallback connection failed:', fallbackError.message);
+    }
+
     return false;
   }
 };
