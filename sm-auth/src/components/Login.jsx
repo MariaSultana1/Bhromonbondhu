@@ -18,7 +18,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch("http://localhost:3000/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,10 +39,18 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         }
       } else {
         setError(data.message || "Login failed. Please try again.");
+        console.error("❌ Login error:", data.message);
       }
     } catch (err) {
-      setError("Unable to connect to server. Please check your connection.");
-      console.error("❌ Login error:", err);
+      console.error("❌ Network error:", err);
+      
+      if (!navigator.onLine) {
+        setError("No internet connection. Please check your network.");
+      } else if (err.message.includes('fetch')) {
+        setError("Cannot connect to server. Make sure the backend is running on http://localhost:3000");
+      } else {
+        setError("Unable to connect to server. Please check your connection and try again.");
+      }
     } finally {
       setIsLoading(false);
     }
