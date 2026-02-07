@@ -138,7 +138,7 @@ const apiService = {
   }
 };
 
-// Database schema examples (for reference)
+// Database schema examples
 /*
 Users: {
   id: string,
