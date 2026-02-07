@@ -1,129 +1,53 @@
-import { useState } from 'react';
-import { Plane, Train, Bus, Home, Search, Filter, Star, MapPin, Languages, Shield, Calendar, X, Check, CreditCard, Users, Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, Search, Filter, Star, MapPin, Languages, Shield, Calendar, X, Check, CreditCard, Users, CheckCircle2, Lock, Loader } from 'lucide-react';
 
-const hosts = [
-  {
-    id: 1,
-    name: 'Fatima Khan',
-    location: 'Cox\'s Bazar',
-    rating: 4.9,
-    reviews: 124,
-    verified: true,
-    languages: ['Bengali', 'English'],
-    price: 2500,
-    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fatima',
-    propertyImage: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    services: ['Local Guide', 'Meals', 'Transportation'],
-    available: true
-  },
-  {
-    id: 2,
-    name: 'Rafiq Ahmed',
-    location: 'Sylhet',
-    rating: 4.8,
-    reviews: 98,
-    verified: true,
-    languages: ['Bengali', 'English', 'Hindi'],
-    price: 2000,
-    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rafiq',
-    propertyImage: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    services: ['Local Guide', 'Photography', 'Trekking'],
-    available: true
-  },
-  {
-    id: 3,
-    name: 'Shahana Begum',
-    location: 'Dhaka',
-    rating: 4.7,
-    reviews: 156,
-    verified: true,
-    languages: ['Bengali', 'English'],
-    price: 1800,
-    image: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shahana',
-    propertyImage: 'https://images.unsplash.com/photo-1513563326940-e76e4641069e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaXR5JTIwc2t5bGluZSUyMG5pZ2h0fGVufDF8fHx8MTc2NTQ3NTIxMXww&ixlib=rb-4.1.0&q=80&w=1080',
-    services: ['City Tour', 'Shopping Guide', 'Food Tour'],
-    available: true
+// API configuration
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Helper function to get auth token
+const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+// Helper function to make authenticated API calls
+const apiCall = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Something went wrong');
   }
-];
 
-const tickets = {
-  flight: [
-    {
-      id: 1,
-      from: 'Dhaka',
-      to: 'Cox\'s Bazar',
-      airline: 'Biman Bangladesh',
-      departure: '10:00 AM',
-      arrival: '11:15 AM',
-      duration: '1h 15m',
-      price: 4500,
-      seats: 12
-    },
-    {
-      id: 2,
-      from: 'Dhaka',
-      to: 'Sylhet',
-      airline: 'US-Bangla',
-      departure: '2:30 PM',
-      arrival: '3:30 PM',
-      duration: '1h',
-      price: 3800,
-      seats: 8
-    }
-  ],
-  train: [
-    {
-      id: 1,
-      from: 'Dhaka',
-      to: 'Chittagong',
-      train: 'Suborno Express',
-      departure: '7:00 AM',
-      arrival: '1:30 PM',
-      duration: '6h 30m',
-      price: 800,
-      seats: 25
-    },
-    {
-      id: 2,
-      from: 'Dhaka',
-      to: 'Sylhet',
-      train: 'Parabat Express',
-      departure: '9:00 PM',
-      arrival: '5:30 AM',
-      duration: '8h 30m',
-      price: 650,
-      seats: 18
-    }
-  ],
-  bus: [
-    {
-      id: 1,
-      from: 'Dhaka',
-      to: 'Cox\'s Bazar',
-      operator: 'Green Line',
-      departure: '11:00 PM',
-      arrival: '8:00 AM',
-      duration: '9h',
-      price: 1200,
-      seats: 15
-    },
-    {
-      id: 2,
-      from: 'Dhaka',
-      to: 'Bandarban',
-      operator: 'Shyamoli',
-      departure: '10:30 PM',
-      arrival: '7:00 AM',
-      duration: '8h 30m',
-      price: 1000,
-      seats: 20
-    }
-  ]
+  return data;
+};
+
+// Helper function to get today's date in YYYY-MM-DD format
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export function BookTravel() {
-  const [bookingType, setBookingType] = useState('hosts');
-  const [ticketType, setTicketType] = useState('flight');
+  // State for hosts
+  const [hosts, setHosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState({
@@ -132,14 +56,25 @@ export function BookTravel() {
     languages: []
   });
 
-  
+  // Booking modal states
   const [showHostModal, setShowHostModal] = useState(false);
-  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedHost, setSelectedHost] = useState(null);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-
   
+  // New modal states
+  const [showHostProfile, setShowHostProfile] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  
+  // Payment simulation
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [bkashNumber, setBkashNumber] = useState('');
+
+  // Host booking form
   const [hostBookingForm, setHostBookingForm] = useState({
     checkIn: '',
     checkOut: '',
@@ -147,12 +82,64 @@ export function BookTravel() {
     selectedServices: []
   });
 
-  
-  const [ticketBookingForm, setTicketBookingForm] = useState({
-    date: '',
-    passengers: 1,
-    seatClass: 'Economy'
-  });
+  // Fetch hosts from database
+  useEffect(() => {
+    fetchHosts();
+  }, []);
+
+  const fetchHosts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('location', searchTerm);
+      if (selectedFilters.minRating > 0) params.append('minRating', selectedFilters.minRating);
+      if (selectedFilters.verified) params.append('verified', 'true');
+      
+      const data = await apiCall(`/hosts?${params.toString()}`);
+      
+      // Map database hosts to component format
+      const mappedHosts = data.hosts.map(host => ({
+        id: host._id,
+        name: host.name,
+        location: host.location,
+        rating: host.rating,
+        reviews: host.reviews,
+        verified: host.verified,
+        languages: host.languages,
+        price: host.price,
+        image: host.image,
+        propertyImage: host.propertyImage,
+        services: host.services,
+        available: host.available,
+        description: host.description,
+        experience: host.experience,
+        responseTime: host.responseTime,
+        maxGuests: host.maxGuests,
+        minStay: host.minStay
+      }));
+      
+      setHosts(mappedHosts);
+    } catch (err) {
+      console.error('Error fetching hosts:', err);
+      setError(err.message || 'Failed to fetch hosts');
+      // Set fallback hosts for demo purposes
+      setHosts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refetch when filters change
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      fetchHosts();
+    }, 500);
+
+    return () => clearTimeout(debounce);
+  }, [searchTerm, selectedFilters]);
 
   const handleHostBooking = (host) => {
     setSelectedHost(host);
@@ -165,16 +152,6 @@ export function BookTravel() {
     });
   };
 
-  const handleTicketBooking = (ticket, type) => {
-    setSelectedTicket({ ...ticket, type });
-    setShowTicketModal(true);
-    setTicketBookingForm({
-      date: '',
-      passengers: 1,
-      seatClass: 'Economy'
-    });
-  };
-
   const calculateHostTotal = () => {
     if (!selectedHost) return 0;
     const checkIn = new Date(hostBookingForm.checkIn);
@@ -183,17 +160,117 @@ export function BookTravel() {
     return days > 0 ? selectedHost.price * days : 0;
   };
 
-  const calculateTicketTotal = () => {
-    if (!selectedTicket) return 0;
-    const basePrice = selectedTicket.price;
-    const classMultiplier = ticketBookingForm.seatClass === 'Business' ? 2 : 1;
-    return basePrice * ticketBookingForm.passengers * classMultiplier;
+  const proceedToPayment = () => {
+    if (!hostBookingForm.checkIn || !hostBookingForm.checkOut) return;
+    setShowHostModal(false);
+    setShowPaymentModal(true);
   };
 
-  const confirmHostBooking = () => {
+  const processPayment = async () => {
+  setPaymentProcessing(true);
+  
+  try {
+    // Validate payment details before processing
+    if (paymentMethod === 'card') {
+      // Validate card number (16 digits)
+      const cleanedCard = cardNumber.replace(/\s+/g, '');
+      if (!/^\d{16}$/.test(cleanedCard)) {
+        alert('Card number must be exactly 16 digits');
+        setPaymentProcessing(false);
+        return;
+      }
+
+      // Validate expiry date
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry)) {
+        alert('Expiry date must be in MM/YY format');
+        setPaymentProcessing(false);
+        return;
+      }
+
+      // Check if card is expired
+      const [month, year] = cardExpiry.split('/');
+      const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
+      if (expiry < new Date()) {
+        alert('Card has expired');
+        setPaymentProcessing(false);
+        return;
+      }
+
+      // Validate CVV (3 digits)
+      if (!/^\d{3}$/.test(cardCVV)) {
+        alert('CVV must be exactly 3 digits');
+        setPaymentProcessing(false);
+        return;
+      }
+    } else if (paymentMethod === 'bkash') {
+      // Validate bKash number (11 digits starting with 01)
+      if (!/^01[3-9]\d{8}$/.test(bkashNumber)) {
+        alert('bKash number must be 11 digits starting with 01');
+        setPaymentProcessing(false);
+        return;
+      }
+    }
+
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     if (!selectedHost) return;
 
-    const booking = {
+    const totalAmount = calculateHostTotal();
+    const platformFee = Math.round(totalAmount * 0.15);
+    const grandTotal = totalAmount + platformFee;
+
+    // Prepare payment details
+    const paymentDetails = {};
+    if (paymentMethod === 'card') {
+      paymentDetails.cardNumber = cardNumber;
+      paymentDetails.cardholderName = 'Card Holder'; // Add cardholder name field if needed
+    } else if (paymentMethod === 'bkash') {
+      paymentDetails.bkashNumber = bkashNumber;
+    }
+
+    // Create booking in database
+    const bookingData = {
+      bookingType: 'host',
+      hostId: selectedHost.id,
+      checkIn: hostBookingForm.checkIn,
+      checkOut: hostBookingForm.checkOut,
+      guests: hostBookingForm.guests,
+      selectedServices: hostBookingForm.selectedServices,
+      notes: `Booking for ${selectedHost.name} in ${selectedHost.location}`,
+      paymentMethod: paymentMethod,
+      paymentDetails: paymentDetails
+    };
+
+    const response = await apiCall('/bookings', {
+      method: 'POST',
+      body: JSON.stringify(bookingData)
+    });
+
+    console.log('✅ Booking created:', response.booking);
+
+    // Also create a trip record for backward compatibility
+    const tripData = {
+      destination: selectedHost.location,
+      date: hostBookingForm.checkIn,
+      endDate: hostBookingForm.checkOut,
+      host: selectedHost.name,
+      hostAvatar: selectedHost.image,
+      image: selectedHost.propertyImage,
+      services: hostBookingForm.selectedServices,
+      guests: hostBookingForm.guests,
+      totalAmount: grandTotal,
+      hostRating: selectedHost.rating,
+      description: `Experience ${selectedHost.location} with ${selectedHost.name}`
+    };
+
+    await apiCall('/trips', {
+      method: 'POST',
+      body: JSON.stringify(tripData)
+    });
+
+    // Store booking info in localStorage as well for quick access
+    const localBooking = {
       hostId: selectedHost.id,
       hostName: selectedHost.name,
       location: selectedHost.location,
@@ -201,46 +278,39 @@ export function BookTravel() {
       checkOut: hostBookingForm.checkOut,
       guests: hostBookingForm.guests,
       services: hostBookingForm.selectedServices,
-      totalPrice: calculateHostTotal(),
+      totalPrice: grandTotal,
       propertyImage: selectedHost.propertyImage,
-      hostAvatar: selectedHost.image
+      hostAvatar: selectedHost.image,
+      bookingId: response.booking.bookingId,
+      createdAt: new Date().toISOString()
     };
 
     const existingBookings = JSON.parse(localStorage.getItem('hostBookings') || '[]');
-    existingBookings.push(booking);
+    existingBookings.push(localBooking);
     localStorage.setItem('hostBookings', JSON.stringify(existingBookings));
 
-    setShowHostModal(false);
+    setPaymentProcessing(false);
+    setShowPaymentModal(false);
     setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 3000);
-  };
+    
+    // Reset form
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCVV('');
+    setBkashNumber('');
+    
+    setTimeout(() => {
+      setShowConfirmation(false);
+      // Optionally redirect to bookings page
+      // window.location.href = '/my-hosts';
+    }, 3000);
 
-  const confirmTicketBooking = () => {
-    if (!selectedTicket) return;
-
-    const booking = {
-      ticketId: selectedTicket.id,
-      type: selectedTicket.type,
-      from: selectedTicket.from,
-      to: selectedTicket.to,
-      date: ticketBookingForm.date,
-      passengers: ticketBookingForm.passengers,
-      seatClass: ticketBookingForm.seatClass,
-      totalPrice: calculateTicketTotal(),
-      departure: selectedTicket.departure,
-      arrival: selectedTicket.arrival,
-      operator: selectedTicket.type === 'flight' ? selectedTicket.airline : 
-                selectedTicket.type === 'train' ? selectedTicket.train : selectedTicket.operator
-    };
-
-    const existingBookings = JSON.parse(localStorage.getItem('ticketBookings') || '[]');
-    existingBookings.push(booking);
-    localStorage.setItem('ticketBookings', JSON.stringify(existingBookings));
-
-    setShowTicketModal(false);
-    setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 3000);
-  };
+  } catch (err) {
+    console.error('Booking error:', err);
+    alert(`Booking failed: ${err.message}`);
+    setPaymentProcessing(false);
+  }
+};
 
   const toggleService = (service) => {
     setHostBookingForm(prev => ({
@@ -251,82 +321,27 @@ export function BookTravel() {
     }));
   };
 
+  // Filter hosts based on search and filters
+  const filteredHosts = hosts.filter(host => {
+    const matchesSearch = !searchTerm || 
+      host.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      host.location.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesVerified = !selectedFilters.verified || host.verified;
+    const matchesRating = host.rating >= selectedFilters.minRating;
+    
+    return matchesSearch && matchesVerified && matchesRating;
+  });
+
   return (
     <div className="space-y-8">
-      
-      <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
-        <h2 className="text-3xl mb-2">Discover Bangladesh</h2>
-        <p className="text-blue-100">Book authentic experiences with verified local hosts and convenient travel tickets</p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-300 rounded-2xl p-8 text-white">
+        <h2 className="text-2xl mb-2">Discover Local Hosts</h2>
+        <p className="text-blue-60">Book authentic experiences with verified local hosts across Bangladesh</p>
       </div>
 
-      
-      <div className="bg-white rounded-xl shadow-sm p-2 inline-flex gap-2">
-        <button
-          onClick={() => setBookingType('hosts')}
-          className={`px-6 py-3 rounded-lg transition-all ${
-            bookingType === 'hosts'
-              ? 'bg-blue-500 text-white shadow-md'
-              : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Home className="w-5 h-5" />
-            <span>Local Hosts</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setBookingType('tickets')}
-          className={`px-6 py-3 rounded-lg transition-all ${
-            bookingType === 'tickets'
-              ? 'bg-blue-500 text-white shadow-md'
-              : 'text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Plane className="w-5 h-5" />
-            <span>Travel Tickets</span>
-          </div>
-        </button>
-      </div>
-
-      {bookingType === 'tickets' && (
-        <div className="flex gap-3">
-          <button
-            onClick={() => setTicketType('flight')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all ${
-              ticketType === 'flight'
-                ? 'bg-blue-50 text-blue-600 border-2 border-blue-200'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200'
-            }`}
-          >
-            <Plane className="w-5 h-5" />
-            <span>Flights</span>
-          </button>
-          <button
-            onClick={() => setTicketType('train')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all ${
-              ticketType === 'train'
-                ? 'bg-blue-50 text-blue-600 border-2 border-blue-200'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200'
-            }`}
-          >
-            <Train className="w-5 h-5" />
-            <span>Trains</span>
-          </button>
-          <button
-            onClick={() => setTicketType('bus')}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all ${
-              ticketType === 'bus'
-                ? 'bg-blue-50 text-blue-600 border-2 border-blue-200'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200'
-            }`}
-          >
-            <Bus className="w-5 h-5" />
-            <span>Buses</span>
-          </button>
-        </div>
-      )}
-
+      {/* Search and Filters */}
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -334,7 +349,7 @@ export function BookTravel() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={bookingType === 'hosts' ? 'Search destinations or host names...' : 'Search routes...'}
+            placeholder="Search destinations or host names..."
             className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -349,8 +364,8 @@ export function BookTravel() {
         </button>
       </div>
 
-     
-      {showFilters && bookingType === 'hosts' && (
+      {/* Filters Panel */}
+      {showFilters && (
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
           <div className="grid md:grid-cols-3 gap-6">
             <div>
@@ -390,136 +405,133 @@ export function BookTravel() {
         </div>
       )}
 
-      
-      <div className="space-y-4">
-        {bookingType === 'hosts' ? (
-          <>
-            {hosts.map((host) => (
-              <div key={host.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
-                <div className="md:flex">
-                  <div className="md:w-80 h-64 md:h-auto relative overflow-hidden">
-                    <img
-                      src={host.propertyImage}
-                      alt={host.location}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                    />
-                    {host.verified && (
-                      <div className="absolute top-4 right-4 bg-white rounded-full px-3 py-1.5 shadow-lg flex items-center gap-1.5">
-                        <Shield className="w-4 h-4 text-blue-500" />
-                        <span className="text-xs">Verified</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <img src={host.image} alt={host.name} className="w-12 h-12 rounded-full border-2 border-blue-100" />
-                          <div>
-                            <h3 className="text-xl mb-1">{host.name}</h3>
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <MapPin className="w-4 h-4" />
-                              <span>{host.location}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="flex items-center gap-1.5 bg-yellow-50 px-3 py-1.5 rounded-lg">
-                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                            <span className="text-sm">{host.rating}</span>
-                            <span className="text-xs text-gray-500">({host.reviews} reviews)</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Languages className="w-4 h-4" />
-                            <span>{host.languages.join(', ')}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {host.services.map((service, index) => (
-                            <span key={index} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm rounded-lg border border-blue-100">
-                              {service}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="text-right ml-6">
-                        <div className="text-3xl text-blue-600 mb-1">৳{host.price}</div>
-                        <div className="text-sm text-gray-500">per day</div>
-                      </div>
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-800">
+          <p className="font-medium">Error loading hosts</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="w-8 h-8 animate-spin text-blue-500" />
+          <span className="ml-3 text-gray-600">Loading hosts...</span>
+        </div>
+      )}
+
+      {/* No Results */}
+      {!loading && !error && filteredHosts.length === 0 && (
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-8 text-center">
+          <p className="text-gray-600">No hosts found matching your criteria.</p>
+          <button 
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedFilters({ verified: false, minRating: 0, languages: [] });
+            }}
+            className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Clear Filters
+          </button>
+        </div>
+      )}
+
+      {/* Hosts List */}
+      {!loading && !error && filteredHosts.length > 0 && (
+        <div className="space-y-4">
+          {filteredHosts.map((host) => (
+            <div key={host.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+              <div className="md:flex">
+                <div className="md:w-80 h-64 md:h-auto relative overflow-hidden">
+                  <img
+                    src={host.propertyImage}
+                    alt={host.location}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                  />
+                  {host.verified && (
+                    <div className="absolute top-4 right-4 bg-white rounded-full px-3 py-1.5 shadow-lg flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      <span className="text-xs">Verified</span>
                     </div>
-                    <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                      <button
-                        disabled={!host.available}
-                        onClick={() => handleHostBooking(host)}
-                        className={`px-6 py-3 rounded-xl transition-all ${
-                          host.available
-                            ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        {host.available ? 'Book Experience' : 'Unavailable'}
-                      </button>
-                      <button className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-                        View Profile
-                      </button>
-                      <button className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-                        Message
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </>
-        ) : (
-          <>
-            {tickets[ticketType].map((ticket) => (
-              <div key={ticket.id} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-8 mb-4">
-                      <div className="text-center">
-                        <div className="text-3xl mb-2">{ticket.departure}</div>
-                        <div className="text-gray-600">{ticket.from}</div>
-                      </div>
-                      <div className="flex-1 flex flex-col items-center">
-                        <div className="text-sm text-gray-500 mb-2">{ticket.duration}</div>
-                        <div className="w-full relative">
-                          <div className="w-full h-0.5 bg-gray-300"></div>
-                          <ArrowRight className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-gray-400 bg-white" />
-                        </div>
-                        <div className="text-sm text-gray-700 mt-2">
-                          {'airline' in ticket ? ticket.airline : 'train' in ticket ? ticket.train : ticket.operator}
+                <div className="flex-1 p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <img src={host.image} alt={host.name} className="w-12 h-12 rounded-full border-2 border-blue-100" />
+                        <div>
+                          <h3 className="text-xl mb-1">{host.name}</h3>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4" />
+                            <span>{host.location}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-3xl mb-2">{ticket.arrival}</div>
-                        <div className="text-gray-600">{ticket.to}</div>
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex items-center gap-1.5 bg-yellow-50 px-3 py-1.5 rounded-lg">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm">{host.rating}</span>
+                          <span className="text-xs text-gray-500">({host.reviews} reviews)</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Languages className="w-4 h-4" />
+                          <span>{host.languages.join(', ')}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {host.services.map((service, index) => (
+                          <span key={index} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm rounded-lg border border-blue-100">
+                            {service}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <div className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg border border-green-100">
-                        {ticket.seats} seats available
-                      </div>
+                    <div className="text-right ml-6">
+                      <div className="text-3xl text-blue-600 mb-1">৳{host.price}</div>
+                      <div className="text-sm text-gray-500">per day</div>
                     </div>
                   </div>
-                  <div className="text-right ml-8">
-                    <div className="text-3xl text-blue-600 mb-3">৳{ticket.price}</div>
-                    <button 
-                      onClick={() => handleTicketBooking(ticket, ticketType)}
-                      className="px-8 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 shadow-md hover:shadow-lg transition-all"
+                  <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                    <button
+                      disabled={!host.available}
+                      onClick={() => handleHostBooking(host)}
+                      className={`px-6 py-3 rounded-xl transition-all ${
+                        host.available
+                          ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
                     >
-                      Book Now
+                      {host.available ? 'Book Experience' : 'Unavailable'}
+                    </button>
+                    <button 
+                      className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all" 
+                      onClick={() => {
+                        setSelectedHost(host);
+                        setShowHostProfile(true);
+                      }}
+                    >
+                      View Profile
+                    </button>
+                    <button 
+                      className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all" 
+                      onClick={() => {
+                        setSelectedHost(host);
+                        setShowMessageModal(true);
+                      }}
+                    >
+                      Message
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
-          </>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-     
+      {/* Booking Info */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -535,7 +547,7 @@ export function BookTravel() {
         </div>
       </div>
 
-      
+      {/* Host Booking Modal */}
       {showHostModal && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
@@ -572,7 +584,7 @@ export function BookTravel() {
                   </div>
                 </div>
 
-             
+                {/* Booking Form */}
                 <div>
                   <label className="block text-sm mb-3 text-gray-700">Select Your Dates</label>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -585,7 +597,7 @@ export function BookTravel() {
                           value={hostBookingForm.checkIn}
                           onChange={(e) => setHostBookingForm({ ...hostBookingForm, checkIn: e.target.value })}
                           className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          min={new Date().toISOString().split('T')[0]}
+                          min={getTodayDate()}
                         />
                       </div>
                     </div>
@@ -598,7 +610,7 @@ export function BookTravel() {
                           value={hostBookingForm.checkOut}
                           onChange={(e) => setHostBookingForm({ ...hostBookingForm, checkOut: e.target.value })}
                           className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          min={hostBookingForm.checkIn || new Date().toISOString().split('T')[0]}
+                          min={hostBookingForm.checkIn || getTodayDate()}
                         />
                       </div>
                     </div>
@@ -617,12 +629,12 @@ export function BookTravel() {
                     </button>
                     <span className="text-xl w-16 text-center">{hostBookingForm.guests}</span>
                     <button
-                      onClick={() => setHostBookingForm({ ...hostBookingForm, guests: hostBookingForm.guests + 1 })}
+                      onClick={() => setHostBookingForm({ ...hostBookingForm, guests: Math.min(selectedHost.maxGuests || 10, hostBookingForm.guests + 1) })}
                       className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white transition-colors"
                     >
                       +
                     </button>
-                    <span className="text-sm text-gray-600">guests</span>
+                    <span className="text-sm text-gray-600">guests (max {selectedHost.maxGuests || 10})</span>
                   </div>
                 </div>
 
@@ -650,6 +662,7 @@ export function BookTravel() {
                   </div>
                 </div>
 
+                {/* Price Summary */}
                 <div className="border-t-2 border-gray-200 pt-6">
                   <h4 className="mb-4">Price Breakdown</h4>
                   <div className="space-y-3 mb-5">
@@ -668,14 +681,13 @@ export function BookTravel() {
                   </div>
 
                   <button
-                    onClick={confirmHostBooking}
+                    onClick={proceedToPayment}
                     disabled={!hostBookingForm.checkIn || !hostBookingForm.checkOut}
                     className="w-full py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all disabled:shadow-none"
                   >
                     <CreditCard className="w-5 h-5" />
-                    <span>Confirm Booking & Pay</span>
+                    <span>Proceed to Payment</span>
                   </button>
-                  <p className="text-xs text-center text-gray-500 mt-3">Payment held in escrow until service confirmation</p>
                 </div>
               </div>
             </div>
@@ -683,179 +695,368 @@ export function BookTravel() {
         </div>
       )}
 
-     
-      {showTicketModal && selectedTicket && (
+      {/* Payment Modal */}
+      {showPaymentModal && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 text-white p-6 flex items-center justify-between">
               <div>
-                <h3 className="text-2xl mb-1">Complete Your Booking</h3>
-                <p className="text-blue-100 text-sm capitalize">Book your {selectedTicket.type} ticket</p>
+                <h3 className="text-2xl mb-1">Secure Payment</h3>
+                <p className="text-green-100 text-sm">Complete your booking payment</p>
               </div>
-              <button onClick={() => setShowTicketModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+              <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="overflow-y-auto max-h-[calc(90vh-88px)]">
               <div className="p-6 space-y-6">
-               
-                <div className="p-5 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        selectedTicket.type === 'flight' ? 'bg-blue-100 text-blue-600' :
-                        selectedTicket.type === 'train' ? 'bg-green-100 text-green-600' :
-                        'bg-orange-100 text-orange-600'
-                      }`}>
-                        {selectedTicket.type === 'flight' ? <Plane className="w-6 h-6" /> :
-                         selectedTicket.type === 'train' ? <Train className="w-6 h-6" /> :
-                         <Bus className="w-6 h-6" />}
+                {/* Payment Amount Summary */}
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 p-5 rounded-xl border-2 border-green-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-gray-700">Booking Total</span>
+                    <span className="text-2xl text-green-600">৳{calculateHostTotal() + Math.round(calculateHostTotal() * 0.15)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Lock className="w-4 h-4" />
+                    <span>Payment secured with escrow protection</span>
+                  </div>
+                </div>
+
+                {/* Payment Method Selection */}
+                <div>
+                  <label className="block text-sm mb-3 text-gray-700">Select Payment Method</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setPaymentMethod('card')}
+                      className={`p-4 border-2 rounded-xl transition-all ${
+                        paymentMethod === 'card'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <CreditCard className="w-6 h-6 mx-auto mb-2 text-blue-600" />
+                      <div className="text-sm">Credit / Debit Card</div>
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethod('bkash')}
+                      className={`p-4 border-2 rounded-xl transition-all ${
+                        paymentMethod === 'bkash'
+                          ? 'border-pink-500 bg-pink-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">💳</div>
+                      <div className="text-sm">bKash</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Payment Forms */}
+                {paymentMethod === 'card' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm mb-2 text-gray-700">Card Number</label>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 16) {
+                            setCardNumber(value.replace(/(\d{4})/g, '$1 ').trim());
+                          }
+                        }}
+                        placeholder="1234 5678 9012 3456"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        maxLength={19}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm mb-2 text-gray-700">Expiry Date</label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 4) {
+                              setCardExpiry(value.length >= 2 ? `${value.slice(0, 2)}/${value.slice(2)}` : value);
+                            }
+                          }}
+                          placeholder="MM/YY"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          maxLength={5}
+                        />
                       </div>
                       <div>
-                        <h4 className="text-lg">{selectedTicket.from} → {selectedTicket.to}</h4>
-                        <p className="text-sm text-gray-600">
-                          {selectedTicket.type === 'flight' ? selectedTicket.airline : 
-                           selectedTicket.type === 'train' ? selectedTicket.train : selectedTicket.operator}
-                        </p>
+                        <label className="block text-sm mb-2 text-gray-700">CVV</label>
+                        <input
+                          type="text"
+                          value={cardCVV}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 3) setCardCVV(value);
+                          }}
+                          placeholder="123"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          maxLength={3}
+                        />
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500 mb-1">Duration</div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <span>{selectedTicket.duration}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Departure</div>
-                      <div className="text-lg">{selectedTicket.departure}</div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400" />
-                    <div className="text-right">
-                      <div className="text-xs text-gray-500 mb-1">Arrival</div>
-                      <div className="text-lg">{selectedTicket.arrival}</div>
-                    </div>
-                  </div>
-                </div>
-
-                
-                <div>
-                  <label className="block text-sm mb-3 text-gray-700">Travel Date</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="date"
-                      value={ticketBookingForm.date}
-                      onChange={(e) => setTicketBookingForm({ ...ticketBookingForm, date: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm mb-3 text-gray-700">Number of Passengers</label>
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
-                    <Users className="w-5 h-5 text-gray-400" />
-                    <button
-                      onClick={() => setTicketBookingForm({ ...ticketBookingForm, passengers: Math.max(1, ticketBookingForm.passengers - 1) })}
-                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white transition-colors"
-                    >
-                      -
-                    </button>
-                    <span className="text-xl w-16 text-center">{ticketBookingForm.passengers}</span>
-                    <button
-                      onClick={() => setTicketBookingForm({ ...ticketBookingForm, passengers: Math.min(selectedTicket.seats, ticketBookingForm.passengers + 1) })}
-                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white transition-colors"
-                    >
-                      +
-                    </button>
-                    <span className="text-sm text-gray-600">passengers</span>
-                  </div>
-                </div>
-
-                {selectedTicket.type === 'flight' && (
-                  <div>
-                    <label className="block text-sm mb-3 text-gray-700">Select Class</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        onClick={() => setTicketBookingForm({ ...ticketBookingForm, seatClass: 'Economy' })}
-                        className={`p-5 border-2 rounded-xl transition-all ${
-                          ticketBookingForm.seatClass === 'Economy'
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="mb-2">Economy</div>
-                        <div className="text-2xl text-blue-600">৳{selectedTicket.price}</div>
-                        {ticketBookingForm.seatClass === 'Economy' && (
-                          <CheckCircle2 className="w-5 h-5 text-blue-500 mt-2" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setTicketBookingForm({ ...ticketBookingForm, seatClass: 'Business' })}
-                        className={`p-5 border-2 rounded-xl transition-all ${
-                          ticketBookingForm.seatClass === 'Business'
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="mb-2">Business</div>
-                        <div className="text-2xl text-blue-600">৳{selectedTicket.price * 2}</div>
-                        {ticketBookingForm.seatClass === 'Business' && (
-                          <CheckCircle2 className="w-5 h-5 text-blue-500 mt-2" />
-                        )}
-                      </button>
                     </div>
                   </div>
                 )}
 
-                
-                <div className="border-t-2 border-gray-200 pt-6">
-                  <h4 className="mb-4">Price Breakdown</h4>
-                  <div className="space-y-3 mb-5">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Base price × {ticketBookingForm.passengers} passenger(s)</span>
-                      <span>৳{selectedTicket.price * ticketBookingForm.passengers * (ticketBookingForm.seatClass === 'Business' ? 2 : 1)}</span>
+                {paymentMethod === 'bkash' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm mb-2 text-gray-700">bKash Number</label>
+                      <input
+                        type="text"
+                        value={bkashNumber}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 11) setBkashNumber(value);
+                        }}
+                        placeholder="01XXXXXXXXX"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                        maxLength={11}
+                      />
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Platform fee (15%)</span>
-                      <span>৳{Math.round(calculateTicketTotal() * 0.15)}</span>
-                    </div>
-                    <div className="flex justify-between pt-3 border-t-2 border-gray-200">
-                      <span className="text-lg">Total Amount</span>
-                      <span className="text-3xl text-blue-600">৳{calculateTicketTotal() + Math.round(calculateTicketTotal() * 0.15)}</span>
+                    <div className="p-4 bg-pink-50 border border-pink-200 rounded-lg text-sm text-pink-800">
+                      You will receive a payment request on your bKash app. Please approve to complete the booking.
                     </div>
                   </div>
+                )}
 
-                  <button
-                    onClick={confirmTicketBooking}
-                    disabled={!ticketBookingForm.date}
-                    className="w-full py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all disabled:shadow-none"
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    <span>Confirm Booking & Pay</span>
-                  </button>
-                  <p className="text-xs text-center text-gray-500 mt-3">Payment held in escrow until service confirmation</p>
+                {/* Security Note */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <strong>100% Secure Transaction:</strong> Your payment is encrypted and held in escrow. 
+                      Funds are only released to the host after you confirm the service.
+                    </div>
+                  </div>
                 </div>
+
+                {/* Payment Button */}
+                <button
+                  onClick={processPayment}
+                  disabled={paymentProcessing || (paymentMethod === 'card' && (!cardNumber || !cardExpiry || !cardCVV)) || (paymentMethod === 'bkash' && !bkashNumber)}
+                  className="w-full py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all disabled:shadow-none"
+                >
+                  {paymentProcessing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing Payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-5 h-5" />
+                      <span>Pay ৳{calculateHostTotal() + Math.round(calculateHostTotal() * 0.15)} Securely</span>
+                    </>
+                  )}
+                </button>
+
+                <p className="text-xs text-center text-gray-500">
+                  Payment will be stored in the database and synced with your bookings.
+                </p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      
+      {/* Host Profile Modal */}
+      {showHostProfile && selectedHost && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between sticky top-0">
+              <div className="flex items-center gap-4">
+                <img src={selectedHost.image} alt={selectedHost.name} className="w-16 h-16 rounded-full border-4 border-white" />
+                <div>
+                  <h3 className="text-2xl mb-1">{selectedHost.name}</h3>
+                  <p className="text-blue-100 text-sm">{selectedHost.location}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHostProfile(false)} className="p-2 hover:bg-white/20 rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Profile Image */}
+              <div className="rounded-xl overflow-hidden">
+                <img src={selectedHost.propertyImage} alt={selectedHost.location} className="w-full h-64 object-cover" />
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-1 mb-2">
+                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                    <span className="text-2xl text-yellow-700">{selectedHost.rating}</span>
+                  </div>
+                  <div className="text-sm text-gray-600">Rating</div>
+                </div>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                  <div className="text-2xl text-blue-600 mb-2">{selectedHost.reviews}</div>
+                  <div className="text-sm text-gray-600">Reviews</div>
+                </div>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-1 mb-2">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    <span className="text-sm">Verified</span>
+                  </div>
+                  <div className="text-sm text-gray-600">Host Status</div>
+                </div>
+              </div>
+
+              {/* About */}
+              <div>
+                <h4 className="mb-3">About {selectedHost.name}</h4>
+                <p className="text-gray-700 leading-relaxed">
+                  {selectedHost.description || `Experienced local host providing authentic experiences in ${selectedHost.location}. 
+                  Passionate about sharing the beauty and culture of Bangladesh with travelers from around the world.`}
+                </p>
+              </div>
+
+              {/* Languages */}
+              <div>
+                <h4 className="mb-3">Languages</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedHost.languages.map((lang, index) => (
+                    <span key={index} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg flex items-center gap-2">
+                      <Languages className="w-4 h-4" />
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Services */}
+              <div>
+                <h4 className="mb-3">Services Offered</h4>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {selectedHost.services.map((service, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                      <span className="text-gray-700">{service}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-600 mb-1">Starting from</div>
+                    <div className="text-3xl text-blue-600">৳{selectedHost.price}<span className="text-lg text-gray-500">/day</span></div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowHostProfile(false);
+                      handleHostBooking(selectedHost);
+                    }}
+                    className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowHostProfile(false)}
+                className="w-full py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Message Modal */}
+      {showMessageModal && selectedHost && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
+            <div className="bg-gradient-to-r from-green-600 to-green-500 text-white p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl mb-1">Message Host</h3>
+                <p className="text-green-100 text-sm">Send a message to {selectedHost.name}</p>
+              </div>
+              <button onClick={() => setShowMessageModal(false)} className="p-2 hover:bg-white/20 rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Host Info */}
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                <img src={selectedHost.image} alt={selectedHost.name} className="w-12 h-12 rounded-full" />
+                <div>
+                  <div className="mb-1">{selectedHost.name}</div>
+                  <div className="text-sm text-gray-600">{selectedHost.location}</div>
+                </div>
+              </div>
+
+              {/* Message Subject */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Subject</label>
+                <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option>General Inquiry</option>
+                  <option>Booking Question</option>
+                  <option>Service Details</option>
+                  <option>Availability Check</option>
+                  <option>Custom Request</option>
+                </select>
+              </div>
+
+              {/* Message Text */}
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Your Message</label>
+                <textarea
+                  placeholder="Type your message here..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  rows={6}
+                />
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                💡 The host will receive your message and can respond within 24 hours
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowMessageModal(false)}
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMessageModal(false);
+                    alert('Message sent successfully!');
+                  }}
+                  className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600"
+                >
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Toast */}
       {showConfirmation && (
         <div className="fixed bottom-8 right-8 bg-white border-2 border-green-200 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-50 animate-slide-up max-w-md">
           <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
             <Check className="w-6 h-6 text-white" />
           </div>
           <div>
-            <div className="mb-1">Booking Confirmed!</div>
-            <div className="text-sm text-gray-600">Check "My Hosts" to view your booking details</div>
+            <div className="mb-1">Payment Successful!</div>
+            <div className="text-sm text-gray-600">Your booking has been saved to the database.</div>
           </div>
         </div>
       )}

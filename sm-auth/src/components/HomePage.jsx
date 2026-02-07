@@ -116,12 +116,13 @@ const HomePage = ({ goLogin, goSignup }) => {
     Login
   </button>
 
-  <button
-    onClick={goSignup}
-    className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-4 py-2 md:px-6 md:py-2 rounded-full hover:from-cyan-500 hover:to-blue-600 transition-all shadow-md hover:shadow-lg text-sm md:text-base"
-  >
-    Register
-  </button>
+  
+<button
+  onClick={() => goSignup()} // This should call goToSignUpAs from App.js
+  className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-4 py-2 md:px-6 md:py-2 rounded-full hover:from-cyan-500 hover:to-blue-600 transition-all shadow-md hover:shadow-lg text-sm md:text-base"
+>
+  Register
+</button>
 </div>
 </div>
 </header>

@@ -32,7 +32,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         
-        console.log("✅ Login successful:", data.user);
+        console.log(" Login successful:", data.user);
         
         if (onLoginSuccess) {
           onLoginSuccess(data.user);
@@ -42,15 +42,8 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         console.error("❌ Login error:", data.message);
       }
     } catch (err) {
-      console.error("❌ Network error:", err);
-      
-      if (!navigator.onLine) {
-        setError("No internet connection. Please check your network.");
-      } else if (err.message.includes('fetch')) {
-        setError("Cannot connect to server. Make sure the backend is running on http://localhost:3000");
-      } else {
-        setError("Unable to connect to server. Please check your connection and try again.");
-      }
+      setError("Unable to connect to server. Please check your connection.");
+      console.error(" Login error:", err);
     } finally {
       setIsLoading(false);
     }

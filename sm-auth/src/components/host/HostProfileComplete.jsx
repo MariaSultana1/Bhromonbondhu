@@ -1,50 +1,393 @@
-import { CheckCircle, AlertCircle, Shield, Camera, Edit, Phone, Mail, MapPin, Languages, Award, X, HelpCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock, User, Languages, Award } from 'lucide-react';
 
-export function HostProfileComplete({ user }) {
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showEditBio, setShowEditBio] = useState(false);
-  const [showContactSupport, setShowContactSupport] = useState(false);
+export function HostProfileComplete({ user: initialUser }) {
+  const [user, setUser] = useState(initialUser);
+  const [loading, setLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Reference for file input
+  const fileInputRef = useRef(null);
+
+  // Edit Profile Form State
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    phone: '',
+    location: '',
+    languages: '',
+    bio: ''
+  });
+
+  // Change Password Form State
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // Fetch user profile from backend
+  const fetchUserProfile = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to view your profile');
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setEditForm({
+          fullName: data.user.fullName || '',
+          phone: data.user.phone || '',
+          location: data.user.location || 'Cox\'s Bazar, Bangladesh',
+          languages: data.user.languages?.join(', ') || 'Bengali, English',
+          bio: data.user.bio || 'Passionate local guide with years of experience showing travelers the best of Bangladesh.'
+        });
+      } else {
+        setError(data.message || 'Failed to fetch profile');
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError('Failed to load profile data');
+    }
+  };
+
+  // Load user profile on component mount
+  useEffect(() => {
+    if (!initialUser) {
+      fetchUserProfile();
+    } else {
+      setEditForm({
+        fullName: initialUser.fullName || '',
+        phone: initialUser.phone || '',
+        location: initialUser.location || 'Cox\'s Bazar, Bangladesh',
+        languages: initialUser.languages?.join(', ') || 'Bengali, English',
+        bio: initialUser.bio || 'Passionate local guide with years of experience showing travelers the best of Bangladesh.'
+      });
+    }
+  }, [initialUser]);
+
+  // Handle profile picture upload
+  const handleProfilePictureClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Image = event.target.result;
+
+        const token = getAuthToken();
+        if (!token) {
+          setError('Please login to update your profile picture');
+          setUploadingImage(false);
+          return;
+        }
+
+        // Send to backend
+        const response = await fetch('http://localhost:5000/api/auth/profile-picture', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            profilePicture: base64Image
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setUser(data.user);
+          setSuccess('Profile picture updated successfully!');
+          setTimeout(() => setSuccess(''), 3000);
+        } else {
+          setError(data.message || 'Failed to upload profile picture');
+        }
+
+        setUploadingImage(false);
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setUploadingImage(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading profile picture:', err);
+      setError('Failed to upload profile picture. Please try again.');
+      setUploadingImage(false);
+    }
+  };
+
+  // Handle Edit Profile Submit
+  const handleEditProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to update your profile');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fullName: editForm.fullName,
+          phone: editForm.phone,
+          location: editForm.location,
+          languages: editForm.languages.split(',').map(lang => lang.trim()),
+          bio: editForm.bio
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        setSuccess('Profile updated successfully!');
+        setTimeout(() => {
+          setShowEditModal(false);
+          setSuccess('');
+        }, 2000);
+      } else {
+        setError(data.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError('Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Change Password Submit
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    // Validation
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setError('Please fill in all password fields');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('New passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Please login to change your password');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Password changed successfully!');
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setSuccess('');
+        }, 2000);
+      } else {
+        setError(data.message || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error('Error changing password:', err);
+      setError('Failed to change password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle input changes
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePasswordFormChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Format joined date
+  const formatJoinedDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-     
+      
       <div>
         <h2 className="text-2xl mb-2">Host Profile</h2>
-        <p className="text-gray-600">Manage your profile and verification</p>
+        <p className="text-gray-600">Manage your account and verification</p>
       </div>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         
         <div className="lg:col-span-2 space-y-6">
-         
+          
+          {/* Profile Card */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-6 mb-6">
               <div className="relative">
-                <img
-                  src="./images/man 2.png"
-                  alt={user.name}
-                  className="w-24 h-24 rounded-full"
+                {/* Profile Picture or Default Icon */}
+                {user.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt={user.fullName || user.username}
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+                    <User className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Camera Button with Upload Functionality */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
                 />
-                <button className="absolute bottom-0 right-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600">
-                  <Camera className="w-4 h-4" />
+                <button 
+                  onClick={handleProfilePictureClick}
+                  disabled={uploadingImage}
+                  className="absolute bottom-0 right-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Change profile picture"
+                >
+                  {uploadingImage ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
                 </button>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl">{user.name}</h3>
+                  <h3 className="text-xl">{user.username}</h3>
                   {user.verified && (
                     <CheckCircle className="w-5 h-5 text-green-500" title="Verified Host" />
                   )}
                 </div>
-                <p className="text-gray-600 mb-1">{user.email}</p>
-                <div className="flex items-center gap-2 mb-3">
-                  <Award className="w-4 h-4 text-yellow-500" />
-                  <span className="text-sm text-gray-600">Superhost</span>
-                </div>
+                <p className="text-gray-600 mb-3">{user.fullName}</p>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowEditProfile(true)}
+                  <button 
+                    onClick={() => setShowEditModal(true)}
                     className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     <Edit className="w-4 h-4" />
@@ -54,22 +397,14 @@ export function HostProfileComplete({ user }) {
               </div>
             </div>
 
-            
+            {/* About Me Section */}
             <div className="border-t pt-6 mb-6">
               <h4 className="mb-3">About Me</h4>
-              <p className="text-sm text-gray-700 mb-3">
-                Passionate local guide with 5+ years of experience showing travelers the best of Cox's Bazar. 
-                I love sharing my culture, cuisine, and the hidden gems of my hometown with visitors from around the world.
+              <p className="text-gray-600 mb-3">
+                {user.bio || editForm.bio}
               </p>
-              <button
-                onClick={() => setShowEditBio(true)}
-                className="text-sm text-blue-500 hover:underline"
-              >
-                Edit Bio
-              </button>
             </div>
 
-            
             <div className="border-t pt-6">
               <h4 className="mb-4">Contact Information</h4>
               <div className="grid md:grid-cols-2 gap-4">
@@ -77,292 +412,439 @@ export function HostProfileComplete({ user }) {
                   <label className="block text-sm text-gray-600 mb-2">Email</label>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{user.email}</span>
+                    <span>{user.email}</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Phone</label>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">+880 1712-345678</span>
+                    <span>{user.phone || 'Not provided'}</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Location</label>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">Cox's Bazar, Bangladesh</span>
+                    <span>{user.location || editForm.location}</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Languages</label>
                   <div className="flex items-center gap-2">
                     <Languages className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">Bengali, English</span>
+                    <span>{Array.isArray(user.languages) ? user.languages.join(', ') : editForm.languages}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          
+          {/* Security Settings */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Verification Status</h3>
+            <h3 className="mb-4">Security Settings</h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
-                  <div>
-                    <h4 className="text-sm mb-1">Identity Verified</h4>
-                    <p className="text-xs text-gray-600">Verified on Nov 12, 2023</p>
-                  </div>
+              <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="text-sm mb-1">Two-Factor Authentication</h4>
+                  <p className="text-xs text-gray-600">Add an extra layer of security</p>
                 </div>
-                <span className="text-sm text-green-600">Verified</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
-                  <div>
-                    <h4 className="text-sm mb-1">Police Clearance</h4>
-                    <p className="text-xs text-gray-600">Valid until Dec 2025</p>
-                  </div>
+              <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="text-sm mb-1">Biometric Login</h4>
+                  <p className="text-xs text-gray-600">Use fingerprint or face recognition</p>
                 </div>
-                <span className="text-sm text-green-600">Verified</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
-                  <div>
-                    <h4 className="text-sm mb-1">Host Training</h4>
-                    <p className="text-xs text-gray-600">Completed on Jan 5, 2024</p>
-                  </div>
-                </div>
-                <span className="text-sm text-green-600">Completed</span>
-              </div>
+              <button 
+                onClick={() => setShowPasswordModal(true)}
+                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Change Password
+              </button>
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-500" />
-                  <div>
-                    <h4 className="text-sm mb-1">Bank Account</h4>
-                    <p className="text-xs text-gray-600">**** **** **** 1234</p>
-                  </div>
-                </div>
-                <span className="text-sm text-green-600">Linked</span>
+          {/* Preferences */}
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <h3 className="mb-4">Preferences</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm mb-2">Language</label>
+                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option>English</option>
+                  <option>বাংলা (Bengali)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-2">Currency</label>
+                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option>BDT (৳)</option>
+                  <option>USD ($)</option>
+                  <option>EUR (€)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="notifications" className="w-4 h-4" defaultChecked />
+                <label htmlFor="notifications" className="text-sm">Email notifications for bookings and updates</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="marketing" className="w-4 h-4" />
+                <label htmlFor="marketing" className="text-sm">Receive promotional emails and offers</label>
               </div>
             </div>
           </div>
         </div>
 
-       
+        {/* Sidebar */}
         <div className="space-y-6">
-         
+          {/* Verification Status */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Performance</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-green-500" />
+              <h3>Verification Status</h3>
+            </div>
             <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-600">Response Rate</span>
-                  <span className="text-green-600">98%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '98%' }}></div>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Email</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-600">Acceptance Rate</span>
-                  <span className="text-blue-600">92%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '92%' }}></div>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Phone</span>
+                {user.phone ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-yellow-500" />
+                )}
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-600">Profile Completeness</span>
-                  <span className="text-purple-600">100%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: '100%' }}></div>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Identity (KYC)</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Background Check</span>
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs text-green-800">
+                ✓ All verifications complete! You're a trusted host.
+              </p>
             </div>
           </div>
 
-          
+          {/* Host Performance */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Need Help?</h3>
-            <button
-              onClick={() => setShowContactSupport(true)}
-              className="w-full flex items-center gap-2 justify-center px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              <HelpCircle className="w-5 h-5" />
-              Contact Support
-            </button>
+            <h3 className="mb-4">Host Performance</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Overall Rating</span>
+                <span className="text-lg text-green-600">{user.hostRating || '4.9'}/5.0</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Total Guests</span>
+                <span className="text-lg text-green-600">{user.totalGuests || '124'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Response Rate</span>
+                <span className="text-lg text-green-600">{user.responseRate || '98'}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Member Since</span>
+                <span className="text-sm text-gray-600">{formatJoinedDate(user.createdAt)}</span>
+              </div>
+            </div>
           </div>
 
-        
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-5 h-5 text-blue-600" />
-              <h4>Safety Tips</h4>
+          {/* Badges & Achievements */}
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <h3 className="mb-4">Host Badges</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-1">
+                  🏆
+                </div>
+                <p className="text-xs">Superhost</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-1">
+                  ⭐
+                </div>
+                <p className="text-xs">Top Rated</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-1">
+                  🌟
+                </div>
+                <p className="text-xs">Verified</p>
+              </div>
             </div>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 mt-0.5">•</span>
-                <span>Never share sensitive information outside the platform</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 mt-0.5">•</span>
-                <span>Always verify guest identity before check-in</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-500 mt-0.5">•</span>
-                <span>Report any suspicious activity immediately</span>
-              </li>
-            </ul>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-red-200">
+            <h3 className="text-red-600 mb-4">Danger Zone</h3>
+            <div className="space-y-2">
+              <button className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+                Download My Data
+              </button>
+              <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm">
+                Delete Account
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      
-      {showEditProfile && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 text-white p-6 flex items-center justify-between">
-              <h3 className="text-2xl">Edit Profile</h3>
-              <button onClick={() => setShowEditProfile(false)} className="p-2 hover:bg-white/20 rounded-lg">
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Profile</h3>
+              <button 
+                onClick={() => {
+                  setShowEditModal(false);
+                  setError('');
+                  setSuccess('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
+              </div>
+            )}
+
+            <form onSubmit={handleEditProfile} className="space-y-4">
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Full Name</label>
+                <label className="block text-sm font-medium mb-2">Full Name</label>
                 <input
                   type="text"
-                  defaultValue={user.name}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                  name="fullName"
+                  value={editForm.fullName}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
                 />
               </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-2 text-gray-700">Email</label>
-                  <input
-                    type="email"
-                    defaultValue={user.email}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-2 text-gray-700">Phone</label>
-                  <input
-                    type="tel"
-                    defaultValue="+880 1712-345678"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              </div>
+
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Location</label>
+                <label className="block text-sm font-medium mb-2">Phone</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={editForm.phone}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="+880 1XXX-XXXXXX"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Location</label>
                 <input
                   type="text"
-                  defaultValue="Cox's Bazar, Bangladesh"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                  name="location"
+                  value={editForm.location}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Cox's Bazar, Bangladesh"
                 />
               </div>
+
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Languages</label>
+                <label className="block text-sm font-medium mb-2">Languages (comma-separated)</label>
                 <input
                   type="text"
-                  defaultValue="Bengali, English"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                  name="languages"
+                  value={editForm.languages}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Bengali, English, Hindi"
                 />
               </div>
-              <button className="w-full py-4 bg-green-500 text-white rounded-xl hover:bg-green-600 shadow-md">
-                Save Changes
-              </button>
-            </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Bio</label>
+                <textarea
+                  name="bio"
+                  value={editForm.bio}
+                  onChange={handleEditFormChange}
+                  rows="4"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Tell guests about yourself..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Email (cannot be changed)</label>
+                <input
+                  type="email"
+                  value={user.email}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      
-      {showEditBio && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-6 flex items-center justify-between">
-              <h3 className="text-2xl">Edit Bio</h3>
-              <button onClick={() => setShowEditBio(false)} className="p-2 hover:bg-white/20 rounded-lg">
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-green-500" />
+                <h3 className="text-xl font-semibold">Change Password</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setError('');
+                  setSuccess('');
+                  setPasswordForm({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: ''
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">About You</label>
-                <textarea
-                  defaultValue="Passionate local guide with 5+ years of experience showing travelers the best of Cox's Bazar. I love sharing my culture, cuisine, and the hidden gems of my hometown with visitors from around the world."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                  rows={6}
-                />
-                <p className="text-xs text-gray-500 mt-2">Tell guests what makes you a great host (500 characters max)</p>
-              </div>
-              <button className="w-full py-4 bg-purple-500 text-white rounded-xl hover:bg-purple-600 shadow-md">
-                Update Bio
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      
-      {showContactSupport && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl mb-1">Contact Support</h3>
-                <p className="text-blue-100 text-sm">We're here to help 24/7</p>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
               </div>
-              <button onClick={() => setShowContactSupport(false)} className="p-2 hover:bg-white/20 rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Subject</label>
-                <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>Booking Issue</option>
-                  <option>Payment Problem</option>
-                  <option>Account Help</option>
-                  <option>Technical Support</option>
-                  <option>Other</option>
-                </select>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
               </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Message</label>
-                <textarea
-                  placeholder="Describe your issue in detail..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={6}
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Attach File (Optional)</label>
+                <label className="block text-sm font-medium mb-2">Current Password</label>
                 <input
-                  type="file"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  type="password"
+                  name="currentPassword"
+                  value={passwordForm.currentPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                  placeholder="Enter current password"
                 />
               </div>
-              <button className="w-full py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 shadow-md">
-                Submit Ticket
-              </button>
-              <p className="text-xs text-center text-gray-600">
-                Average response time: 2-4 hours
-              </p>
-            </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">New Password</label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                  placeholder="Enter new password (min. 6 characters)"
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordForm.confirmPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                  placeholder="Re-enter new password"
+                  minLength={6}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  • Password must be at least 6 characters long<br />
+                  • Make sure your new passwords match
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setError('');
+                    setSuccess('');
+                    setPasswordForm({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
