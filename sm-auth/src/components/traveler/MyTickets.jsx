@@ -230,7 +230,7 @@ const downloadTicket = (ticket) => {
           <div class="ticket-section" style="border-bottom: none;">
             <div class="ticket-row">
               <div class="ticket-label">Total Amount Paid</div>
-              <div class="ticket-value" style="color: #16a34a; font-size: 24px;">৳${ticket.totalAmount.toLocaleString()}</div>
+              <div class="ticket-value" style="color: #16a34a; font-size: 24px;">৳${(ticket.amount || ticket.totalAmount || 0).toLocaleString()}</div>
             </div>
           </div>
         </div>
