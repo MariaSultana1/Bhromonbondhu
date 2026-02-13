@@ -12,7 +12,17 @@ export function AllTrips({ onBack }) {
 
   // Fetch trips from backend API
   useEffect(() => {
-    const fetchTrips = async () => {
+    fetchTrips();
+    
+    // Also refresh trips every 5 seconds to get updated statuses
+    const interval = setInterval(() => {
+      fetchTrips();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchTrips = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -45,6 +55,8 @@ export function AllTrips({ onBack }) {
         
         if (data.success) {
           setTrips(data.trips || []);
+          console.log('✅ Trips fetched:', data.trips?.length, 'trips');
+          console.log('Trip statuses:', data.trips?.map(t => ({ destination: t.destination, status: t.status })));
         } else {
           throw new Error(data.message || 'Failed to fetch trips');
         }
@@ -55,9 +67,6 @@ export function AllTrips({ onBack }) {
         setLoading(false);
       }
     };
-
-    fetchTrips();
-  }, []);
 
   // Function to seed sample trips (for development)
   const seedSampleTrips = async () => {
@@ -266,24 +275,25 @@ export function AllTrips({ onBack }) {
                   </div>
                 </div>
                 <div className="p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <img
-                      src={trip.hostAvatar}
-                      alt={trip.host}
-                      className="w-10 h-10 rounded-full border-2 border-blue-100"
-                      onError={(e) => {
-                        e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${trip.host?.replace(/\s/g, '')}`;
-                      }}
-                    />
-                    <div>
-                      <div className="text-sm text-gray-500">Hosted by</div>
-                      <div className="font-medium">{trip.host}</div>
-                      <div className="flex items-center text-sm text-yellow-600">
-                        <span>★</span>
-                        <span className="ml-1">{trip.hostRating}</span>
+                  {trip.host === 'pending' ? (
+                    <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+                      <p className="text-blue-800 font-medium text-sm">Transportation Details</p>
+                      <div className="text-blue-700 text-xs mt-2 space-y-1">
+                        <p><span className="font-semibold">Type:</span> {trip.transportType?.charAt(0).toUpperCase() + trip.transportType?.slice(1) || 'N/A'}</p>
+                        <p><span className="font-semibold">Provider:</span> {trip.transportProvider || 'N/A'}</p>
+                        <p><span className="font-semibold">Route:</span> {trip.transportFrom} → {trip.transportTo}</p>
+                        <p className="mt-2 text-blue-900 font-medium">Host: Pending</p>
+                        <p className="text-blue-600 text-xs">Select a host below to complete your trip booking.</p>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
+                      <p className="text-green-800 font-medium text-sm">Host Information</p>
+                      <div className="text-green-700 text-xs mt-2">
+                        <p><span className="font-semibold">Hosted by:</span> {trip.host}</p>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
@@ -294,7 +304,7 @@ export function AllTrips({ onBack }) {
                       <span>{trip.weather}</span>
                     </div>
                     <div className="text-sm text-gray-600">
-                      <span className="font-medium">${trip.totalAmount?.toLocaleString()}</span>
+                      <span className="font-medium">৳{trip.totalAmount?.toLocaleString()}</span>
                       <span className="text-gray-500"> • {trip.guests} guest{trip.guests !== 1 ? 's' : ''} • {trip.nights} night{trip.nights !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
@@ -310,12 +320,22 @@ export function AllTrips({ onBack }) {
                       </span>
                     )}
                   </div>
-                  <button
-                    className="w-full py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md hover:shadow-lg"
-                    onClick={() => setSelectedTrip(trip)}
-                  >
-                    View Details
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md hover:shadow-lg"
+                      onClick={() => setSelectedTrip(trip)}
+                    >
+                      View Details
+                    </button>
+                    {trip.host === 'pending' && (
+                      <button
+                        className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all shadow-md hover:shadow-lg"
+                        onClick={() => window.location.href = '/traveler/book-travel'}
+                      >
+                        Book a Host
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

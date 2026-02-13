@@ -10,92 +10,91 @@ const apiService = {
   // Upcoming Trips
   getUpcomingTrips: async (userId) => {
     try {
-      const response = await fetch(`/api/users/${userId}/trips?status=upcoming`, {
+      const response = await fetch(`/api/trips`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       if (!response.ok) throw new Error('Failed to fetch trips');
-      return await response.json();
+      const data = await response.json();
+      console.log('📍 All trips from API:', data.trips);
+      // Filter for upcoming trips and sort by date
+      if (data.success && data.trips) {
+        const upcomingTrips = data.trips.filter(trip => {
+          const tripStatus = trip.status || 'upcoming'; // Default to upcoming if undefined
+          console.log(`Trip: ${trip.destination}, Status: "${trip.status}" (using: "${tripStatus}"), Host: ${trip.host}`);
+          return tripStatus === 'upcoming';
+        }).sort((a, b) => new Date(a.date) - new Date(b.date));
+        console.log('✅ Filtered upcoming trips:', upcomingTrips.length, upcomingTrips);
+        return upcomingTrips;
+      }
+      console.log('⚠️ No trips data in response');
+      return [];
     } catch (error) {
-      console.error('Error fetching trips:', error);
+      console.error('❌ Error fetching trips:', error);
       throw error;
     }
   },
 
-  // Memory Albums
+  // Memory Albums - Return mock data
   getMemoryAlbums: async (userId) => {
     try {
-      const response = await fetch(`/api/users/${userId}/albums`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch albums');
-      return await response.json();
+      return [];
     } catch (error) {
       console.error('Error fetching albums:', error);
-      throw error;
+      return [];
     }
   },
 
   // Community Posts
   getCommunityPosts: async (userId, limit = 2) => {
     try {
-      const response = await fetch(`/api/community/posts?userId=${userId}&limit=${limit}`, {
+      const response = await fetch(`/api/community/posts`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       if (!response.ok) throw new Error('Failed to fetch community posts');
-      return await response.json();
+      const data = await response.json();
+      return data.posts || [];
     } catch (error) {
       console.error('Error fetching community posts:', error);
-      throw error;
+      return [];
     }
   },
 
-  // Wishlist
+  // Wishlist - Return mock data
   getWishlist: async (userId) => {
     try {
-      const response = await fetch(`/api/users/${userId}/wishlist`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch wishlist');
-      return await response.json();
+      return [];
     } catch (error) {
       console.error('Error fetching wishlist:', error);
-      throw error;
+      return [];
     }
   },
 
-  // User Stats
+  // User Stats - Return mock data
   getUserStats: async (userId) => {
     try {
-      const response = await fetch(`/api/users/${userId}/stats`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch user stats');
-      return await response.json();
+      return {
+        totalTrips: 0,
+        tripsCompleted: 0,
+        locations: 0,
+        reviews: 0
+      };
     } catch (error) {
       console.error('Error fetching user stats:', error);
-      throw error;
+      return {};
     }
   },
 
-  // Trending Destinations
+  // Trending Destinations - Return mock data
   getTrendingDestinations: async () => {
     try {
-      const response = await fetch('/api/destinations/trending');
-      if (!response.ok) throw new Error('Failed to fetch trending destinations');
-      return await response.json();
+      return [];
     } catch (error) {
       console.error('Error fetching trending destinations:', error);
-      throw error;
+      return [];
     }
   },
 
@@ -236,15 +235,27 @@ export function TravelerHome({ user }) {
 
   // Fetch all data on component mount
   useEffect(() => {
-    if (view === 'home' && user?.id) {
+    console.log('🔍 TravelerHome useEffect - view:', view, 'user:', user);
+    if (view === 'home' && user) {
+      console.log('✅ Calling fetchAllData');
       fetchAllData();
+    } else {
+      console.log('⚠️ Not fetching: view !== home or no user');
     }
-  }, [view, user?.id]);
+  }, [view, user]);
 
   const fetchAllData = async () => {
     try {
       setError(null);
       setRefreshing(true);
+      setLoading({
+        trips: true,
+        albums: true,
+        community: true,
+        wishlist: true,
+        stats: true,
+        trending: true
+      });
       
       // Fetch all data in parallel
       const [
@@ -265,9 +276,11 @@ export function TravelerHome({ user }) {
 
       // Handle each response
       if (tripsData.status === 'fulfilled') {
+        console.log('✅ Trips data fulfilled:', tripsData.value);
         setUpcomingTrips(tripsData.value || []);
       } else {
-        console.error('Failed to load trips:', tripsData.reason);
+        console.error('❌ Failed to load trips:', tripsData.reason);
+        setUpcomingTrips([]);
       }
 
       if (albumsData.status === 'fulfilled') {
@@ -523,7 +536,7 @@ export function TravelerHome({ user }) {
               <div className="space-y-4">
                 {upcomingTrips.slice(0, 2).map((trip) => (
                   <div 
-                    key={trip.id} 
+                    key={trip._id} 
                     className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group"
                     onClick={() => setView('allTrips')}
                   >
@@ -539,13 +552,13 @@ export function TravelerHome({ user }) {
                       <div className="flex justify-between items-start">
                         <h4 className="text-lg font-medium mb-1">{trip.destination}</h4>
                         <span className={`px-2 py-1 text-xs rounded-full ${
-                          trip.status === 'confirmed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : trip.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
+                          trip.status === 'upcoming' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : trip.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {trip.status}
+                          {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-2">
@@ -562,7 +575,17 @@ export function TravelerHome({ user }) {
                           {trip.weather || 'Check forecast'}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500">Host: {trip.host}</p>
+                      {trip.host === 'pending' ? (
+                        <div className="text-sm text-blue-700 mb-2">
+                          <p className="font-medium">🚌 {trip.transportProvider || 'N/A'}</p>
+                          <p className="text-xs text-blue-600">{trip.transportType?.charAt(0).toUpperCase() + trip.transportType?.slice(1) || 'N/A'}</p>
+                          <p className="text-xs text-gray-500 mt-1">Host: Pending</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Hosted by:</span> {trip.host}
+                        </p>
+                      )}
                       <p className="text-sm font-medium mt-2">
                         ৳{trip.totalAmount?.toLocaleString() || '0'}
                       </p>

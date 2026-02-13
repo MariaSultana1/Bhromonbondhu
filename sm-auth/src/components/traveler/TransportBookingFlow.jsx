@@ -142,6 +142,49 @@ export function TransportBookingFlow() {
             setError('Booking confirmed but failed to save to your account. Please contact support with booking ID: ' + confirmation.bookingId);
           } else {
             console.log('✅ Booking saved to database:', saveData.booking);
+            
+            // NOW CREATE TRIP FROM TICKET
+            try {
+              // Fetch image from Pixabay API
+              let tripImage = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80';
+              try {
+                const pixabayKey = process.env.REACT_APP_PIXABAY_API_KEY || 'your_pixabay_key';
+                const pixabayResponse = await fetch(
+                  `https://pixabay.com/api/?key=${pixabayKey}&q=${encodeURIComponent(selectedTicket.to)}&image_type=photo&order=popular&per_page=1`
+                );
+                if (pixabayResponse.ok) {
+                  const pixabayData = await pixabayResponse.json();
+                  if (pixabayData.hits && pixabayData.hits.length > 0) {
+                    tripImage = pixabayData.hits[0].largeImageURL;
+                  }
+                }
+              } catch (imageError) {
+                console.log('Could not fetch image from Pixabay, using default');
+              }
+
+              const tripResponse = await fetch(
+                `${API_URL}/trips/from-ticket/${confirmation.bookingId}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    image: tripImage
+                  })
+                }
+              );
+
+              const tripData = await tripResponse.json();
+              if (tripData.success) {
+                console.log('✅ Trip created from ticket:', tripData.trip);
+              } else {
+                console.warn('Failed to create trip:', tripData.message);
+              }
+            } catch (tripError) {
+              console.error('Error creating trip from ticket:', tripError);
+            }
           }
         } catch (dbError) {
           console.error('Database save error:', dbError);

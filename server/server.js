@@ -447,7 +447,7 @@ const tripSchema = new mongoose.Schema({
   },
   host: {
     type: String,
-    required: [true, 'Host name is required']
+    default: 'pending'
   },
   hostAvatar: {
     type: String,
@@ -478,6 +478,31 @@ const tripSchema = new mongoose.Schema({
   bookingId: {
     type: String,
     unique: true
+  },
+  transportTicketId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TransportTicket'
+  },
+  transportType: {
+    type: String,
+    enum: ['bus', 'train', 'flight', null],
+    default: null
+  },
+  transportProvider: {
+    type: String,
+    default: null
+  },
+  transportFrom: {
+    type: String,
+    default: null
+  },
+  transportTo: {
+    type: String,
+    default: null
+  },
+  transportDate: {
+    type: String,
+    default: null
   },
   checkIn: {
     type: String,
@@ -1248,6 +1273,77 @@ app.put('/api/auth/profile-picture', authenticate, async (req, res) => {
   }
 });
 
+// Get Traveler Stats (Total Trips and Unique Places Visited)
+app.get('/api/traveler/stats', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get total confirmed trips (from transporttickets collection)
+    const totalTrips = await TransportTicket.countDocuments({
+      userId: userId,
+      status: 'confirmed'
+    });
+
+    // Get unique destinations visited (from transporttickets collection)
+    const uniquePlaces = await TransportTicket.distinct('to', {
+      userId: userId,
+      status: 'confirmed'
+    });
+
+    // Get unique hosts booked (from trips where host is not "pending")
+    const bookedHostsResult = await Trip.find({
+      userId: userId,
+      status: 'completed'
+    }).select('host');
+
+    const uniqueHosts = new Set();
+    bookedHostsResult.forEach(trip => {
+      if (trip.host && trip.host !== 'pending' && trip.host !== 'Pending') {
+        uniqueHosts.add(trip.host);
+      }
+    });
+
+    // For now, reviews given will be 0 (can be extended when review collection exists)
+    // In future: const totalReviews = await Review.countDocuments({ userId: userId });
+    const totalReviews = 0;
+
+    // Calculate travel tier based on confirmed trips
+    let travelTier = 'Explorer';
+    if (totalTrips >= 30) {
+      travelTier = 'Gold Traveler';
+    } else if (totalTrips >= 15) {
+      travelTier = 'Silver Traveler';
+    } else if (totalTrips >= 5) {
+      travelTier = 'Bronze Traveler';
+    }
+
+    // Calculate travel points 
+    // Formula: 100 points per confirmed trip + 50 points per unique destination
+    const travelPoints = (totalTrips * 100) + (uniquePlaces.length * 50);
+
+    res.json({
+      success: true,
+      stats: {
+        totalTrips: totalTrips,
+        placesVisited: uniquePlaces.length,
+        reviewsGiven: totalReviews,
+        hostsBooked: uniqueHosts.size,
+        travelTier: travelTier,
+        travelPoints: travelPoints,
+        destinations: uniquePlaces.filter(p => p) // Remove null/undefined
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching traveler stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching traveler stats',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Book Transport Tickets (Store booking in database)
 app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
   try {
@@ -1638,22 +1734,176 @@ app.put('/api/auth/change-password', authenticate, async (req, res) => {
 
 
 
+// Create a trip from a transport ticket (Protected)
+app.post('/api/trips/from-ticket/:ticketBookingId', authenticate, async (req, res) => {
+  try {
+    const { image } = req.body;
+    
+    // Get the transport ticket
+    const ticket = await TransportTicket.findOne({
+      bookingId: req.params.ticketBookingId,
+      userId: req.user._id
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transport ticket not found'
+      });
+    }
+
+    // Check if trip already exists for this ticket
+    const existingTrip = await Trip.findOne({
+      transportTicketId: ticket._id
+    });
+
+    if (existingTrip) {
+      return res.status(400).json({
+        success: false,
+        message: 'A trip already exists for this ticket'
+      });
+    }
+
+    // Create a new trip from the ticket
+    const trip = new Trip({
+      destination: ticket.to,
+      location: ticket.to,
+      date: ticket.journeyDate,
+      endDate: ticket.journeyDate,
+      host: 'pending',
+      image: image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80',
+      weather: '25°C, Pleasant',
+      status: 'upcoming',
+      services: [],
+      checkIn: '2:00 PM',
+      checkOut: '11:00 AM',
+      guests: ticket.passengers.length,
+      nights: 1,
+      totalAmount: ticket.totalAmount,
+      description: `Trip to ${ticket.to} via ${ticket.transportType}`,
+      userId: req.user._id,
+      transportTicketId: ticket._id,
+      transportType: ticket.transportType,
+      transportProvider: ticket.provider,
+      transportFrom: ticket.from,
+      transportTo: ticket.to,
+      transportDate: ticket.journeyDate
+    });
+
+    await trip.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Trip created from transport ticket successfully',
+      trip: trip
+    });
+  } catch (error) {
+    console.error('❌ Create trip from ticket error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating trip from ticket',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get all trips for a user (Protected)
 app.get('/api/trips', authenticate, async (req, res) => {
   try {
     const trips = await Trip.find({ userId: req.user._id })
       .sort({ date: -1, createdAt: -1 });
 
+    // Auto-complete trips where date has passed
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const updatedTrips = await Promise.all(trips.map(async (trip) => {
+      // Only auto-complete if status is 'upcoming' and not already completed
+      if (trip.status === 'upcoming' && trip.date) {
+        try {
+          // Parse trip date
+          const tripDate = new Date(trip.date);
+          const tripDateOnly = new Date(tripDate.getFullYear(), tripDate.getMonth(), tripDate.getDate());
+          
+          // If trip date is in the past, mark as completed
+          if (tripDateOnly < today) {
+            console.log(`🔄 Auto-completing trip ${trip._id} - date was ${trip.date}`);
+            
+            trip.status = 'completed';
+            trip.completedAt = now;
+            
+            // Save the updated trip
+            await trip.save();
+            
+            // Also update associated transport ticket
+            if (trip.transportTicketId) {
+              await TransportTicket.findByIdAndUpdate(
+                trip.transportTicketId,
+                { 
+                  status: 'completed',
+                  completedAt: now
+                }
+              );
+            }
+          }
+        } catch (dateError) {
+          console.error(`Error checking trip date for ${trip._id}:`, dateError);
+        }
+      }
+      return trip;
+    }));
+
+    console.log(`📍 GET /api/trips - Found ${updatedTrips.length} trips for user ${req.user._id}`);
+    console.log('Trip statuses:', updatedTrips.map(t => ({ destination: t.destination, status: t.status, date: t.date })));
+
     res.json({
       success: true,
-      count: trips.length,
-      trips: trips
+      count: updatedTrips.length,
+      trips: updatedTrips
     });
   } catch (error) {
     console.error(' Get trips error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching trips',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Fix trips without status (Development endpoint)
+app.put('/api/trips/fix/status', authenticate, async (req, res) => {
+  try {
+    // Find all trips for this user without a status
+    const tripsWithoutStatus = await Trip.find({ 
+      userId: req.user._id,
+      $or: [
+        { status: null },
+        { status: undefined },
+        { status: { $exists: false } }
+      ]
+    });
+
+    console.log(`🔧 Found ${tripsWithoutStatus.length} trips without status`);
+
+    // Update them all to 'upcoming'
+    const updateResult = await Trip.updateMany(
+      { userId: req.user._id, status: null },
+      { $set: { status: 'upcoming' } }
+    );
+
+    console.log(`✅ Updated ${updateResult.modifiedCount} trips to status: upcoming`);
+
+    res.json({
+      success: true,
+      message: `Fixed ${updateResult.modifiedCount} trips`,
+      fixed: updateResult.modifiedCount
+    });
+  } catch (error) {
+    console.error('❌ Fix trips error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing trips',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -1795,6 +2045,235 @@ app.put('/api/trips/:id', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating trip',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Complete a trip (Protected) - Mark trip as completed and update associated transport ticket
+app.post('/api/trips/:id/complete', authenticate, async (req, res) => {
+  try {
+    const { rating = null, review = null, photos = [] } = req.body;
+
+    // Find the trip
+    const trip = await Trip.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: 'Trip not found'
+      });
+    }
+
+    // Check if trip is already completed
+    if (trip.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trip is already marked as completed'
+      });
+    }
+
+    // Check if trip is cancelled
+    if (trip.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot complete a cancelled trip'
+      });
+    }
+
+    // Mark trip as completed
+    trip.status = 'completed';
+    trip.completedAt = new Date();
+    
+    // Add review and photos if provided
+    if (rating !== null || review) {
+      trip.tripReview = {
+        rating: rating,
+        review: review,
+        photos: photos || [],
+        createdAt: new Date()
+      };
+    }
+
+    await trip.save();
+
+    // Also update the associated transport ticket if it exists
+    if (trip.transportTicketId) {
+      const ticket = await TransportTicket.findByIdAndUpdate(
+        trip.transportTicketId,
+        { 
+          status: 'completed',
+          completedAt: new Date()
+        },
+        { new: true }
+      );
+
+      // Add review to ticket if provided
+      if (ticket && (rating !== null || review)) {
+        ticket.ticketReview = {
+          rating: rating,
+          review: review,
+          photos: photos || [],
+          createdAt: new Date()
+        };
+        await ticket.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Trip completed successfully',
+      trip: trip,
+      stats: {
+        totalTripsCompleted: await Trip.countDocuments({
+          userId: req.user._id,
+          status: 'completed'
+        }),
+        points: rating ? (rating * 100) : 0 // Award points based on completion
+      }
+    });
+  } catch (error) {
+    console.error('❌ Complete trip error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing trip',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get trip completion status (Protected)
+app.get('/api/trips/:id/completion-status', authenticate, async (req, res) => {
+  try {
+    const trip = await Trip.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: 'Trip not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      tripId: trip._id,
+      status: trip.status,
+      destination: trip.destination,
+      source: trip.transportFrom || 'Dhaka',
+      date: trip.date,
+      completedAt: trip.completedAt || null,
+      canComplete: trip.status === 'upcoming',
+      tripReview: trip.tripReview || null
+    });
+  } catch (error) {
+    console.error('❌ Get completion status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching trip status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get route and checkpoints for a trip (Protected)
+app.get('/api/trips/:id/route', authenticate, async (req, res) => {
+  try {
+    const trip = await Trip.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    }).populate('transportTicketId');
+
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: 'Trip not found'
+      });
+    }
+
+    // If trip has a transport ticket, get the route details
+    if (trip.transportTicketId && trip.transportTicketId.transportationId) {
+      const transportation = await Transportation.findById(trip.transportTicketId.transportationId);
+      
+      if (transportation) {
+        // Extract checkpoints from stops
+        const checkpoints = [];
+        
+        // Add starting point
+        checkpoints.push({
+          name: `${transportation.from} - Start`,
+          city: transportation.from,
+          time: transportation.departure,
+          coordinates: null, // Will be filled by frontend
+          completed: false,
+          current: false
+        });
+
+        // Add intermediate stops
+        if (transportation.stops && transportation.stops.length > 0) {
+          transportation.stops.forEach((stop, index) => {
+            checkpoints.push({
+              name: stop.station,
+              city: stop.station,
+              time: stop.arrival,
+              coordinates: null,
+              completed: false,
+              current: false
+            });
+          });
+        }
+
+        // Add destination
+        checkpoints.push({
+          name: `${transportation.to} - End`,
+          city: transportation.to,
+          time: transportation.arrival,
+          coordinates: null,
+          completed: false,
+          current: false
+        });
+
+        return res.json({
+          success: true,
+          route: {
+            from: transportation.from,
+            to: transportation.to,
+            type: transportation.type,
+            operator: transportation.operator,
+            departure: transportation.departure,
+            arrival: transportation.arrival,
+            departureDate: transportation.departureDate,
+            duration: transportation.duration
+          },
+          checkpoints: checkpoints,
+          stops: transportation.stops || []
+        });
+      }
+    }
+
+    // Fallback if no transportation found
+    res.json({
+      success: true,
+      route: {
+        from: trip.transportFrom,
+        to: trip.transportTo,
+        type: trip.transportType,
+        operator: trip.transportProvider,
+        departure: trip.transportDate
+      },
+      checkpoints: [],
+      stops: []
+    });
+  } catch (error) {
+    console.error('❌ Get trip route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching trip route',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -4122,25 +4601,6 @@ app.get('/api/bookings', authenticate, async (req, res) => {
 });
 
 // Get all trips for user
-app.get('/api/trips', authenticate, async (req, res) => {
-  try {
-    const trips = await Trip.find({ userId: req.user._id })
-      .sort({ date: -1, createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: trips.length,
-      trips
-    });
-  } catch (error) {
-    console.error('❌ Get trips error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching trips'
-    });
-  }
-});
-
 // Create trip
 app.post('/api/trips', authenticate, async (req, res) => {
   try {
