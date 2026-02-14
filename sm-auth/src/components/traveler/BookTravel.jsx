@@ -118,14 +118,14 @@ export function BookTravel() {
         experience: host.experience,
         responseTime: host.responseTime,
         maxGuests: host.maxGuests,
-        minStay: host.minStay
+        minStay: host.minStay,
+        offersAccommodation: host.services?.includes('Accommodation')
       }));
       
       setHosts(mappedHosts);
     } catch (err) {
       console.error('Error fetching hosts:', err);
       setError(err.message || 'Failed to fetch hosts');
-      // Set fallback hosts for demo purposes
       setHosts([]);
     } finally {
       setLoading(false);
@@ -167,150 +167,123 @@ export function BookTravel() {
   };
 
   const processPayment = async () => {
-  setPaymentProcessing(true);
-  
-  try {
-    // Validate payment details before processing
-    if (paymentMethod === 'card') {
-      // Validate card number (16 digits)
-      const cleanedCard = cardNumber.replace(/\s+/g, '');
-      if (!/^\d{16}$/.test(cleanedCard)) {
-        alert('Card number must be exactly 16 digits');
-        setPaymentProcessing(false);
-        return;
+    setPaymentProcessing(true);
+    
+    try {
+      // Validate payment details before processing
+      if (paymentMethod === 'card') {
+        const cleanedCard = cardNumber.replace(/\s+/g, '');
+        if (!/^\d{16}$/.test(cleanedCard)) {
+          alert('Card number must be exactly 16 digits');
+          setPaymentProcessing(false);
+          return;
+        }
+
+        if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry)) {
+          alert('Expiry date must be in MM/YY format');
+          setPaymentProcessing(false);
+          return;
+        }
+
+        const [month, year] = cardExpiry.split('/');
+        const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
+        if (expiry < new Date()) {
+          alert('Card has expired');
+          setPaymentProcessing(false);
+          return;
+        }
+
+        if (!/^\d{3}$/.test(cardCVV)) {
+          alert('CVV must be exactly 3 digits');
+          setPaymentProcessing(false);
+          return;
+        }
+      } else if (paymentMethod === 'bkash') {
+        if (!/^01[3-9]\d{8}$/.test(bkashNumber)) {
+          alert('bKash number must be 11 digits starting with 01');
+          setPaymentProcessing(false);
+          return;
+        }
       }
 
-      // Validate expiry date
-      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry)) {
-        alert('Expiry date must be in MM/YY format');
-        setPaymentProcessing(false);
-        return;
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      if (!selectedHost) return;
+
+      const totalAmount = calculateHostTotal();
+      const platformFee = Math.round(totalAmount * 0.15);
+      const grandTotal = totalAmount + platformFee;
+
+      // Prepare payment details
+      const paymentDetails = {};
+      if (paymentMethod === 'card') {
+        paymentDetails.cardNumber = cardNumber;
+        paymentDetails.cardholderName = 'Card Holder';
+      } else if (paymentMethod === 'bkash') {
+        paymentDetails.bkashNumber = bkashNumber;
       }
 
-      // Check if card is expired
-      const [month, year] = cardExpiry.split('/');
-      const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
-      if (expiry < new Date()) {
-        alert('Card has expired');
-        setPaymentProcessing(false);
-        return;
-      }
+      // Create booking in database
+      const bookingData = {
+        bookingType: 'host',
+        hostId: selectedHost.id,
+        checkIn: hostBookingForm.checkIn,
+        checkOut: hostBookingForm.checkOut,
+        guests: hostBookingForm.guests,
+        selectedServices: hostBookingForm.selectedServices,
+        notes: `Booking for ${selectedHost.name} in ${selectedHost.location}`,
+        paymentMethod: paymentMethod,
+        paymentDetails: paymentDetails
+      };
 
-      // Validate CVV (3 digits)
-      if (!/^\d{3}$/.test(cardCVV)) {
-        alert('CVV must be exactly 3 digits');
-        setPaymentProcessing(false);
-        return;
-      }
-    } else if (paymentMethod === 'bkash') {
-      // Validate bKash number (11 digits starting with 01)
-      if (!/^01[3-9]\d{8}$/.test(bkashNumber)) {
-        alert('bKash number must be 11 digits starting with 01');
-        setPaymentProcessing(false);
-        return;
-      }
+      const response = await apiCall('/bookings', {
+        method: 'POST',
+        body: JSON.stringify(bookingData)
+      });
+
+      console.log('✅ Booking created:', response.booking);
+
+      // Also create a trip record
+      const tripData = {
+        destination: selectedHost.location,
+        date: hostBookingForm.checkIn,
+        endDate: hostBookingForm.checkOut,
+        host: selectedHost.name,
+        hostAvatar: selectedHost.image,
+        image: selectedHost.propertyImage || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80',
+        services: hostBookingForm.selectedServices,
+        guests: hostBookingForm.guests,
+        totalAmount: grandTotal,
+        hostRating: selectedHost.rating,
+        description: `Experience ${selectedHost.location} with ${selectedHost.name}`
+      };
+
+      await apiCall('/trips', {
+        method: 'POST',
+        body: JSON.stringify(tripData)
+      });
+
+      setPaymentProcessing(false);
+      setShowPaymentModal(false);
+      setShowConfirmation(true);
+      
+      // Reset form
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCVV('');
+      setBkashNumber('');
+      
+      setTimeout(() => {
+        setShowConfirmation(false);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Booking error:', err);
+      alert(`Booking failed: ${err.message}`);
+      setPaymentProcessing(false);
     }
-
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    if (!selectedHost) return;
-
-    const totalAmount = calculateHostTotal();
-    const platformFee = Math.round(totalAmount * 0.15);
-    const grandTotal = totalAmount + platformFee;
-
-    // Prepare payment details
-    const paymentDetails = {};
-    if (paymentMethod === 'card') {
-      paymentDetails.cardNumber = cardNumber;
-      paymentDetails.cardholderName = 'Card Holder'; // Add cardholder name field if needed
-    } else if (paymentMethod === 'bkash') {
-      paymentDetails.bkashNumber = bkashNumber;
-    }
-
-    // Create booking in database
-    const bookingData = {
-      bookingType: 'host',
-      hostId: selectedHost.id,
-      checkIn: hostBookingForm.checkIn,
-      checkOut: hostBookingForm.checkOut,
-      guests: hostBookingForm.guests,
-      selectedServices: hostBookingForm.selectedServices,
-      notes: `Booking for ${selectedHost.name} in ${selectedHost.location}`,
-      paymentMethod: paymentMethod,
-      paymentDetails: paymentDetails
-    };
-
-    const response = await apiCall('/bookings', {
-      method: 'POST',
-      body: JSON.stringify(bookingData)
-    });
-
-    console.log('✅ Booking created:', response.booking);
-
-    // Also create a trip record for backward compatibility
-    const tripData = {
-      destination: selectedHost.location,
-      date: hostBookingForm.checkIn,
-      endDate: hostBookingForm.checkOut,
-      host: selectedHost.name,
-      hostAvatar: selectedHost.image,
-      image: selectedHost.propertyImage,
-      services: hostBookingForm.selectedServices,
-      guests: hostBookingForm.guests,
-      totalAmount: grandTotal,
-      hostRating: selectedHost.rating,
-      description: `Experience ${selectedHost.location} with ${selectedHost.name}`
-    };
-
-    await apiCall('/trips', {
-      method: 'POST',
-      body: JSON.stringify(tripData)
-    });
-
-    // Store booking info in localStorage as well for quick access
-    const localBooking = {
-      hostId: selectedHost.id,
-      hostName: selectedHost.name,
-      location: selectedHost.location,
-      checkIn: hostBookingForm.checkIn,
-      checkOut: hostBookingForm.checkOut,
-      guests: hostBookingForm.guests,
-      services: hostBookingForm.selectedServices,
-      totalPrice: grandTotal,
-      propertyImage: selectedHost.propertyImage,
-      hostAvatar: selectedHost.image,
-      bookingId: response.booking.bookingId,
-      createdAt: new Date().toISOString()
-    };
-
-    const existingBookings = JSON.parse(localStorage.getItem('hostBookings') || '[]');
-    existingBookings.push(localBooking);
-    localStorage.setItem('hostBookings', JSON.stringify(existingBookings));
-
-    setPaymentProcessing(false);
-    setShowPaymentModal(false);
-    setShowConfirmation(true);
-    
-    // Reset form
-    setCardNumber('');
-    setCardExpiry('');
-    setCardCVV('');
-    setBkashNumber('');
-    
-    setTimeout(() => {
-      setShowConfirmation(false);
-      // Optionally redirect to bookings page
-      // window.location.href = '/my-hosts';
-    }, 3000);
-
-  } catch (err) {
-    console.error('Booking error:', err);
-    alert(`Booking failed: ${err.message}`);
-    setPaymentProcessing(false);
-  }
-};
+  };
 
   const toggleService = (service) => {
     setHostBookingForm(prev => ({
@@ -443,12 +416,40 @@ export function BookTravel() {
           {filteredHosts.map((host) => (
             <div key={host.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
               <div className="md:flex">
-                <div className="md:w-80 h-64 md:h-auto relative overflow-hidden">
-                  <img
-                    src={host.propertyImage}
-                    alt={host.location}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  />
+                {/* Property Image or Placeholder */}
+                <div className="md:w-80 h-64 md:h-auto relative overflow-hidden bg-gray-100">
+                  {host.propertyImage ? (
+                    <img
+                      src={host.propertyImage}
+                      alt={host.location}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'w-full h-full flex items-center justify-center text-gray-400';
+                        placeholder.innerHTML = `
+                          <div class="text-center">
+                            <svg class="w-16 h-16 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
+                            <p class="text-sm">No property image</p>
+                          </div>
+                        `;
+                        e.target.parentElement.appendChild(placeholder);
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="text-center">
+                        <Home className="w-16 h-16 mx-auto mb-2 text-gray-300" />
+                        <p className="text-sm">Service Provider</p>
+                        {host.offersAccommodation && (
+                          <p className="text-xs text-gray-400 mt-1">(Accommodation available)</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   {host.verified && (
                     <div className="absolute top-4 right-4 bg-white rounded-full px-3 py-1.5 shadow-lg flex items-center gap-1.5">
                       <Shield className="w-4 h-4 text-blue-500" />
@@ -456,6 +457,8 @@ export function BookTravel() {
                     </div>
                   )}
                 </div>
+
+                {/* Host Details */}
                 <div className="flex-1 p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -565,7 +568,13 @@ export function BookTravel() {
               <div className="p-6 space-y-6">
                 {/* Host Info */}
                 <div className="flex gap-5 p-5 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200">
-                  <img src={selectedHost.propertyImage} alt={selectedHost.location} className="w-32 h-32 object-cover rounded-xl shadow-md" />
+                  {selectedHost.propertyImage ? (
+                    <img src={selectedHost.propertyImage} alt={selectedHost.location} className="w-32 h-32 object-cover rounded-xl shadow-md" />
+                  ) : (
+                    <div className="w-32 h-32 bg-gray-100 rounded-xl shadow-md flex items-center justify-center">
+                      <Home className="w-12 h-12 text-gray-300" />
+                    </div>
+                  )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <img src={selectedHost.image} alt={selectedHost.name} className="w-10 h-10 rounded-full border-2 border-blue-200" />
@@ -885,9 +894,18 @@ export function BookTravel() {
             </div>
             <div className="p-6 space-y-6">
               {/* Profile Image */}
-              <div className="rounded-xl overflow-hidden">
-                <img src={selectedHost.propertyImage} alt={selectedHost.location} className="w-full h-64 object-cover" />
-              </div>
+              {selectedHost.propertyImage ? (
+                <div className="rounded-xl overflow-hidden">
+                  <img src={selectedHost.propertyImage} alt={selectedHost.location} className="w-full h-64 object-cover" />
+                </div>
+              ) : (
+                <div className="rounded-xl overflow-hidden bg-gray-100 h-64 flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <Home className="w-16 h-16 mx-auto mb-2" />
+                    <p className="text-sm">No property image available</p>
+                  </div>
+                </div>
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-4">

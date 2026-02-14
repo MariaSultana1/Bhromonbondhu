@@ -3,6 +3,8 @@ import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Ca
 
 export function TravelerProfile({ user: initialUser }) {
   const [user, setUser] = useState(initialUser);
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -29,6 +31,51 @@ export function TravelerProfile({ user: initialUser }) {
   // Get auth token from localStorage
   const getAuthToken = () => {
     return localStorage.getItem('token');
+  };
+
+  // Fetch traveler statistics
+  const fetchTravelerStats = async () => {
+    try {
+      setStatsLoading(true);
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await fetch('http://localhost:5000/api/traveler/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.stats) {
+        setStats(data.stats);
+      } else {
+        console.error('Failed to fetch stats:', data.message);
+        // Set default stats if fetch fails
+        setStats({
+          totalTrips: 0,
+          placesVisited: 0,
+          reviewsGiven: 0,
+          hostsBooked: 0,
+          travelTier: 'Explorer',
+          travelPoints: 0
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching traveler stats:', err);
+      // Set default stats on error
+      setStats({
+        totalTrips: 0,
+        placesVisited: 0,
+        reviewsGiven: 0,
+        hostsBooked: 0,
+        travelTier: 'Explorer',
+        travelPoints: 0
+      });
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   // Fetch user profile from backend
@@ -63,7 +110,7 @@ export function TravelerProfile({ user: initialUser }) {
     }
   };
 
-  // Load user profile on component mount
+  // Load user profile and stats on component mount
   useEffect(() => {
     if (!initialUser) {
       fetchUserProfile();
@@ -73,6 +120,9 @@ export function TravelerProfile({ user: initialUser }) {
         phone: initialUser.phone || ''
       });
     }
+    
+    // Always fetch stats
+    fetchTravelerStats();
   }, [initialUser]);
 
   // Handle profile picture upload
@@ -533,47 +583,80 @@ export function TravelerProfile({ user: initialUser }) {
           {/* Travel Stats */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Travel Stats</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Total Trips</span>
-                <span className="text-lg text-blue-600">8</span>
+            {statsLoading ? (
+              <div className="text-center py-4">
+                <p className="text-gray-500">Loading stats...</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Places Visited</span>
-                <span className="text-lg text-blue-600">12</span>
+            ) : stats ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total Trips</span>
+                  <span className="text-lg font-semibold text-blue-600">{stats.totalTrips || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Places Visited</span>
+                  <span className="text-lg font-semibold text-blue-600">{stats.placesVisited || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Reviews Given</span>
+                  <span className="text-lg font-semibold text-blue-600">{stats.reviewsGiven || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Travel Tier</span>
+                  <span className="text-lg font-semibold text-purple-600">{stats.travelTier || 'Explorer'}</span>
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <span className="text-sm text-gray-600">Travel Points</span>
+                  <span className="text-lg font-semibold text-purple-600">{(stats.travelPoints || 0).toLocaleString()}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Reviews Given</span>
-                <span className="text-lg text-blue-600">6</span>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-500">No stats available</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Travel Points</span>
-                <span className="text-lg text-purple-600">2,450</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Badges & Achievements */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="mb-4">Badges & Achievements</h3>
             <div className="grid grid-cols-3 gap-3">
+              {/* Travel Tier Badge */}
               <div className="text-center">
-                <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-1">
-                  🏆
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
+                  stats?.travelTier === 'Gold Traveler' ? 'bg-yellow-100 text-yellow-600' :
+                  stats?.travelTier === 'Silver Traveler' ? 'bg-gray-200 text-gray-600' :
+                  stats?.travelTier === 'Bronze Traveler' ? 'bg-orange-100 text-orange-600' :
+                  'bg-blue-100 text-blue-600'
+                }`}>
+                  {stats?.travelTier === 'Gold Traveler' ? '🥇' :
+                   stats?.travelTier === 'Silver Traveler' ? '🥈' :
+                   stats?.travelTier === 'Bronze Traveler' ? '🥉' :
+                   '🎫'}
+                </div>
+                <p className="text-xs font-semibold">{stats?.travelTier || 'Explorer'}</p>
+              </div>
+
+              {/* Explorer Badge (5+ trips) */}
+              <div className="text-center opacity-75">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
+                  (stats?.totalTrips || 0) >= 5 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  🌍
                 </div>
                 <p className="text-xs">Explorer</p>
+                {(stats?.totalTrips || 0) < 5 && <p className="text-xs text-gray-400">{5 - (stats?.totalTrips || 0)} trips</p>}
               </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-1">
-                  ⭐
+
+              {/* Places Badge (10+ places) */}
+              <div className="text-center opacity-75">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
+                  (stats?.placesVisited || 0) >= 10 ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  📍
                 </div>
-                <p className="text-xs">Reviewer</p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-1">
-                  🌟
-                </div>
-                <p className="text-xs">Local Friend</p>
+                <p className="text-xs">Wanderer</p>
+                {(stats?.placesVisited || 0) < 10 && <p className="text-xs text-gray-400">{10 - (stats?.placesVisited || 0)} places</p>}
               </div>
             </div>
           </div>
