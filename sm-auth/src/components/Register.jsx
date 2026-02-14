@@ -11,6 +11,18 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
     }
   }, [userType]);
 
+  // Normalize userType
+  const normalizedUserType = React.useMemo(() => {
+    if (!userType) return 'tourist';
+    if (typeof userType === 'string') {
+      const normalized = userType.toLowerCase();
+      return normalized === 'traveller' ? 'tourist' : normalized;
+    }
+    return 'tourist';
+  }, [userType]);
+
+  const isHost = normalizedUserType === 'host';
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -18,6 +30,7 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
     password: "",
     confirmPassword: "",
   });
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -55,6 +68,13 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
       setError("Passwords do not match! Please check and try again.");
       return false;
     }
+
+    // Phone is required for hosts
+    if (isHost && !formData.phone.trim()) {
+      setError("Phone number is required for host registration");
+      return false;
+    }
+
     return true;
   };
 
@@ -70,40 +90,14 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
       // Generate username from email
       const username = formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // Handle userType safely
-      let safeRole = "tourist"; // Default role
-      
-      // Debug userType
-      console.log("🔍 Processing userType:", userType);
-      
-      if (userType) {
-        if (typeof userType === 'string') {
-          safeRole = userType.toLowerCase();
-        } else if (typeof userType === 'object' && userType !== null) {
-          // Extract role from object properties
-          if (userType.role && typeof userType.role === 'string') {
-            safeRole = userType.role.toLowerCase();
-          } else if (userType.type && typeof userType.type === 'string') {
-            safeRole = userType.type.toLowerCase();
-          } else if (userType.userType && typeof userType.userType === 'string') {
-            safeRole = userType.userType.toLowerCase();
-          } else {
-            // If it's an object but we can't extract role, use default
-            console.warn("⚠️ Could not extract role from userType object, using 'tourist'");
-          }
-        }
-      }
-      
-      console.log("✅ Final role being used:", safeRole);
-
-      // Create clean request body with only string values
+      // Create clean request body
       const payload = {
         username: String(username),
         fullName: String(formData.fullName.trim()),
         email: String(formData.email.trim().toLowerCase()),
         phone: String(formData.phone.trim()),
         password: String(formData.password),
-        role: String(safeRole),
+        role: String(normalizedUserType),
       };
 
       console.log("📤 Sending registration request:", payload);
@@ -228,7 +222,9 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
       <main className="absolute top-[295px] left-[760px] w-[472px] h-[555px] bg-[#f1eeee] rounded-xl border shadow-md px-10 py-6">
         <h1 className="text-4xl text-center mt-2 font-serif">REGISTER</h1>
         <p className="text-center mt-2 text-lg font-serif">
-          Create your account to join the Bhromonbondhu community
+          {isHost 
+            ? 'Create your host account - complete your profile later' 
+            : 'Create your account to join the Bhromonbondhu community'}
         </p>
 
         {error && (
@@ -265,9 +261,10 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-            placeholder="Phone Number (Optional)"
+            placeholder={`Phone Number ${isHost ? '*' : '(Optional)'}`}
             disabled={isLoading}
             autoComplete="tel"
+            required={isHost}
           />
 
           <div className="relative">
@@ -346,7 +343,16 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
           
           <div className="text-xs text-gray-500 text-center mt-4">
             <p>Fields marked with * are required</p>
-            <p className="mt-1">Default role: Tourist</p>
+            <p className="mt-1">
+              Registering as: <span className="font-semibold capitalize">
+                {normalizedUserType === 'tourist' ? 'Tourist' : 'Host'}
+              </span>
+            </p>
+            {isHost && (
+              <p className="mt-2 text-blue-600">
+                You can complete your host profile after registration
+              </p>
+            )}
           </div>
         </div>
       </main>

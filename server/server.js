@@ -191,67 +191,12 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
-  },
-  location: {
-    type: String,
-    trim: true,
-    default: ''
-  },
-  languages: [{
-    type: String,
-    default: []
-  }],
-  bio: {
-    type: String,
-    trim: true,
-    default: '',
-    maxlength: 500
-  },
-  hostBadge: {
-    type: String,
-    enum: ['Host', 'Superhost', 'Pro Host'],
-    default: 'Host'
-  },
-  hostRating: {
-    type: Number,
-    min: 0,
-    max: 5,
-    default: 0
-  },
-  totalGuests: {
-    type: Number,
-    default: 0
-  },
-  responseRate: {
-    type: Number,
-    min: 0,
-    max: 100,
-    default: 0
-  },
-  idVerifiedAt: {
-    type: Date
-  },
-  bgCheckAt: {
-    type: Date
-  },
-  trainingAt: {
-    type: Date
-  },
-  bankVerifiedAt: {
-    type: Date
-  },
-  kycCompleted: {
-    type: Boolean,
-    default: false
-  },
-  verified: {
-    type: Boolean,
-    default: false
   }
 }, {
   timestamps: true
 });
 
+// Password hashing
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
@@ -264,10 +209,12 @@ userSchema.pre('save', async function(next) {
   }
 });
 
+// Password comparison
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// Remove password from response
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
@@ -725,14 +672,56 @@ const Conversation = mongoose.model('Conversation', conversationSchema);
 
 // Host Schema
 const hostSchema = new mongoose.Schema({
+  // Host Profile Information
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'User ID is required'],
+    unique: true
+  },
+  
+  // Basic Information
   name: {
     type: String,
-    required: [true, 'Host name is required']
+    required: [true, 'Host name is required'],
+    trim: true
   },
   location: {
     type: String,
-    required: [true, 'Location is required']
+    required: [true, 'Location is required'],
+    trim: true
   },
+  description: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: [500, 'Description cannot exceed 500 characters']
+  },
+  bio: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 500
+  },
+  
+  // Languages & Communication
+  languages: [{
+    type: String,
+    default: []
+  }],
+  responseTime: {
+    type: String,
+    enum: ['Within 30 minutes', 'Within 1 hour', 'Within 2 hours', 'Within 24 hours'],
+    default: 'Within 1 hour'
+  },
+  
+  // Host Image
+  image: {
+    type: String,
+    default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'
+  },
+  
+  // Host Status & Ratings
   rating: {
     type: Number,
     min: 0,
@@ -743,69 +732,244 @@ const hostSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  verified: {
-    type: Boolean,
-    default: false
-  },
-  languages: [{
-    type: String,
-    default: []
-  }],
-  price: {
-    type: Number,
-    required: [true, 'Price per day is required']
-  },
-  image: {
-    type: String,
-    default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'
-  },
-  propertyImage: {
-    type: String,
-    required: [true, 'Property image is required']
-  },
-  services: [{
-    type: String,
-    default: []
-  }],
-  available: {
-    type: Boolean,
-    default: true
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  description: {
-    type: String,
-    default: 'Experienced local host'
-  },
+  
+  // Experience Level
   experience: {
     type: String,
     enum: ['Beginner', 'Intermediate', 'Expert'],
     default: 'Beginner'
   },
-  responseTime: {
+  
+  // Host Badge & Recognition
+  hostBadge: {
     type: String,
-    default: 'Within 1 hour'
+    enum: ['Host', 'Superhost', 'Pro Host'],
+    default: 'Host'
   },
-  cancellationPolicy: {
-    type: String,
-    default: 'Flexible'
-  },
-  minStay: {
+  
+  // Host Statistics
+  hostRating: {
     type: Number,
-    default: 1
+    min: 0,
+    max: 5,
+    default: 0
   },
-  maxGuests: {
+  totalGuests: {
     type: Number,
-    default: 4
+    default: 0
+  },
+  responseRate: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 0
+  },
+  
+  // Availability
+  available: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Verification Status
+  verified: {
+    type: Boolean,
+    default: false
+  },
+  kycCompleted: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Verification Dates
+  idVerifiedAt: {
+    type: Date,
+    default: null
+  },
+  bgCheckAt: {
+    type: Date,
+    default: null
+  },
+  trainingAt: {
+    type: Date,
+    default: null
+  },
+  bankVerifiedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
 });
 
+// Index for quick lookups
+hostSchema.index({ userId: 1 });
+hostSchema.index({ location: 1 });
+hostSchema.index({ verified: 1 });
+
 const Host = mongoose.model('Host', hostSchema);
+
+
+
+const hostServiceSchema = new mongoose.Schema({
+  // Link to Host
+  hostId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Host',
+    required: [true, 'Host ID is required'],
+    index: true
+  },
+  
+  // Link to User (for easier queries)
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'User ID is required'],
+    index: true
+  },
+  
+  // Service Details
+  name: {
+    type: String,
+    required: [true, 'Service name is required'],
+    trim: true
+  },
+  
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  
+  // Pricing
+  price: {
+    type: Number,
+    required: [true, 'Price is required'],
+    min: [0, 'Price cannot be negative']
+  },
+  
+  // Service Type
+  serviceType: {
+    type: [String],
+    enum: ['Local Guide', 'Transportation', 'Meals', 'Photography', 'Activities', 'Accommodation'],
+    required: [true, 'At least one service type is required']
+  },
+  
+  // Location specific to this service
+  location: {
+    type: String,
+    required: [true, 'Service location is required'],
+    trim: true
+  },
+  
+  // Capacity
+  maxGuests: {
+    type: Number,
+    required: [true, 'Maximum guests is required'],
+    min: 1,
+    default: 4
+  },
+  
+  minStay: {
+    type: Number,
+    default: 1,
+    min: 1
+  },
+  
+  // Property Image (required if offering accommodation)
+  propertyImage: {
+    type: String,
+    default: ''
+  },
+  
+  // Service-specific settings
+  experience: {
+    type: String,
+    enum: ['Beginner', 'Intermediate', 'Expert'],
+    default: 'Beginner'
+  },
+  
+  responseTime: {
+    type: String,
+    enum: ['Within 30 minutes', 'Within 1 hour', 'Within 2 hours', 'Within 24 hours'],
+    default: 'Within 1 hour'
+  },
+  
+  cancellationPolicy: {
+    type: String,
+    enum: ['Flexible', 'Moderate', 'Strict'],
+    default: 'Flexible'
+  },
+  
+  // Availability
+  available: {
+    type: Boolean,
+    default: true
+  },
+  
+  availableFromDate: {
+    type: Date,
+    required: [true, 'Available from date is required']
+  },
+  
+  availableToDate: {
+    type: Date,
+    required: [true, 'Available to date is required']
+  },
+  
+  // Status
+  active: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Stats
+  totalBookings: {
+    type: Number,
+    default: 0
+  },
+  
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  
+  reviews: {
+    type: Number,
+    default: 0
+  }
+}, {
+  timestamps: true
+});
+
+// Validation middleware
+hostServiceSchema.pre('save', function(next) {
+  // If offering accommodation, property image is required
+  if (this.serviceType.includes('Accommodation') && !this.propertyImage) {
+    return next(new Error('Property image is required when offering accommodation'));
+  }
+  
+  // Validate date range
+  if (this.availableFromDate && this.availableToDate) {
+    if (this.availableFromDate > this.availableToDate) {
+      return next(new Error('Available from date must be before available to date'));
+    }
+  }
+  
+  next();
+});
+
+// Indexes for efficient queries
+hostServiceSchema.index({ hostId: 1, active: 1 });
+hostServiceSchema.index({ userId: 1, active: 1 });
+hostServiceSchema.index({ location: 1, available: 1 });
+hostServiceSchema.index({ availableFromDate: 1, availableToDate: 1 });
+
+const HostService = mongoose.model('HostService', hostServiceSchema);
+
+
 
 // Booking Schema
 const bookingSchema = new mongoose.Schema({
@@ -4746,6 +4910,467 @@ app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
   }
 });
 
+
+//============ HOST SERVICES ROUTES ============
+
+// Get all services for a specific host (Protected)
+app.get('/api/host-services/my-services', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can access their services'
+      });
+    }
+
+    // Find host profile
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found. Please complete your host profile first.'
+      });
+    }
+
+    // Get all services for this host
+    const services = await HostService.find({
+      hostId: hostProfile._id,
+      active: true
+    })
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: services.length,
+      services
+    });
+  } catch (error) {
+    console.error('❌ Get host services error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching services',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Create a new service (Protected)
+app.post('/api/host-services', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can create services'
+      });
+    }
+
+    const {
+      name,
+      description,
+      price,
+      serviceType,
+      location,
+      maxGuests,
+      minStay,
+      propertyImage,
+      experience,
+      responseTime,
+      cancellationPolicy,
+      availableFromDate,
+      availableToDate
+    } = req.body;
+
+    // Validation
+    if (!name || !price || !serviceType || !location || !availableFromDate || !availableToDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: name, price, serviceType, location, availableFromDate, availableToDate'
+      });
+    }
+
+    // Check if serviceType is an array
+    if (!Array.isArray(serviceType) || serviceType.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one service type is required'
+      });
+    }
+
+    // Validate dates
+    const fromDate = new Date(availableFromDate);
+    const toDate = new Date(availableToDate);
+    
+    if (fromDate > toDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Available from date must be before available to date'
+      });
+    }
+
+    // Find host profile
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found. Please complete your host profile first.'
+      });
+    }
+
+    // Check if offering accommodation
+    const offersAccommodation = serviceType.includes('Accommodation');
+    
+    if (offersAccommodation && !propertyImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Property image is required when offering accommodation'
+      });
+    }
+
+    // Validate property image URL if provided
+    if (propertyImage) {
+      try {
+        new URL(propertyImage);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid property image URL'
+        });
+      }
+    }
+
+    // Create service
+    const service = new HostService({
+      hostId: hostProfile._id,
+      userId: req.user._id,
+      name: name.trim(),
+      description: description ? description.trim() : '',
+      price: parseFloat(price),
+      serviceType,
+      location: location.trim(),
+      maxGuests: maxGuests ? parseInt(maxGuests) : 4,
+      minStay: minStay ? parseInt(minStay) : 1,
+      propertyImage: propertyImage || '',
+      experience: experience || 'Beginner',
+      responseTime: responseTime || 'Within 1 hour',
+      cancellationPolicy: cancellationPolicy || 'Flexible',
+      availableFromDate: fromDate,
+      availableToDate: toDate,
+      available: true,
+      active: true
+    });
+
+    await service.save();
+
+    console.log(`✅ Service created: ${service.name} for host: ${req.user.email}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Service created successfully',
+      service
+    });
+  } catch (error) {
+    console.error('❌ Create service error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error creating service',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get a single service by ID (Protected)
+app.get('/api/host-services/:id', authenticate, async (req, res) => {
+  try {
+    const service = await HostService.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    })
+    .populate('hostId', 'name location rating reviews');
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      service
+    });
+  } catch (error) {
+    console.error('❌ Get service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching service',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update a service (Protected)
+app.put('/api/host-services/:id', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can update services'
+      });
+    }
+
+    const service = await HostService.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    const {
+      name,
+      description,
+      price,
+      serviceType,
+      location,
+      maxGuests,
+      minStay,
+      propertyImage,
+      experience,
+      responseTime,
+      cancellationPolicy,
+      availableFromDate,
+      availableToDate,
+      available
+    } = req.body;
+
+    // Update fields
+    if (name) service.name = name.trim();
+    if (description !== undefined) service.description = description.trim();
+    if (price !== undefined) service.price = parseFloat(price);
+    if (serviceType) service.serviceType = serviceType;
+    if (location) service.location = location.trim();
+    if (maxGuests !== undefined) service.maxGuests = parseInt(maxGuests);
+    if (minStay !== undefined) service.minStay = parseInt(minStay);
+    if (propertyImage !== undefined) service.propertyImage = propertyImage;
+    if (experience) service.experience = experience;
+    if (responseTime) service.responseTime = responseTime;
+    if (cancellationPolicy) service.cancellationPolicy = cancellationPolicy;
+    if (availableFromDate) service.availableFromDate = new Date(availableFromDate);
+    if (availableToDate) service.availableToDate = new Date(availableToDate);
+    if (available !== undefined) service.available = available;
+
+    await service.save();
+
+    console.log(`✅ Service updated: ${service.name} for host: ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Service updated successfully',
+      service
+    });
+  } catch (error) {
+    console.error('❌ Update service error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error updating service',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Delete a service (Soft delete - mark as inactive) (Protected)
+app.delete('/api/host-services/:id', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can delete services'
+      });
+    }
+
+    const service = await HostService.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    // Soft delete - mark as inactive instead of removing
+    service.active = false;
+    service.available = false;
+    await service.save();
+
+    console.log(`✅ Service deleted (soft): ${service.name} for host: ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Service deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Delete service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting service',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get all services (Public - for browsing/searching)
+app.get('/api/host-services', async (req, res) => {
+  try {
+    const { 
+      location, 
+      minPrice, 
+      maxPrice, 
+      serviceType,
+      availableFrom,
+      availableTo,
+      limit = 20,
+      page = 1 
+    } = req.query;
+
+    let query = { active: true, available: true };
+
+    // Location filter
+    if (location) {
+      query.location = { $regex: location, $options: 'i' };
+    }
+
+    // Price range filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+
+    // Service type filter
+    if (serviceType) {
+      query.serviceType = serviceType;
+    }
+
+    // Availability date filter
+    if (availableFrom && availableTo) {
+      query.availableFromDate = { $lte: new Date(availableFrom) };
+      query.availableToDate = { $gte: new Date(availableTo) };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const services = await HostService.find(query)
+      .populate('hostId', 'name location rating reviews verified hostBadge')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await HostService.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: services.length,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      services
+    });
+  } catch (error) {
+    console.error('❌ Get all services error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching services',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get service statistics for current host (Protected)
+app.get('/api/host-services/stats/my-stats', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can access service statistics'
+      });
+    }
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    // Get statistics
+    const [
+      totalServices,
+      activeServices,
+      totalBookings,
+      avgRating
+    ] = await Promise.all([
+      HostService.countDocuments({ hostId: hostProfile._id }),
+      HostService.countDocuments({ hostId: hostProfile._id, active: true, available: true }),
+      HostService.aggregate([
+        { $match: { hostId: hostProfile._id } },
+        { $group: { _id: null, total: { $sum: '$totalBookings' } } }
+      ]),
+      HostService.aggregate([
+        { $match: { hostId: hostProfile._id, reviews: { $gt: 0 } } },
+        { $group: { _id: null, avg: { $avg: '$rating' } } }
+      ])
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalServices,
+        activeServices,
+        inactiveServices: totalServices - activeServices,
+        totalBookings: totalBookings[0]?.total || 0,
+        averageRating: avgRating[0]?.avg || 0
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get service stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // ==================== MESSAGE ROUTES ====================
 
 // Get conversations for current user (Protected)
@@ -5224,7 +5849,8 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, fullName, email, phone, password, role } = req.body;
 
-    // Validation
+    // ============ VALIDATION ============
+    
     if (!username || !fullName || !email || !password) {
       return res.status(400).json({ 
         success: false,
@@ -5239,7 +5865,28 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // Validate phone if provided
+    if (phone) {
+      const phoneValidation = validatePhoneNumber(phone);
+      if (!phoneValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: phoneValidation.message
+        });
+      }
+    }
+
+    // Phone is required for hosts
+    const isHost = role === 'host';
+    if (isHost && !phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required for host registration'
+      });
+    }
+
+    // ============ CHECK EXISTING USER ============
+    
     const existingUser = await User.findOne({ 
       $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] 
     });
@@ -5257,11 +5904,8 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    // Set default verification dates for host role
-    const now = new Date();
-    const isHost = role === 'host';
-
-    // Create new user
+    // ============ CREATE USER ============
+    
     const user = new User({
       username: username.toLowerCase(),
       fullName,
@@ -5270,31 +5914,274 @@ app.post('/api/auth/register', async (req, res) => {
       password,
       role: role || 'tourist',
       profilePicture: '',
-      location: isHost ? 'Cox\'s Bazar, Bangladesh' : '',
-      languages: isHost ? ['Bengali', 'English'] : [],
-      bio: isHost ? 'Passionate local guide with years of experience showing travelers the best of Bangladesh.' : '',
-      hostBadge: isHost ? 'Host' : undefined,
-      verified: isHost ? true : false,
-      idVerifiedAt: isHost ? now : undefined,
-      bgCheckAt: isHost ? now : undefined,
-      trainingAt: isHost ? now : undefined,
-      bankVerifiedAt: isHost ? now : undefined,
-      hostRating: isHost ? 4.9 : 0,
-      totalGuests: isHost ? 124 : 0,
-      responseRate: isHost ? 98 : 0
+      // Basic fields - no defaults
+      location: '',
+      languages: [],
+      bio: '',
+      // Host-specific fields - only for hosts
+      ...(isHost && {
+        hostBadge: 'Host',
+        verified: false,
+        kycCompleted: false,
+        hostRating: 0,
+        totalGuests: 0,
+        responseRate: 0
+      })
     });
 
     await user.save();
 
-    // Generate token
+    // ============ CREATE BASIC HOST PROFILE (if host) ============
+    
+    let hostProfile = null;
+    if (isHost) {
+      try {
+        // Create a minimal host profile
+        // User will complete it later via profile settings
+        hostProfile = new Host({
+          name: fullName,
+          userId: user._id,
+          location: '', // To be filled by user
+          rating: 0,
+          reviews: 0,
+          verified: false,
+          languages: [], // To be filled by user
+          price: 0, // To be filled by user
+          image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          propertyImage: '', // To be filled by user
+          services: [], // To be filled by user
+          available: false, // Not available until profile is complete
+          description: '', // To be filled by user
+          experience: 'Beginner', // Default, can be updated
+          responseTime: 'Within 1 hour', // Default, can be updated
+          cancellationPolicy: 'Flexible', // Default, can be updated
+          minStay: 1, // Default, can be updated
+          maxGuests: 1 // Default, can be updated
+        });
+
+        await hostProfile.save();
+        
+        console.log(`✅ Basic host profile created for: ${user.email} (Host ID: ${hostProfile._id})`);
+        console.log(`⚠️ Host profile is incomplete - user needs to complete it`);
+      } catch (hostError) {
+        console.error('❌ Error creating host profile:', hostError);
+        
+        // Rollback user creation if host profile fails
+        await User.findByIdAndDelete(user._id);
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Error creating host profile. Please try again.',
+          error: process.env.NODE_ENV === 'development' ? hostError.message : undefined
+        });
+      }
+    }
+
+    // ============ GENERATE TOKEN ============
+    
     const token = generateToken(user._id);
 
     console.log(`✅ New user registered: ${user.email} (Role: ${user.role})`);
+    if (isHost && hostProfile) {
+      console.log(`✅ Host registration complete - profile needs completion`);
+    }
 
+    // ============ SEND RESPONSE ============
+    
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Welcome to Bhromonbondhu!',
+      message: isHost 
+        ? 'Registration successful! Please complete your host profile to start hosting.' 
+        : 'Registration successful! Welcome to Bhromonbondhu!',
       token,
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        location: user.location,
+        languages: user.languages,
+        bio: user.bio,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        hostBadge: user.hostBadge || null,
+        hostRating: user.hostRating || 0,
+        totalGuests: user.totalGuests || 0,
+        responseRate: user.responseRate || 0,
+        verified: user.verified || false,
+        kycCompleted: user.kycCompleted || false,
+        createdAt: user.createdAt
+      },
+      ...(hostProfile && {
+        host: {
+          id: hostProfile._id,
+          name: hostProfile.name,
+          profileComplete: false, // Flag to show profile is incomplete
+          needsCompletion: true
+        }
+      })
+    });
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ 
+        success: false,
+        message: `This ${field} is already registered. Please use a different ${field}.` 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'An error occurred during registration. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
+// ============ NEW ENDPOINT: Complete Host Profile ============
+
+app.put('/api/hosts/complete-profile', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can complete host profiles'
+      });
+    }
+
+    const {
+      location,
+      languages,
+      bio,
+      price,
+      propertyImage,
+      services,
+      experience,
+      responseTime,
+      cancellationPolicy,
+      minStay,
+      maxGuests,
+      availableFromDate,
+      availableToDate
+    } = req.body;
+
+    // Check if accommodation is offered
+    const offersAccommodation = services && services.includes('Accommodation');
+
+    // Validate required fields
+    if (!location || !languages || !bio || !price || !services) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: location, languages, bio, price, and services'
+      });
+    }
+
+    // If offering accommodation, property image is required
+    if (offersAccommodation && !propertyImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Property image is required when offering accommodation service'
+      });
+    }
+
+    // Validate property image URL if provided
+    if (propertyImage) {
+      try {
+        new URL(propertyImage);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid property image URL'
+        });
+      }
+    }
+
+    // Additional validations
+    if (!Array.isArray(languages) || languages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one language is required'
+      });
+    }
+
+    if (!Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one service is required'
+      });
+    }
+
+    if (typeof price !== 'number' || price <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid price is required'
+      });
+    }
+
+    if (bio.length < 20 || bio.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bio must be between 20 and 500 characters'
+      });
+    }
+
+    // Validate URL
+    try {
+      new URL(propertyImage);
+    } catch (e) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid property image URL'
+      });
+    }
+
+    // Find host profile
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    // Update host profile
+    hostProfile.location = location;
+    hostProfile.languages = languages;
+    hostProfile.description = bio;
+    hostProfile.price = price;
+    hostProfile.propertyImage = propertyImage || '';
+    hostProfile.services = services;
+    hostProfile.offersAccommodation = offersAccommodation;
+    hostProfile.available = true;
+    hostProfile.availableFromDate = availableFromDate;
+    hostProfile.availableToDate = availableToDate;
+
+    if (experience) hostProfile.experience = experience;
+    if (responseTime) hostProfile.responseTime = responseTime;
+    if (cancellationPolicy) hostProfile.cancellationPolicy = cancellationPolicy;
+    if (minStay) hostProfile.minStay = minStay;
+    if (maxGuests) hostProfile.maxGuests = maxGuests;
+
+    await hostProfile.save();
+
+    // Also update user profile
+    const user = await User.findById(req.user._id);
+    user.location = location;
+    user.languages = languages;
+    user.bio = bio;
+    await user.save();
+
+    console.log(`✅ Host profile completed for: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Host profile completed successfully! You can now start hosting.',
+      host: hostProfile,
       user: {
         id: user._id,
         username: user.username,
@@ -5311,23 +6198,180 @@ app.post('/api/auth/register', async (req, res) => {
         totalGuests: user.totalGuests,
         responseRate: user.responseRate,
         verified: user.verified,
-        createdAt: user.createdAt
+        kycCompleted: user.kycCompleted
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({ 
+    console.error('❌ Complete host profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing host profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
+// ============ ENDPOINT: Check if Host Profile is Complete ============
+
+app.get('/api/hosts/profile-status', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
         success: false,
-        message: `This ${field} is already registered. Please use a different ${field}.` 
+        message: 'Only hosts can check profile status'
       });
     }
-    
-    res.status(500).json({ 
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    // Check if profile is complete
+    const isComplete = 
+      hostProfile.location && 
+      hostProfile.languages.length > 0 && 
+      hostProfile.description && 
+      hostProfile.price > 0 && 
+      hostProfile.propertyImage && 
+      hostProfile.services.length > 0;
+
+    const missingFields = [];
+    if (!hostProfile.location) missingFields.push('location');
+    if (hostProfile.languages.length === 0) missingFields.push('languages');
+    if (!hostProfile.description) missingFields.push('bio/description');
+    if (hostProfile.price <= 0) missingFields.push('price');
+    if (!hostProfile.propertyImage) missingFields.push('propertyImage');
+    if (hostProfile.services.length === 0) missingFields.push('services');
+
+    res.json({
+      success: true,
+      profileComplete: isComplete,
+      available: hostProfile.available,
+      missingFields,
+      completionPercentage: Math.round(((6 - missingFields.length) / 6) * 100)
+    });
+  } catch (error) {
+    console.error('❌ Check profile status error:', error);
+    res.status(500).json({
       success: false,
-      message: 'An error occurred during registration. Please try again.',
+      message: 'Error checking profile status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
+// ============ EXISTING ENDPOINTS (Keep these) ============
+
+// Get host profile for current user
+app.get('/api/hosts/my-profile', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can access host profiles'
+      });
+    }
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found. Please contact support.'
+      });
+    }
+
+    res.json({
+      success: true,
+      host: hostProfile
+    });
+  } catch (error) {
+    console.error('❌ Get host profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching host profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update host profile (same as before)
+app.put('/api/hosts/my-profile', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can update host profiles'
+      });
+    }
+
+    const {
+      name,
+      location,
+      price,
+      propertyImage,
+      services,
+      languages,
+      description,
+      experience,
+      responseTime,
+      cancellationPolicy,
+      minStay,
+      maxGuests,
+      available
+    } = req.body;
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    // Update fields
+    if (name) hostProfile.name = name;
+    if (location) hostProfile.location = location;
+    if (price !== undefined) hostProfile.price = price;
+    if (propertyImage) hostProfile.propertyImage = propertyImage;
+    if (services) hostProfile.services = services;
+    if (languages) hostProfile.languages = languages;
+    if (description) hostProfile.description = description;
+    if (experience) hostProfile.experience = experience;
+    if (responseTime) hostProfile.responseTime = responseTime;
+    if (cancellationPolicy) hostProfile.cancellationPolicy = cancellationPolicy;
+    if (minStay !== undefined) hostProfile.minStay = minStay;
+    if (maxGuests !== undefined) hostProfile.maxGuests = maxGuests;
+    if (available !== undefined) hostProfile.available = available;
+
+    await hostProfile.save();
+
+    // Also update corresponding fields in User model
+    const user = await User.findById(req.user._id);
+    if (name) user.fullName = name;
+    if (location) user.location = location;
+    if (languages) user.languages = languages;
+    if (description) user.bio = description;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Host profile updated successfully',
+      host: hostProfile
+    });
+  } catch (error) {
+    console.error('❌ Update host profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating host profile',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
