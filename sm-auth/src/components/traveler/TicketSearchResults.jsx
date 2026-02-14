@@ -281,7 +281,7 @@ export function TicketSearchResults({ tickets, loading, onSelectTicket, searchPa
                       <div className="text-right ml-6">
                         <div className="mb-3">
                           <p className="text-sm text-gray-600">Starting from</p>
-                          <p className="text-3xl font-bold text-gray-900">৳{ticket.price.toLocaleString()}</p>
+                          <p className="text-3xl font-bold text-gray-900">৳{(ticket.price || 0).toLocaleString()}</p>
                           <p className="text-xs text-gray-500">per person</p>
                         </div>
                         <button

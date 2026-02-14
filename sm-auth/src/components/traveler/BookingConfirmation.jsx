@@ -240,7 +240,7 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
             <div className="space-y-2">
               <div className="flex justify-between text-gray-700">
                 <span>Total Amount</span>
-                <span className="font-semibold">৳{booking.totalAmount.toLocaleString()}</span>
+                <span className="font-semibold">৳{(booking.totalAmount || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-gray-700">
                 <span>Payment Status</span>

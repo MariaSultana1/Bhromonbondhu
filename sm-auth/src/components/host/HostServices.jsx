@@ -1,3 +1,5 @@
+// src/pages/HostServices.jsx - COMPLETE FIXED VERSION
+
 import { Plus, Edit, Trash2, Calendar as CalendarIcon, DollarSign, Users, MapPin, X, Clock, Loader, AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -73,6 +75,492 @@ class HostServiceAPI {
   }
 }
 
+// ============ EDIT SERVICE MODAL ============
+
+const EditServiceModal = ({ isOpen, onClose, service, onSubmit, isLoading, error }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    price: '',
+    maxGuests: '',
+    propertyImage: '',
+    services: [],
+    description: '',
+    experience: 'Beginner',
+    responseTime: 'Within 1 hour',
+    cancellationPolicy: 'Flexible',
+    minStay: 1,
+    availableFromDate: '',
+    availableToDate: '',
+    available: true
+  });
+
+  const [validationErrors, setValidationErrors] = useState({});
+
+  useEffect(() => {
+    if (service && isOpen) {
+      setFormData({
+        name: service.name || '',
+        location: service.location || '',
+        price: service.price || '',
+        maxGuests: service.maxGuests || '',
+        propertyImage: service.propertyImage || '',
+        services: service.serviceType || [],
+        description: service.description || '',
+        experience: service.experience || 'Beginner',
+        responseTime: service.responseTime || 'Within 1 hour',
+        cancellationPolicy: service.cancellationPolicy || 'Flexible',
+        minStay: service.minStay || 1,
+        availableFromDate: service.availableFromDate ? new Date(service.availableFromDate).toISOString().split('T')[0] : '',
+        availableToDate: service.availableToDate ? new Date(service.availableToDate).toISOString().split('T')[0] : '',
+        available: service.available !== undefined ? service.available : true
+      });
+    }
+  }, [service, isOpen]);
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleToggleService = (serviceType) => {
+    const updatedServices = formData.services.includes(serviceType)
+      ? formData.services.filter(s => s !== serviceType)
+      : [...formData.services, serviceType];
+    setFormData(prev => ({ ...prev, services: updatedServices }));
+  };
+
+  const offersAccommodation = formData.services.includes('Accommodation');
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Service name is required';
+    }
+
+    if (!formData.location.trim()) {
+      errors.location = 'Location is required';
+    }
+
+    if (!formData.price || parseFloat(formData.price) <= 0) {
+      errors.price = 'Price must be a positive number';
+    }
+
+    if (!formData.maxGuests || parseInt(formData.maxGuests) < 1) {
+      errors.maxGuests = 'Maximum guests must be at least 1';
+    }
+
+    if (offersAccommodation && !formData.propertyImage.trim()) {
+      errors.propertyImage = 'Property image is required when offering accommodation';
+    }
+
+    if (formData.propertyImage) {
+      try {
+        new URL(formData.propertyImage);
+      } catch (e) {
+        errors.propertyImage = 'Please enter a valid URL';
+      }
+    }
+
+    if (formData.services.length === 0) {
+      errors.services = 'Please select at least one service';
+    }
+
+    if (!formData.availableFromDate) {
+      errors.availableFromDate = 'Available from date is required';
+    }
+
+    if (!formData.availableToDate) {
+      errors.availableToDate = 'Available to date is required';
+    }
+
+    if (formData.availableFromDate && formData.availableToDate) {
+      if (new Date(formData.availableFromDate) > new Date(formData.availableToDate)) {
+        errors.availableToDate = 'Available to date must be after available from date';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    await onSubmit(formData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
+          <h3 className="text-2xl font-bold">Edit Service</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-red-700 text-sm">
+                <p className="font-medium">Error updating service</p>
+                <p>{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Basic Information Section */}
+          <div className="border-b pb-4">
+            <h4 className="font-semibold text-gray-800 mb-3">Basic Information</h4>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Service Name *
+                  {validationErrors.name && <span className="text-red-600 ml-1 text-xs">{validationErrors.name}</span>}
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Local Guide Service"
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.name
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Location *
+                  {validationErrors.location && <span className="text-red-600 ml-1 text-xs">{validationErrors.location}</span>}
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Cox's Bazar, Bangladesh"
+                  value={formData.location}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.location
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Description</label>
+                <textarea
+                  placeholder="Describe your service..."
+                  value={formData.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing & Capacity */}
+          <div className="border-b pb-4">
+            <h4 className="font-semibold text-gray-800 mb-3">Pricing & Capacity</h4>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Price (৳/day) *
+                  {validationErrors.price && <span className="text-red-600 ml-1 text-xs">{validationErrors.price}</span>}
+                </label>
+                <input
+                  type="number"
+                  placeholder="2500"
+                  value={formData.price}
+                  onChange={(e) => handleChange('price', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.price
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min="1"
+                  step="100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Max Guests *
+                  {validationErrors.maxGuests && <span className="text-red-600 ml-1 text-xs">{validationErrors.maxGuests}</span>}
+                </label>
+                <input
+                  type="number"
+                  placeholder="4"
+                  value={formData.maxGuests}
+                  onChange={(e) => handleChange('maxGuests', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.maxGuests
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Minimum Stay (nights)</label>
+                <input
+                  type="number"
+                  value={formData.minStay}
+                  onChange={(e) => handleChange('minStay', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Response Time</label>
+                <select
+                  value={formData.responseTime}
+                  onChange={(e) => handleChange('responseTime', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>Within 30 minutes</option>
+                  <option>Within 1 hour</option>
+                  <option>Within 2 hours</option>
+                  <option>Within 24 hours</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Services Section */}
+          <div className="border-b pb-4">
+            <h4 className="font-semibold text-gray-800 mb-3">Services Offered *</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {['Local Guide', 'Transportation', 'Meals', 'Photography', 'Activities', 'Accommodation'].map(serviceType => (
+                <label key={serviceType} className={`flex items-center gap-2 p-3 border rounded-lg hover:bg-blue-50 cursor-pointer transition-colors ${
+                  formData.services.includes(serviceType) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={formData.services.includes(serviceType)}
+                    onChange={() => handleToggleService(serviceType)}
+                    className="w-4 h-4 text-blue-500 rounded"
+                  />
+                  <span className="text-sm font-medium">{serviceType}</span>
+                </label>
+              ))}
+            </div>
+            {validationErrors.services && (
+              <span className="text-red-600 text-xs mt-1 block">{validationErrors.services}</span>
+            )}
+          </div>
+
+          {/* Service Availability Dates */}
+          <div className="border-b pb-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-blue-600" />
+              📅 Service Availability Dates *
+            </h4>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Available From Date *
+                  {validationErrors.availableFromDate && (
+                    <span className="text-red-600 ml-1 text-xs">{validationErrors.availableFromDate}</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableFromDate}
+                  onChange={(e) => handleChange('availableFromDate', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.availableFromDate
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-600 mt-1">When do you start offering this service?</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Available To Date *
+                  {validationErrors.availableToDate && (
+                    <span className="text-red-600 ml-1 text-xs">{validationErrors.availableToDate}</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableToDate}
+                  onChange={(e) => handleChange('availableToDate', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.availableToDate
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min={formData.availableFromDate || new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-600 mt-1">Until when will you offer this service?</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Property Image - Conditional */}
+          <div className="border-b pb-4">
+            <h4 className="font-semibold text-gray-800 mb-3">
+              Property Image {offersAccommodation && '*'}
+            </h4>
+            
+            {offersAccommodation && (
+              <div className="mb-3 p-3 bg-yellow-50 rounded border border-yellow-200">
+                <p className="text-xs text-yellow-900">
+                  <strong>📸 Required:</strong> Since you're offering accommodation, please provide a property image so guests can see where they'll be staying.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
+                {offersAccommodation ? 'Property Image URL *' : 'Property Image URL (Optional)'}
+                {validationErrors.propertyImage && (
+                  <span className="text-red-600 ml-1 text-xs">{validationErrors.propertyImage}</span>
+                )}
+              </label>
+              <input
+                type="url"
+                placeholder="https://example.com/property-image.jpg"
+                value={formData.propertyImage}
+                onChange={(e) => handleChange('propertyImage', e.target.value)}
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                  validationErrors.propertyImage
+                    ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                    : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                }`}
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                {offersAccommodation 
+                  ? 'Show guests your property (required for accommodation)' 
+                  : 'Optional: Add an image to showcase your service'}
+              </p>
+            </div>
+
+            {formData.propertyImage && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-600 mb-2">Preview:</p>
+                <img 
+                  src={formData.propertyImage} 
+                  alt="Property preview" 
+                  className="w-full h-48 object-cover rounded-lg"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    setValidationErrors(prev => ({
+                      ...prev,
+                      propertyImage: 'Invalid image URL'
+                    }));
+                  }}
+                  onLoad={() => {
+                    if (validationErrors.propertyImage === 'Invalid image URL') {
+                      setValidationErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.propertyImage;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Experience Level & Policies */}
+          <div className="border-b pb-4">
+            <h4 className="font-semibold text-gray-800 mb-3">Additional Details</h4>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Experience Level</label>
+                <select
+                  value={formData.experience}
+                  onChange={(e) => handleChange('experience', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Expert</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Cancellation Policy</label>
+                <select
+                  value={formData.cancellationPolicy}
+                  onChange={(e) => handleChange('cancellationPolicy', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>Flexible</option>
+                  <option>Moderate</option>
+                  <option>Strict</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.available}
+                  onChange={(e) => handleChange('available', e.target.checked)}
+                  className="w-4 h-4 text-blue-500 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700">Service is currently available for booking</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-4 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                Updating Service...
+              </>
+            ) : (
+              <>
+                <Edit className="w-4 h-4" />
+                Update Service
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ============ ADD SERVICE MODAL ============
 
 const AddServiceModal = ({ isOpen, onClose, onSubmit, isLoading, error }) => {
@@ -80,7 +568,7 @@ const AddServiceModal = ({ isOpen, onClose, onSubmit, isLoading, error }) => {
     name: '',
     location: '',
     price: '',
-    maxGuests: '',
+    maxGuests: 4,
     propertyImage: '',
     services: [],
     description: '',
@@ -354,6 +842,63 @@ const AddServiceModal = ({ isOpen, onClose, onSubmit, isLoading, error }) => {
             )}
           </div>
 
+          {/* Service Availability Dates - NEWLY ADDED */}
+          <div className="border-b pb-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-blue-600" />
+              📅 Service Availability Dates *
+            </h4>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Available From Date *
+                  {validationErrors.availableFromDate && (
+                    <span className="text-red-600 ml-1 text-xs">{validationErrors.availableFromDate}</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableFromDate}
+                  onChange={(e) => handleChange('availableFromDate', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.availableFromDate
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-600 mt-1">When do you start offering this service?</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Available To Date *
+                  {validationErrors.availableToDate && (
+                    <span className="text-red-600 ml-1 text-xs">{validationErrors.availableToDate}</span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableToDate}
+                  onChange={(e) => handleChange('availableToDate', e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
+                    validationErrors.availableToDate
+                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
+                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
+                  }`}
+                  min={formData.availableFromDate || new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-xs text-gray-600 mt-1">Until when will you offer this service?</p>
+              </div>
+            </div>
+            
+            <div className="mt-3 p-3 bg-blue-100 rounded border border-blue-300">
+              <p className="text-xs text-blue-900">
+                <strong>💡 Tip:</strong> Set your availability dates to manage when guests can book your service. You can update these dates anytime.
+              </p>
+            </div>
+          </div>
+
           {/* Property Image - Conditional */}
           <div className="border-b pb-4">
             <h4 className="font-semibold text-gray-800 mb-3">
@@ -419,59 +964,6 @@ const AddServiceModal = ({ isOpen, onClose, onSubmit, isLoading, error }) => {
                 />
               </div>
             )}
-          </div>
-
-          {/* Service Availability Dates */}
-          <div className="border-b pb-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-blue-600" />
-              📅 Service Availability Dates
-            </h4>
-            
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700">
-                  Available From Date *
-                  {validationErrors.availableFromDate && <span className="text-red-600 ml-1 text-xs">{validationErrors.availableFromDate}</span>}
-                </label>
-                <input
-                  type="date"
-                  value={formData.availableFromDate}
-                  onChange={(e) => handleChange('availableFromDate', e.target.value)}
-                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
-                    validationErrors.availableFromDate
-                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
-                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
-                  }`}
-                  min={new Date().toISOString().split('T')[0]}
-                />
-                <p className="text-xs text-gray-600 mt-1">When do you start offering this service?</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700">
-                  Available To Date *
-                  {validationErrors.availableToDate && <span className="text-red-600 ml-1 text-xs">{validationErrors.availableToDate}</span>}
-                </label>
-                <input
-                  type="date"
-                  value={formData.availableToDate}
-                  onChange={(e) => handleChange('availableToDate', e.target.value)}
-                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-all ${
-                    validationErrors.availableToDate
-                      ? 'border-red-300 focus:ring-2 focus:ring-red-500'
-                      : 'border-gray-200 focus:ring-2 focus:ring-blue-500'
-                  }`}
-                  min={formData.availableFromDate || new Date().toISOString().split('T')[0]}
-                />
-                <p className="text-xs text-gray-600 mt-1">Until when will you offer this service?</p>
-              </div>
-            </div>
-            
-            <div className="mt-3 p-3 bg-blue-100 rounded border border-blue-300">
-              <p className="text-xs text-blue-900">
-                <strong>💡 Tip:</strong> Set your availability dates to manage when guests can book your service. You can update these dates anytime.
-              </p>
-            </div>
           </div>
 
           {/* Experience Level & Policies */}
@@ -702,6 +1194,10 @@ const StatisticsWidget = ({ stats }) => {
           <span className="text-sm font-medium text-gray-700">Active Services</span>
           <span className="text-2xl font-bold text-green-600">{stats.activeServices}</span>
         </div>
+        <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+          <span className="text-sm font-medium text-gray-700">Total Bookings</span>
+          <span className="text-2xl font-bold text-purple-600">{stats.totalBookings}</span>
+        </div>
         <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
           <span className="text-sm font-medium text-gray-700">Avg. Rating</span>
           <span className="text-2xl font-bold text-yellow-600">
@@ -747,10 +1243,15 @@ export function HostServices() {
   const [currentUser, setCurrentUser] = useState(null);
   
   const [showAddService, setShowAddService] = useState(false);
+  const [showEditService, setShowEditService] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState('');
   const [createError, setCreateError] = useState('');
+  const [updateError, setUpdateError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const [api, setApi] = useState(null);
@@ -785,7 +1286,7 @@ export function HostServices() {
       }
 
       try {
-        // Fetch services using NEW endpoint
+        // Fetch services using the correct endpoint
         const servicesData = await apiInstance.getMyServices();
         setServices(servicesData.services || []);
 
@@ -843,6 +1344,55 @@ export function HostServices() {
       setCreateError(err.message || 'Failed to create service. Please check all fields and try again.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleEditService = (service) => {
+    setSelectedService(service);
+    setShowEditService(true);
+    setUpdateError('');
+  };
+
+  const handleUpdateService = async (formData) => {
+    if (!api || !selectedService) return;
+
+    setIsUpdating(true);
+    setUpdateError('');
+
+    try {
+      const submissionData = {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.price),
+        serviceType: formData.services,
+        location: formData.location,
+        maxGuests: parseInt(formData.maxGuests),
+        minStay: parseInt(formData.minStay),
+        propertyImage: formData.propertyImage || '',
+        experience: formData.experience,
+        responseTime: formData.responseTime,
+        cancellationPolicy: formData.cancellationPolicy,
+        availableFromDate: formData.availableFromDate ? new Date(formData.availableFromDate).toISOString() : null,
+        availableToDate: formData.availableToDate ? new Date(formData.availableToDate).toISOString() : null,
+        available: formData.available
+      };
+
+      console.log('Updating service data:', submissionData);
+
+      await api.updateService(selectedService._id, submissionData);
+      
+      setSuccessMessage('✓ Service updated successfully!');
+      setShowEditService(false);
+      setSelectedService(null);
+      
+      await fetchData(api);
+
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      console.error('Error updating service:', err);
+      setUpdateError(err.message || 'Failed to update service. Please check all fields and try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -944,7 +1494,7 @@ export function HostServices() {
                   <ServiceCard
                     key={service._id}
                     service={service}
-                    onEdit={() => console.log('Edit:', service)}
+                    onEdit={handleEditService}
                     onDelete={handleDeleteService}
                     onRefresh={() => fetchData(api)}
                   />
@@ -984,6 +1534,19 @@ export function HostServices() {
         onSubmit={handleAddService}
         isLoading={isCreating}
         error={createError}
+      />
+
+      <EditServiceModal
+        isOpen={showEditService}
+        onClose={() => {
+          setShowEditService(false);
+          setSelectedService(null);
+          setUpdateError('');
+        }}
+        service={selectedService}
+        onSubmit={handleUpdateService}
+        isLoading={isUpdating}
+        error={updateError}
       />
     </div>
   );

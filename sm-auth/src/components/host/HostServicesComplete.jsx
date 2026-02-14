@@ -360,7 +360,7 @@ const ServiceCard = ({ service, onEdit, onDelete }) => {
             </div>
             <div className="flex items-center gap-1">
               <DollarSign className="w-4 h-4" />
-              <span>৳{service.price.toLocaleString('en-BD')}</span>
+              <span>৳{service.price?.toLocaleString('en-BD') || 'N/A'}</span>
             </div>
             <div className="flex items-center gap-1">
               <Users className="w-4 h-4" />

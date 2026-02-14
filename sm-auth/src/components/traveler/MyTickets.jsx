@@ -605,7 +605,7 @@ export function MyTickets() {
                       <CreditCard className="w-4 h-4" />
                       <span className="text-sm">Amount</span>
                     </div>
-                    <p className="font-bold text-xl text-green-600">৳{ticket.amount.toLocaleString()}</p>
+                    <p className="font-bold text-xl text-green-600">৳{(ticket.amount || 0).toLocaleString()}</p>
                   </div>
                 </div>
 
