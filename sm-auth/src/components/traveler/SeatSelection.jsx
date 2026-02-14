@@ -163,7 +163,7 @@ export function SeatSelection({ ticket, passengersCount, onConfirm, onCancel }) 
     }
   };
 
-  const totalPrice = selectedSeats.length * ticket.price;
+  const totalPrice = selectedSeats.length * (ticket.price || 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -299,7 +299,7 @@ export function SeatSelection({ ticket, passengersCount, onConfirm, onCancel }) 
           <div className="border-t border-gray-200 pt-4">
             <div className="flex justify-between items-center mb-4">
               <span className="text-gray-700">Seat Price (×{selectedSeats.length})</span>
-              <span className="text-xl font-bold text-gray-900">৳{totalPrice.toLocaleString()}</span>
+              <span className="text-xl font-bold text-gray-900">৳{(totalPrice || 0).toLocaleString()}</span>
             </div>
             
             <div className="flex gap-3">

@@ -715,10 +715,10 @@ const hostSchema = new mongoose.Schema({
     default: 'Within 1 hour'
   },
   
-  // Host Image
+  // Host Image - will be populated from User profile picture
   image: {
     type: String,
-    default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'
+    default: null
   },
   
   // Host Status & Ratings
@@ -2494,13 +2494,20 @@ app.get('/api/hosts', async (req, res) => {
     }
     
     const hosts = await Host.find(query)
+      .populate('userId', 'profilePicture fullName username')
       .limit(parseInt(limit))
       .sort({ rating: -1, createdAt: -1 });
 
+    // Format hosts to include user profile picture
+    const formattedHosts = hosts.map(host => ({
+      ...host.toObject(),
+      image: host.userId?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`
+    }));
+
     res.json({
       success: true,
-      count: hosts.length,
-      hosts
+      count: formattedHosts.length,
+      hosts: formattedHosts
     });
   } catch (error) {
     console.error('❌ Get hosts error:', error);
@@ -2677,7 +2684,8 @@ app.post('/api/bookings', authenticate, async (req, res) => {
 // Get host by ID
 app.get('/api/hosts/:id', async (req, res) => {
   try {
-    const host = await Host.findById(req.params.id);
+    const host = await Host.findById(req.params.id)
+      .populate('userId', 'profilePicture fullName username email');
 
     if (!host) {
       return res.status(404).json({
@@ -2686,12 +2694,16 @@ app.get('/api/hosts/:id', async (req, res) => {
       });
     }
 
+    // Format host to include user profile picture
+    const hostData = host.toObject();
+    hostData.image = host.userId?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`;
+
     res.json({
       success: true,
-      host
+      host: hostData
     });
   } catch (error) {
-    console.error(' Get host error:', error);
+    console.error('❌ Get host error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching host',
@@ -2725,6 +2737,9 @@ app.post('/api/hosts', authenticate, async (req, res) => {
       });
     }
 
+    // Get user to use their profile picture
+    const user = await User.findById(req.user._id);
+    
     const host = new Host({
       name,
       location,
@@ -2739,7 +2754,7 @@ app.post('/api/hosts', authenticate, async (req, res) => {
       minStay: minStay || 1,
       maxGuests: maxGuests || 4,
       userId: req.user._id,
-      image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s/g, '')}`
+      image: user?.profilePicture || null // Use user's profile picture
     });
 
     await host.save();
@@ -2750,7 +2765,7 @@ app.post('/api/hosts', authenticate, async (req, res) => {
       host
     });
   } catch (error) {
-    console.error(' Create host error:', error);
+    console.error('❌ Create host error:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating host profile',
@@ -5368,7 +5383,7 @@ app.get('/api/host-services/stats/my-stats', authenticate, async (req, res) => {
       message: 'Error fetching statistics',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
-  }
+  }   
 });
 
 // ==================== MESSAGE ROUTES ====================
@@ -5382,7 +5397,7 @@ app.get('/api/messages/conversations', authenticate, async (req, res) => {
     })
     .populate({
       path: 'participants',
-      select: 'username fullName email'
+      select: 'username fullName email profilePicture'
     })
     .populate({
       path: 'lastMessage',
@@ -5423,7 +5438,7 @@ app.get('/api/messages/conversations', authenticate, async (req, res) => {
           _id: conv._id,
           participantId: otherParticipant._id,
           hostName: otherParticipant.fullName,
-          hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.username}`,
+          hostAvatar: otherParticipant.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.username}`,
           lastMessage: conv.lastMessage?.content || 'No messages yet',
           time: formatTimeAgo(conv.lastMessage?.createdAt || conv.updatedAt),
           unread: unreadMessages,
@@ -5507,9 +5522,9 @@ app.get('/api/messages/conversations/:conversationId', authenticate, async (req,
       p => p.toString() !== req.user._id.toString()
     );
 
-    // Get host info
+    // Get host info with profile picture
     const host = await Host.findOne({ userId: otherParticipant });
-    const user = await User.findById(otherParticipant);
+    const user = await User.findById(otherParticipant).select('fullName username profilePicture');
 
     res.json({
       success: true,
@@ -5517,7 +5532,7 @@ app.get('/api/messages/conversations/:conversationId', authenticate, async (req,
       conversationInfo: {
         id: conversation._id,
         hostName: user?.fullName || 'Unknown',
-        hostAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'default'}`,
+        hostAvatar: user?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'default'}`,
         hostRating: host?.rating || 0,
         hostReviews: host?.reviews || 0,
         hostLocation: host?.location || '',
@@ -5947,7 +5962,7 @@ app.post('/api/auth/register', async (req, res) => {
           verified: false,
           languages: [], // To be filled by user
           price: 0, // To be filled by user
-          image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          image: user.profilePicture || null, // Use user's profile picture
           propertyImage: '', // To be filled by user
           services: [], // To be filled by user
           available: false, // Not available until profile is complete
@@ -6149,6 +6164,9 @@ app.put('/api/hosts/complete-profile', authenticate, async (req, res) => {
       });
     }
 
+    // Get user's profile picture
+    const user = await User.findById(req.user._id);
+
     // Update host profile
     hostProfile.location = location;
     hostProfile.languages = languages;
@@ -6160,6 +6178,7 @@ app.put('/api/hosts/complete-profile', authenticate, async (req, res) => {
     hostProfile.available = true;
     hostProfile.availableFromDate = availableFromDate;
     hostProfile.availableToDate = availableToDate;
+    hostProfile.image = user?.profilePicture || null; // Set image from user profile picture
 
     if (experience) hostProfile.experience = experience;
     if (responseTime) hostProfile.responseTime = responseTime;
@@ -6170,7 +6189,6 @@ app.put('/api/hosts/complete-profile', authenticate, async (req, res) => {
     await hostProfile.save();
 
     // Also update user profile
-    const user = await User.findById(req.user._id);
     user.location = location;
     user.languages = languages;
     user.bio = bio;
@@ -6178,10 +6196,15 @@ app.put('/api/hosts/complete-profile', authenticate, async (req, res) => {
 
     console.log(`✅ Host profile completed for: ${user.email}`);
 
+    // Populate user info
+    await hostProfile.populate('userId', 'profilePicture fullName username email');
+    const hostData = hostProfile.toObject();
+    hostData.image = hostProfile.userId?.profilePicture || null;
+
     res.json({
       success: true,
       message: 'Host profile completed successfully! You can now start hosting.',
-      host: hostProfile,
+      host: hostData,
       user: {
         id: user._id,
         username: user.username,
@@ -6223,7 +6246,8 @@ app.get('/api/hosts/profile-status', authenticate, async (req, res) => {
       });
     }
 
-    const hostProfile = await Host.findOne({ userId: req.user._id });
+    const hostProfile = await Host.findOne({ userId: req.user._id })
+      .populate('userId', 'profilePicture');
 
     if (!hostProfile) {
       return res.status(404).json({
@@ -6249,12 +6273,16 @@ app.get('/api/hosts/profile-status', authenticate, async (req, res) => {
     if (!hostProfile.propertyImage) missingFields.push('propertyImage');
     if (hostProfile.services.length === 0) missingFields.push('services');
 
+    // Get current profile picture
+    const currentImage = hostProfile.userId?.profilePicture || null;
+
     res.json({
       success: true,
       profileComplete: isComplete,
       available: hostProfile.available,
       missingFields,
-      completionPercentage: Math.round(((6 - missingFields.length) / 6) * 100)
+      completionPercentage: Math.round(((6 - missingFields.length) / 6) * 100),
+      hostImage: currentImage
     });
   } catch (error) {
     console.error('❌ Check profile status error:', error);
@@ -6279,7 +6307,8 @@ app.get('/api/hosts/my-profile', authenticate, async (req, res) => {
       });
     }
 
-    const hostProfile = await Host.findOne({ userId: req.user._id });
+    const hostProfile = await Host.findOne({ userId: req.user._id })
+      .populate('userId', 'profilePicture fullName username email');
 
     if (!hostProfile) {
       return res.status(404).json({
@@ -6288,9 +6317,13 @@ app.get('/api/hosts/my-profile', authenticate, async (req, res) => {
       });
     }
 
+    // Format host to include user profile picture
+    const hostData = hostProfile.toObject();
+    hostData.image = hostProfile.userId?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${hostProfile.name.replace(/\s/g, '')}`;
+
     res.json({
       success: true,
-      host: hostProfile
+      host: hostData
     });
   } catch (error) {
     console.error('❌ Get host profile error:', error);
@@ -6362,10 +6395,15 @@ app.put('/api/hosts/my-profile', authenticate, async (req, res) => {
     if (description) user.bio = description;
     await user.save();
 
+    // Refresh host data with user info
+    await hostProfile.populate('userId', 'profilePicture fullName username');
+    const hostData = hostProfile.toObject();
+    hostData.image = hostProfile.userId?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${hostProfile.name.replace(/\s/g, '')}`;
+
     res.json({
       success: true,
       message: 'Host profile updated successfully',
-      host: hostProfile
+      host: hostData
     });
   } catch (error) {
     console.error('❌ Update host profile error:', error);
@@ -7101,6 +7139,10 @@ app.post('/api/hosts/seed', authenticate, async (req, res) => {
     // Clear existing hosts for this user
     await Host.deleteMany({ userId: req.user._id });
 
+    // Get current user's profile picture
+    const user = await User.findById(req.user._id);
+    const userImage = user?.profilePicture || null;
+
     const sampleHosts = [
       {
         name: 'Fatima Khan',
@@ -7117,7 +7159,8 @@ app.post('/api/hosts/seed', authenticate, async (req, res) => {
         responseTime: 'Within 30 minutes',
         cancellationPolicy: 'Flexible',
         minStay: 2,
-        maxGuests: 6
+        maxGuests: 6,
+        image: userImage
       },
       {
         name: 'Rafiq Ahmed',
@@ -7134,7 +7177,8 @@ app.post('/api/hosts/seed', authenticate, async (req, res) => {
         responseTime: 'Within 1 hour',
         cancellationPolicy: 'Moderate',
         minStay: 1,
-        maxGuests: 4
+        maxGuests: 4,
+        image: userImage
       },
       {
         name: 'Shahana Begum',
@@ -7151,7 +7195,8 @@ app.post('/api/hosts/seed', authenticate, async (req, res) => {
         responseTime: 'Within 2 hours',
         cancellationPolicy: 'Flexible',
         minStay: 1,
-        maxGuests: 8
+        maxGuests: 8,
+        image: userImage
       }
     ];
 

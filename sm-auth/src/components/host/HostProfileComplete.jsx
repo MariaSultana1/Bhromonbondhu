@@ -29,15 +29,13 @@ export function HostProfileComplete({ user: initialUser }) {
     confirmPassword: ''
   });
 
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    return localStorage.getItem('token');
-  };
+  // Get auth token helper
+  const getToken = () => localStorage.getItem('token');
 
   // Fetch user profile from backend
   const fetchUserProfile = async () => {
     try {
-      const token = getAuthToken();
+      const token = getToken();
       if (!token) {
         setError('Please login to view your profile');
         return;
@@ -115,7 +113,7 @@ export function HostProfileComplete({ user: initialUser }) {
       reader.onload = async (event) => {
         const base64Image = event.target.result;
 
-        const token = getAuthToken();
+        const token = getToken();
         if (!token) {
           setError('Please login to update your profile picture');
           setUploadingImage(false);
@@ -168,7 +166,7 @@ export function HostProfileComplete({ user: initialUser }) {
     setSuccess('');
 
     try {
-      const token = getAuthToken();
+      const token = getToken();
       if (!token) {
         setError('Please login to update your profile');
         setLoading(false);
@@ -237,7 +235,7 @@ export function HostProfileComplete({ user: initialUser }) {
     }
 
     try {
-      const token = getAuthToken();
+      const token = getToken();
       if (!token) {
         setError('Please login to change your password');
         setLoading(false);
