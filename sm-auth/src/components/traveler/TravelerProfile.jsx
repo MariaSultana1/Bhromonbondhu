@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, Shield, AlertCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock, User } from 'lucide-react';
+import { CheckCircle, Camera, Edit, Phone, Mail, MapPin, Calendar, X, Lock, User } from 'lucide-react';
 
 export function TravelerProfile({ user: initialUser }) {
   const [user, setUser] = useState(initialUser);
-  const [stats, setStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -31,51 +29,6 @@ export function TravelerProfile({ user: initialUser }) {
   // Get auth token from localStorage
   const getAuthToken = () => {
     return localStorage.getItem('token');
-  };
-
-  // Fetch traveler statistics
-  const fetchTravelerStats = async () => {
-    try {
-      setStatsLoading(true);
-      const token = getAuthToken();
-      if (!token) return;
-
-      const response = await fetch('http://localhost:5000/api/traveler/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.stats) {
-        setStats(data.stats);
-      } else {
-        console.error('Failed to fetch stats:', data.message);
-        // Set default stats if fetch fails
-        setStats({
-          totalTrips: 0,
-          placesVisited: 0,
-          reviewsGiven: 0,
-          hostsBooked: 0,
-          travelTier: 'Explorer',
-          travelPoints: 0
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching traveler stats:', err);
-      // Set default stats on error
-      setStats({
-        totalTrips: 0,
-        placesVisited: 0,
-        reviewsGiven: 0,
-        hostsBooked: 0,
-        travelTier: 'Explorer',
-        travelPoints: 0
-      });
-    } finally {
-      setStatsLoading(false);
-    }
   };
 
   // Fetch user profile from backend
@@ -110,7 +63,7 @@ export function TravelerProfile({ user: initialUser }) {
     }
   };
 
-  // Load user profile and stats on component mount
+  // Load user profile on component mount
   useEffect(() => {
     if (!initialUser) {
       fetchUserProfile();
@@ -120,9 +73,6 @@ export function TravelerProfile({ user: initialUser }) {
         phone: initialUser.phone || ''
       });
     }
-    
-    // Always fetch stats
-    fetchTravelerStats();
   }, [initialUser]);
 
   // Handle profile picture upload
@@ -358,7 +308,7 @@ export function TravelerProfile({ user: initialUser }) {
       
       <div>
         <h2 className="text-2xl mb-2">Profile</h2>
-        <p className="text-gray-600">Manage your account and verification</p>
+        <p className="text-gray-600">Manage your account settings</p>
       </div>
 
       {/* Success/Error Messages */}
@@ -373,305 +323,112 @@ export function TravelerProfile({ user: initialUser }) {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      {/* Main Profile Content */}
+      <div className="max-w-4xl space-y-6">
         
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Profile Card */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-start gap-6 mb-6">
-              <div className="relative">
-                {/* Profile Picture or Default Icon */}
-                {user.profilePicture ? (
-                  <img
-                    src={user.profilePicture}
-                    alt={user.fullName || user.username}
-                    className="w-24 h-24 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
-                    <User className="w-12 h-12 text-gray-400" />
-                  </div>
-                )}
-                
-                {/* Camera Button with Upload Functionality */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureChange}
-                  className="hidden"
+        {/* Profile Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="flex items-start gap-6 mb-6">
+            <div className="relative">
+              {/* Profile Picture or Default Icon */}
+              {user.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt={user.fullName || user.username}
+                  className="w-24 h-24 rounded-full object-cover"
                 />
-                <button 
-                  onClick={handleProfilePictureClick}
-                  disabled={uploadingImage}
-                  className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Change profile picture"
-                >
-                  {uploadingImage ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <Camera className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl">{user.username}</h3>
-                  {user.verified && (
-                    <CheckCircle className="w-5 h-5 text-blue-500" title="Verified User" />
-                  )}
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+                  <User className="w-12 h-12 text-gray-400" />
                 </div>
-                <p className="text-gray-600 mb-3">{user.fullName}</p>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setShowEditModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit Profile
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t pt-6">
-              <h4 className="mb-4">Contact Information</h4>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Email</label>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <span>{user.email}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Phone</label>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{user.phone || 'Not provided'}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Location</label>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span>Dhaka, Bangladesh</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Member Since</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span>{formatJoinedDate(user.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Security Settings */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Security Settings</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                <div>
-                  <h4 className="text-sm mb-1">Two-Factor Authentication</h4>
-                  <p className="text-xs text-gray-600">Add an extra layer of security</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                <div>
-                  <h4 className="text-sm mb-1">Biometric Login</h4>
-                  <p className="text-xs text-gray-600">Use fingerprint or face recognition</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
-              </div>
-
+              )}
+              
+              {/* Camera Button with Upload Functionality */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                className="hidden"
+              />
               <button 
-                onClick={() => setShowPasswordModal(true)}
-                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+                onClick={handleProfilePictureClick}
+                disabled={uploadingImage}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Change profile picture"
               >
-                Change Password
+                {uploadingImage ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
               </button>
             </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-xl">{user.username}</h3>
+                {user.verified && (
+                  <CheckCircle className="w-5 h-5 text-blue-500" title="Verified User" />
+                )}
+              </div>
+              <p className="text-gray-600 mb-3">{user.fullName}</p>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Profile
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Preferences */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Preferences</h3>
-            <div className="space-y-4">
+          <div className="border-t pt-6">
+            <h4 className="mb-4">Contact Information</h4>
+            <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm mb-2">Language</label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>English</option>
-                  <option>বাংলা (Bengali)</option>
-                </select>
+                <label className="block text-sm text-gray-600 mb-2">Email</label>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span>{user.email}</span>
+                </div>
               </div>
               <div>
-                <label className="block text-sm mb-2">Currency</label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>BDT (৳)</option>
-                  <option>USD ($)</option>
-                  <option>EUR (€)</option>
-                </select>
+                <label className="block text-sm text-gray-600 mb-2">Phone</label>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span>{user.phone || 'Not provided'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="notifications" className="w-4 h-4" defaultChecked />
-                <label htmlFor="notifications" className="text-sm">Email notifications for bookings and updates</label>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Location</label>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400" />
+                  <span>Dhaka, Bangladesh</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="marketing" className="w-4 h-4" />
-                <label htmlFor="marketing" className="text-sm">Receive promotional emails and offers</label>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Member Since</label>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span>{formatJoinedDate(user.createdAt)}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Verification Status */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5 text-blue-500" />
-              <h3>Verification Status</h3>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Email</span>
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Phone</span>
-                {user.phone ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-yellow-500" />
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Identity (KYC)</span>
-                {user.kycCompleted ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-yellow-500" />
-                )}
-              </div>
-            </div>
-            {!user.kycCompleted && (
-              <div className="mt-4">
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-3">
-                  <p className="text-xs text-yellow-800">
-                    KYC verification is required for bookings over ৳10,000
-                  </p>
-                </div>
-                <button className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                  Complete KYC
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Travel Stats */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Travel Stats</h3>
-            {statsLoading ? (
-              <div className="text-center py-4">
-                <p className="text-gray-500">Loading stats...</p>
-              </div>
-            ) : stats ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Trips</span>
-                  <span className="text-lg font-semibold text-blue-600">{stats.totalTrips || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Places Visited</span>
-                  <span className="text-lg font-semibold text-blue-600">{stats.placesVisited || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Reviews Given</span>
-                  <span className="text-lg font-semibold text-blue-600">{stats.reviewsGiven || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Travel Tier</span>
-                  <span className="text-lg font-semibold text-purple-600">{stats.travelTier || 'Explorer'}</span>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <span className="text-sm text-gray-600">Travel Points</span>
-                  <span className="text-lg font-semibold text-purple-600">{(stats.travelPoints || 0).toLocaleString()}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-gray-500">No stats available</p>
-              </div>
-            )}
-          </div>
-
-          {/* Badges & Achievements */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Badges & Achievements</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {/* Travel Tier Badge */}
-              <div className="text-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
-                  stats?.travelTier === 'Gold Traveler' ? 'bg-yellow-100 text-yellow-600' :
-                  stats?.travelTier === 'Silver Traveler' ? 'bg-gray-200 text-gray-600' :
-                  stats?.travelTier === 'Bronze Traveler' ? 'bg-orange-100 text-orange-600' :
-                  'bg-blue-100 text-blue-600'
-                }`}>
-                  {stats?.travelTier === 'Gold Traveler' ? '🥇' :
-                   stats?.travelTier === 'Silver Traveler' ? '🥈' :
-                   stats?.travelTier === 'Bronze Traveler' ? '🥉' :
-                   '🎫'}
-                </div>
-                <p className="text-xs font-semibold">{stats?.travelTier || 'Explorer'}</p>
-              </div>
-
-              {/* Explorer Badge (5+ trips) */}
-              <div className="text-center opacity-75">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
-                  (stats?.totalTrips || 0) >= 5 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                }`}>
-                  🌍
-                </div>
-                <p className="text-xs">Explorer</p>
-                {(stats?.totalTrips || 0) < 5 && <p className="text-xs text-gray-400">{5 - (stats?.totalTrips || 0)} trips</p>}
-              </div>
-
-              {/* Places Badge (10+ places) */}
-              <div className="text-center opacity-75">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 ${
-                  (stats?.placesVisited || 0) >= 10 ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-400'
-                }`}>
-                  📍
-                </div>
-                <p className="text-xs">Wanderer</p>
-                {(stats?.placesVisited || 0) < 10 && <p className="text-xs text-gray-400">{10 - (stats?.placesVisited || 0)} places</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border-2 border-red-200">
-            <h3 className="text-red-600 mb-4">Danger Zone</h3>
-            <div className="space-y-2">
-              <button className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
-                Download My Data
-              </button>
-              <button className="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm">
-                Delete Account
-              </button>
-            </div>
+        {/* Security Settings */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <h3 className="mb-4">Security Settings</h3>
+          <div className="space-y-4">
+            <button 
+              onClick={() => setShowPasswordModal(true)}
+              className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Change Password
+            </button>
           </div>
         </div>
       </div>

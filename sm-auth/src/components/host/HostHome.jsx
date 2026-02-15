@@ -1,3 +1,4 @@
+// src/components/host/HostHome.jsx
 import { useState } from 'react';
 import {
   TrendingUp,
@@ -76,15 +77,15 @@ const recentReviews = [
   },
 ];
 
-export function HostHome({ user }) {
+export function HostHome({ user, token }) {
   const [view, setView] = useState('home');
 
   if (view === 'allBookings') {
-    return <AllBookings onBack={() => setView('home')} />;
+    return <AllBookings onBack={() => setView('home')} token={token} />;
   }
 
   if (view === 'allReviews') {
-    return <AllReviews onBack={() => setView('home')} />;
+    return <AllReviews onBack={() => setView('home')} token={token} />;
   }
 
   return (
@@ -92,7 +93,7 @@ export function HostHome({ user }) {
       
       <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
         <h2 className="text-2xl mb-2">
-          Welcome back, {user.name}! 👋
+          Welcome back, {user?.name || 'Host'}! 👋
         </h2>
         <p>You have 3 upcoming bookings and 2 new messages</p>
       </div>
@@ -142,7 +143,7 @@ export function HostHome({ user }) {
         <div className="lg:col-span-2 space-y-6">
          
           <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Earnings Overview</h3>
+            <h3 className="mb-4 font-bold text-lg">Earnings Overview</h3>
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
                 <AreaChart data={earningsData}>
@@ -184,7 +185,7 @@ export function HostHome({ user }) {
          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between mb-4">
-              <h3>Upcoming Bookings</h3>
+              <h3 className="font-bold text-lg">Upcoming Bookings</h3>
               <button
                 className="text-sm text-blue-500 hover:underline"
                 onClick={() => setView('allBookings')}
@@ -205,7 +206,7 @@ export function HostHome({ user }) {
                     className="w-12 h-12 rounded-full"
                   />
                   <div>
-                    <h4 className="text-sm">{booking.traveler}</h4>
+                    <h4 className="text-sm font-medium">{booking.traveler}</h4>
                     <p className="text-xs text-gray-600">
                       {booking.dates}
                     </p>
@@ -213,7 +214,7 @@ export function HostHome({ user }) {
                 </div>
 
                 <div className="text-right">
-                  <div>৳{booking.amount}</div>
+                  <div className="font-semibold">৳{booking.amount}</div>
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${
                       booking.status === 'confirmed'
@@ -231,7 +232,7 @@ export function HostHome({ user }) {
          
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between mb-4">
-              <h3>Recent Reviews</h3>
+              <h3 className="font-bold text-lg">Recent Reviews</h3>
               <button
                 className="text-sm text-blue-500 hover:underline"
                 onClick={() => setView('allReviews')}
@@ -248,9 +249,9 @@ export function HostHome({ user }) {
                     alt={review.traveler}
                     className="w-10 h-10 rounded-full"
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="flex justify-between">
-                      <h4 className="text-sm">{review.traveler}</h4>
+                      <h4 className="text-sm font-medium">{review.traveler}</h4>
                       <span className="text-xs text-gray-500">
                         {review.date}
                       </span>
@@ -278,14 +279,14 @@ export function HostHome({ user }) {
       
         <div className="space-y-6">
           <div className="bg-white rounded-xl p-6 shadow-sm">
-            <h3 className="mb-4">Verification Status</h3>
+            <h3 className="font-bold text-lg mb-4">Verification Status</h3>
             {[
               'Identity Verified',
               'Police Check',
               'Training Complete',
               'Bank Details',
             ].map((item) => (
-              <div key={item} className="flex items-center gap-2">
+              <div key={item} className="flex items-center gap-2 mb-3">
                 <CheckCircle className="w-5 h-5 text-green-500" />
                 <span className="text-sm">{item}</span>
               </div>
