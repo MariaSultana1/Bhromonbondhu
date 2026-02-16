@@ -18,7 +18,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch("http://localhost:3000/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,6 +39,7 @@ const Login = ({ goSignupAs, onLoginSuccess }) => {
         }
       } else {
         setError(data.message || "Login failed. Please try again.");
+        console.error("❌ Login error:", data.message);
       }
     } catch (err) {
       setError("Unable to connect to server. Please check your connection.");
