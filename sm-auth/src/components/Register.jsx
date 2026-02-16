@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 
 const Register = ({ userType, goLogin, onRegisterSuccess }) => {
+  // Debug props on mount
   React.useEffect(() => {
     console.log("🔍 Register component mounted with props:");
     console.log("- userType:", userType);
@@ -10,6 +11,7 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
     }
   }, [userType]);
 
+  // Normalize userType
   const normalizedUserType = React.useMemo(() => {
     if (!userType) return 'tourist';
     if (typeof userType === 'string') {
@@ -25,17 +27,17 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
     fullName: "",
     email: "",
     phone: "",
-    location: "",
     password: "",
     confirmPassword: "",
   });
-
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const validateForm = () => {
+    // Clear previous errors
     setError("");
 
     if (!formData.fullName.trim()) {
@@ -54,10 +56,6 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
       setError("Please enter a valid email address");
       return false;
     }
-    if (!formData.location.trim()) {
-      setError("Please enter your location");
-      return false;
-    }
     if (!formData.password) {
       setError("Please enter a password");
       return false;
@@ -70,6 +68,8 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
       setError("Passwords do not match! Please check and try again.");
       return false;
     }
+
+    // Phone is required for hosts
     if (isHost && !formData.phone.trim()) {
       setError("Phone number is required for host registration");
       return false;
@@ -79,20 +79,23 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
 
     setIsLoading(true);
     setError("");
 
     try {
+      // Generate username from email
       const username = formData.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
+      // Create clean request body
       const payload = {
         username: String(username),
         fullName: String(formData.fullName.trim()),
         email: String(formData.email.trim().toLowerCase()),
         phone: String(formData.phone.trim()),
-        location: String(formData.location.trim()),
         password: String(formData.password),
         role: String(normalizedUserType),
       };
@@ -101,10 +104,13 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
 
       const response = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
+      // Parse response
       let responseData;
       try {
         responseData = await response.json();
@@ -117,31 +123,47 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
 
       if (response.ok) {
         if (responseData.success) {
-          if (responseData.token) localStorage.setItem("token", responseData.token);
-          if (responseData.user) localStorage.setItem("user", JSON.stringify(responseData.user));
+          // Store user data
+          if (responseData.token) {
+            localStorage.setItem("token", responseData.token);
+          }
+          if (responseData.user) {
+            localStorage.setItem("user", JSON.stringify(responseData.user));
+          }
 
           console.log("✅ Registration successful!");
-          setError("");
-
+          
+          // Show success message
+          setError(""); // Clear any errors
+          
+          // Call success callback after a short delay
           if (onRegisterSuccess) {
-            setTimeout(() => onRegisterSuccess(responseData.user), 1000);
+            setTimeout(() => {
+              onRegisterSuccess(responseData.user);
+            }, 1000);
           }
         } else {
+          // Server returned success: false
           setError(responseData.message || "Registration failed on server.");
         }
       } else {
+        // HTTP error (400, 500, etc.)
         setError(responseData.message || `Server error: ${response.status}`);
         console.error("❌ Server error response:", responseData);
       }
     } catch (err) {
+      // Network or other errors
       const errorMessage = err.message || "Network error";
+      
       if (errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
         setError("Cannot connect to server. Please check your internet connection and ensure the backend is running.");
+        console.error("🌐 Network error - Is backend running on http://localhost:5000?");
       } else if (errorMessage.includes("500")) {
         setError("Server error. Please try again later or contact support.");
       } else {
         setError(`Error: ${errorMessage}`);
       }
+      
       console.error("❌ Registration error:", errorMessage);
     } finally {
       setIsLoading(false);
@@ -165,6 +187,7 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
         alt="Background"
         src="/images/image 187.png"
       />
+
       <img
         className="absolute top-[124px] left-[108px] w-[157px] h-[151px] object-cover"
         alt="Sun"
@@ -196,27 +219,21 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
         />
       </div>
 
-      <main className="absolute top-[270px] left-[760px] w-[472px] bg-[#f1eeee] rounded-xl border shadow-md px-10 py-6">
+      <main className="absolute top-[295px] left-[760px] w-[472px] h-[555px] bg-[#f1eeee] rounded-xl border shadow-md px-10 py-6">
         <h1 className="text-4xl text-center mt-2 font-serif">REGISTER</h1>
         <p className="text-center mt-2 text-lg font-serif">
-          {isHost
-            ? 'Create your host account - complete your profile later'
+          {isHost 
+            ? 'Create your host account - complete your profile later' 
             : 'Create your account to join the Bhromonbondhu community'}
         </p>
 
         {error && (
-          <div className={`mt-4 p-3 rounded-lg text-sm text-center ${
-            error.includes("successful")
-              ? 'bg-green-100 border border-green-400 text-green-700'
-              : 'bg-red-100 border border-red-400 text-red-700'
-          }`}>
+          <div className={`mt-4 p-3 rounded-lg text-sm text-center ${error.includes("successful") ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'}`}>
             {error}
           </div>
         )}
 
         <div className="mt-6 space-y-4">
-
-          {/* Full Name */}
           <input
             type="text"
             value={formData.fullName}
@@ -225,9 +242,9 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             placeholder="Full Name *"
             disabled={isLoading}
             autoComplete="name"
+            required
           />
-
-          {/* Email */}
+          
           <input
             type="email"
             value={formData.email}
@@ -236,9 +253,9 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             placeholder="Email *"
             disabled={isLoading}
             autoComplete="email"
+            required
           />
-
-          {/* Phone */}
+          
           <input
             type="tel"
             value={formData.phone}
@@ -247,20 +264,9 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             placeholder={`Phone Number ${isHost ? '*' : '(Optional)'}`}
             disabled={isLoading}
             autoComplete="tel"
+            required={isHost}
           />
 
-          {/* Location — NEW FIELD */}
-          <input
-            type="text"
-            value={formData.location}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            className="w-full h-[46px] bg-[#d9d9d9] rounded-xl px-4 focus:outline-none focus:ring-2 focus:ring-[#047ba3] transition-all disabled:opacity-50"
-            placeholder="Location (City / District) *"
-            disabled={isLoading}
-            autoComplete="address-level2"
-          />
-
-          {/* Password */}
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
@@ -270,6 +276,8 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               placeholder="Password (min 6 characters) *"
               disabled={isLoading}
               autoComplete="new-password"
+              required
+              minLength={6}
             />
             <button
               type="button"
@@ -282,7 +290,6 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             </button>
           </div>
 
-          {/* Confirm Password */}
           <div className="relative">
             <input
               type={showConfirmPassword ? "text" : "password"}
@@ -292,6 +299,7 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               placeholder="Confirm Password *"
               disabled={isLoading}
               autoComplete="new-password"
+              required
             />
             <button
               type="button"
@@ -304,7 +312,6 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
             </button>
           </div>
 
-          {/* Submit Button */}
           <button
             type="button"
             onClick={handleSubmit}
@@ -333,12 +340,11 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               Login now!
             </span>
           </p>
-
+          
           <div className="text-xs text-gray-500 text-center mt-4">
             <p>Fields marked with * are required</p>
             <p className="mt-1">
-              Registering as:{" "}
-              <span className="font-semibold capitalize">
+              Registering as: <span className="font-semibold capitalize">
                 {normalizedUserType === 'tourist' ? 'Tourist' : 'Host'}
               </span>
             </p>
@@ -348,7 +354,6 @@ const Register = ({ userType, goLogin, onRegisterSuccess }) => {
               </p>
             )}
           </div>
-
         </div>
       </main>
     </div>

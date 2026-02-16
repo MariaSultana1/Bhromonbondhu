@@ -17,11 +17,13 @@ app.use(cors({
   credentials: true
 }));
 
-
 // MongoDB Atlas Connection
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     console.log('✅ MongoDB Atlas connected successfully');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
@@ -400,8 +402,7 @@ const tripSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    // ✅ FIX: Make it required but with a default fallback
-    default: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80'
+    required: [true, 'Image URL is required']
   },
   weather: {
     type: String,
@@ -475,8 +476,7 @@ const tripSchema = new mongoose.Schema({
   },
   hostRating: {
     type: Number,
-    // ✅ FIX: Change min from 1 to 0
-    min: 0,
+    min: 1,
     max: 5,
     default: 4.5
   },
@@ -509,9 +509,6 @@ tripSchema.pre('save', function(next) {
 });
 
 const Trip = mongoose.model('Trip', tripSchema);
-
-
-
 
 // Transportation Schema
 const transportationSchema = new mongoose.Schema({
@@ -806,6 +803,7 @@ const hostSchema = new mongoose.Schema({
 });
 
 // Index for quick lookups
+hostSchema.index({ userId: 1 });
 hostSchema.index({ location: 1 });
 hostSchema.index({ verified: 1 });
 
@@ -908,23 +906,6 @@ const hostServiceSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-
-  bookedDates: [{
-    checkIn: { type: Date, required: true },
-    checkOut: { type: Date, required: true },
-    bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-  }],
-  
-  // Availability settings
-  availableFromDate: {
-    type: Date,
-    required: [true, 'Available from date is required']
-  },
-  availableToDate: {
-    type: Date,
-    required: [true, 'Available to date is required']
-  },
   
   availableFromDate: {
     type: Date,
@@ -966,7 +947,7 @@ const hostServiceSchema = new mongoose.Schema({
 // Validation middleware
 hostServiceSchema.pre('save', function(next) {
   // If offering accommodation, property image is required
-  if (this.serviceType && this.serviceType.includes('Accommodation') && !this.propertyImage) {
+  if (this.serviceType.includes('Accommodation') && !this.propertyImage) {
     return next(new Error('Property image is required when offering accommodation'));
   }
   
@@ -987,139 +968,6 @@ hostServiceSchema.index({ location: 1, available: 1 });
 hostServiceSchema.index({ availableFromDate: 1, availableToDate: 1 });
 
 const HostService = mongoose.model('HostService', hostServiceSchema);
-
-
-//Traveler Schema - stores extra traveler info in the 'travelers' collection
-const travelerSchema = new mongoose.Schema({
-  // Link to User
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'User ID is required'],
-    unique: true
-  },
-
-  // Mirror basic info from User for quick queries
-  fullName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    lowercase: true,
-    trim: true
-  },
-  phone: {
-    type: String,
-    default: '',
-    trim: true
-  },
-
-  // Traveler-specific fields (filled over time)
-  bio: {
-    type: String,
-    default: '',
-    maxlength: 500
-  },
-  dateOfBirth: {
-    type: Date,
-    default: null
-  },
-  gender: {
-    type: String,
-    enum: ['male', 'female', 'other', ''],
-    default: ''
-  },
-  nationality: {
-    type: String,
-    default: 'Bangladeshi',
-    trim: true
-  },
-  nid: {
-    type: String,
-    default: '',
-    trim: true,
-    validate: {
-      validator: function(v) {
-        if (!v) return true;
-        return /^(\d{10}|\d{13}|\d{17})$/.test(v);
-      },
-      message: 'NID must be 10, 13, or 17 digits'
-    }
-  },
-  passport: {
-    type: String,
-    default: '',
-    trim: true,
-    validate: {
-      validator: function(v) {
-        if (!v) return true;
-        return /^[A-Z]{2}\d{7}$/.test(v);
-      },
-      message: 'Passport must be 2 uppercase letters followed by 7 digits'
-    }
-  },
-
-  // Travel preferences
-  preferredLanguages: {
-    type: [String],
-    default: ['Bengali']
-  },
-  travelStyle: {
-    type: String,
-    enum: ['Budget', 'Mid-range', 'Luxury', ''],
-    default: ''
-  },
-  interests: {
-    type: [String],
-    default: []
-  },
-
-  // Stats (updated as they travel)
-  totalTrips: {
-    type: Number,
-    default: 0
-  },
-  placesVisited: {
-    type: Number,
-    default: 0
-  },
-  travelTier: {
-    type: String,
-    enum: ['Explorer', 'Bronze Traveler', 'Silver Traveler', 'Gold Traveler'],
-    default: 'Explorer'
-  },
-  travelPoints: {
-    type: Number,
-    default: 0
-  },
-
-  // Emergency contact
-  emergencyContact: {
-    name: { type: String, default: '' },
-    phone: { type: String, default: '' },
-    relation: { type: String, default: '' }
-  },
-
-  // Status
-  profileComplete: {
-    type: Boolean,
-    default: false
-  },
-  active: {
-    type: Boolean,
-    default: true
-  }
-}, {
-  timestamps: true
-});
-
-travelerSchema.index({ userId: 1 });
-travelerSchema.index({ email: 1 });
-
-const Traveler = mongoose.model('Traveler', travelerSchema);
 
 
 
@@ -1282,24 +1130,23 @@ app.get('/api/health', (req, res) => {
 // Register Route
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { username, fullName, email, phone, location, password, role } = req.body;
-
-    // ============ VALIDATION ============
+    const { username, fullName, email, phone, password, role } = req.body;
 
     if (!username || !fullName || !email || !password) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        message: 'Please provide all required fields: username, fullName, email, and password'
+        message: 'Please provide all required fields: username, fullName, email, and password' 
       });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: 'Password must be at least 6 characters long' 
       });
     }
 
+    // Validate phone if provided
     if (phone) {
       const phoneValidation = validatePhoneNumber(phone);
       if (!phoneValidation.valid) {
@@ -1310,210 +1157,66 @@ app.post('/api/auth/register', async (req, res) => {
       }
     }
 
-    const normalizedRole = role === 'traveller' ? 'tourist' : (role || 'tourist');
-    const isHost = normalizedRole === 'host';
-    const isTourist = normalizedRole === 'tourist';
-
-    // Phone is required for hosts
-    if (isHost && !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required for host registration'
-      });
-    }
-
-    // ============ CHECK EXISTING USER ============
-
-    const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }]
+    const existingUser = await User.findOne({ 
+      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] 
     });
 
     if (existingUser) {
       if (existingUser.email === email.toLowerCase()) {
-        return res.status(400).json({
+        return res.status(400).json({ 
           success: false,
-          message: 'This email is already registered. Please login or use a different email.'
+          message: 'This email is already registered. Please login or use a different email.' 
         });
       }
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        message: 'This username is already taken. Please choose a different username.'
+        message: 'This username is already taken. Please choose a different username.' 
       });
     }
-
-    // ============ CREATE USER (always) ============
 
     const user = new User({
       username: username.toLowerCase(),
       fullName,
       email: email.toLowerCase(),
       phone: phone || '',
-      location: location || '',
       password,
-      role: normalizedRole,
-      profilePicture: '',
-      location: '',
-      languages: [],
-      bio: '',
-      ...(isHost && {
-        hostBadge: 'Host',
-        verified: false,
-        kycCompleted: false,
-        hostRating: 0,
-        totalGuests: 0,
-        responseRate: 0
-      })
+      role: role || 'tourist',
+      profilePicture: ''
     });
 
     await user.save();
-    console.log(`✅ User created: ${user.email} (Role: ${user.role})`);
-
-    // ============ CREATE TRAVELER PROFILE (if tourist) ============
-
-    let travelerProfile = null;
-    if (isTourist) {
-      try {
-        travelerProfile = new Traveler({
-          userId: user._id,
-          fullName: user.fullName,
-          email: user.email,
-          phone: user.phone || '',
-          preferredLanguages: ['Bengali'],
-          travelStyle: '',
-          interests: [],
-          totalTrips: 0,
-          placesVisited: 0,
-          travelTier: 'Explorer',
-          travelPoints: 0,
-          profileComplete: false,
-          active: true
-        });
-
-        await travelerProfile.save();
-        console.log(`✅ Traveler profile created for: ${user.email} (Traveler ID: ${travelerProfile._id})`);
-      } catch (travelerError) {
-        console.error('❌ Error creating traveler profile:', travelerError);
-
-        // Rollback user if traveler profile fails
-        await User.findByIdAndDelete(user._id);
-
-        return res.status(500).json({
-          success: false,
-          message: 'Error creating traveler profile. Please try again.',
-          error: process.env.NODE_ENV === 'development' ? travelerError.message : undefined
-        });
-      }
-    }
-
-    // ============ CREATE HOST PROFILE (if host) ============
-
-    let hostProfile = null;
-    if (isHost) {
-      try {
-        hostProfile = new Host({
-          name: fullName,
-          userId: user._id,
-          location: location || '',
-          rating: 0,
-          reviews: 0,
-          verified: false,
-          languages: [],
-          image: null,
-          available: false,
-          description: '',
-          experience: 'Beginner',
-          responseTime: 'Within 1 hour'
-        });
-
-        await hostProfile.save();
-        console.log(`✅ Host profile created for: ${user.email} (Host ID: ${hostProfile._id})`);
-        console.log(`⚠️  Host profile is incomplete — user must complete it after login`);
-      } catch (hostError) {
-        console.error('❌ Error creating host profile:', hostError);
-
-        // Rollback user
-        await User.findByIdAndDelete(user._id);
-
-        return res.status(500).json({
-          success: false,
-          message: 'Error creating host profile. Please try again.',
-          error: process.env.NODE_ENV === 'development' ? hostError.message : undefined
-        });
-      }
-    }
-
-    // ============ GENERATE TOKEN ============
 
     const token = generateToken(user._id);
 
-    // ============ BUILD RESPONSE ============
+    console.log(`✅ New user registered: ${user.email} (Role: ${user.role})`);
 
-    const responseUser = {
-      id: user._id,
-      username: user.username,
-      fullName: user.fullName,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      profilePicture: user.profilePicture,
-      location: user.location,
-      languages: user.languages,
-      bio: user.bio,
-      createdAt: user.createdAt,
-      // Host-specific
-      ...(isHost && {
-        hostBadge: user.hostBadge || 'Host',
-        hostRating: user.hostRating || 0,
-        totalGuests: user.totalGuests || 0,
-        responseRate: user.responseRate || 0,
-        verified: user.verified || false,
-        kycCompleted: user.kycCompleted || false
-      })
-    };
-
-    const successMessage = isHost
-      ? 'Registration successful! Please complete your host profile to start hosting.'
-      : 'Registration successful! Welcome to Bhromonbondhu!';
-
-    console.log(`✅ Registration complete — User: ${user.email}, Collections updated: users + ${isHost ? 'hosts' : 'travelers'}`);
-
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: successMessage,
+      message: 'Registration successful! Welcome to Bhromonbondhu!',
       token,
-      user: responseUser,
-      // Traveler details (for tourists)
-      ...(travelerProfile && {
-        traveler: {
-          id: travelerProfile._id,
-          travelTier: travelerProfile.travelTier,
-          travelPoints: travelerProfile.travelPoints,
-          profileComplete: travelerProfile.profileComplete
-        }
-      }),
-      // Host details (for hosts)
-      ...(hostProfile && {
-        host: {
-          id: hostProfile._id,
-          name: hostProfile.name,
-          profileComplete: false,
-          needsCompletion: true
-        }
-      })
+      user: {
+        id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        createdAt: user.createdAt
+      }
     });
-
   } catch (error) {
-    console.error('❌ Registration error:', error);
-
+    console.error('Registration error:', error);
+    
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
-        message: `This ${field} is already registered. Please use a different ${field}.`
+        message: `This ${field} is already registered. Please use a different ${field}.` 
       });
     }
-
-    res.status(500).json({
+    
+    res.status(500).json({ 
       success: false,
       message: 'An error occurred during registration. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -2816,16 +2519,12 @@ app.get('/api/hosts', async (req, res) => {
   }
 });
 
-// ==================== UPDATED POST /api/bookings ENDPOINT ====================
-// Replace the existing POST /api/bookings endpoint (around line 2445) with this:
-
 // Create host booking
 app.post('/api/bookings', authenticate, async (req, res) => {
   try {
     const {
       bookingType,
       hostId,
-      serviceId,
       checkIn,
       checkOut,
       guests,
@@ -2835,63 +2534,25 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       paymentDetails
     } = req.body;
 
-    console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut });
-
-    // Validate basic input
-    if (!bookingType || bookingType !== 'host') {
+    if (!bookingType || bookingType !== 'host' || !hostId) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid booking type'
+        message: 'Invalid booking data'
       });
     }
 
-    // Get service first
-    let service = null;
-    if (serviceId) {
-      service = await HostService.findById(serviceId).populate('hostId');
-    }
-
-    if (!service) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service not found. Cannot complete booking.'
-      });
-    }
-
-    const actualHostId = service.hostId._id;
-    console.log('✅ Service found, Host ID:', actualHostId);
-
-    // ✅ NEW: Check if service is available for requested dates
-    const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
-    
-    if (!availabilityCheck.available) {
+    const host = await Host.findById(hostId);
+    if (!host || !host.available) {
       return res.status(400).json({
         success: false,
-        message: availabilityCheck.reason,
-        conflictingBookings: availabilityCheck.conflictingBookings.map(b => ({
-          checkIn: b.checkIn,
-          checkOut: b.checkOut
-        }))
+        message: 'Host not available'
       });
     }
 
-    // Get actual host document
-    const host = await Host.findById(actualHostId);
-    
-    if (!host) {
-      return res.status(404).json({
-        success: false,
-        message: 'Host profile not found'
-      });
-    }
-
-    console.log('🏠 Host:', host.name, 'Available:', host.available);
-
-    // Validate dates
     if (!checkIn || !checkOut) {
       return res.status(400).json({
         success: false,
-        message: 'Check-in and check-out dates are required'
+        message: 'Check-in and check-out dates required'
       });
     }
 
@@ -2902,32 +2563,27 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     if (days <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Check-out date must be after check-in date'
+        message: 'Invalid dates'
       });
     }
 
-    // Validate guests
-    if (guests > service.maxGuests) {
+    if (guests > host.maxGuests) {
       return res.status(400).json({
         success: false,
-        message: `Maximum ${service.maxGuests} guests allowed. You selected ${guests} guests.`
+        message: `Maximum ${host.maxGuests} guests allowed`
       });
     }
 
-    // Calculate amounts
-    const totalAmount = service.price * days;
-    const platformFee = Math.round(totalAmount * 0.15);
-    const hostEarningsAmount = totalAmount - platformFee;
+    const totalAmount = host.price * days;
+    const platformFee = totalAmount * 0.15;
     const grandTotal = totalAmount + platformFee;
-
-    console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
 
     // Validate payment details
     if (paymentMethod === 'card') {
       if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
         return res.status(400).json({
           success: false,
-          message: 'Card number and holder name are required'
+          message: 'Card details are required'
         });
       }
 
@@ -2964,14 +2620,12 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     } else if (paymentMethod === 'bkash') {
       securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
     }
-    const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    securePaymentDetails.transactionId = transactionId;
+    securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-    // Create booking
     const booking = new Booking({
       userId: req.user._id,
       bookingType: 'host',
-      hostId: actualHostId,
+      hostId,
       checkIn,
       checkOut,
       guests,
@@ -2987,99 +2641,41 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     });
 
     await booking.save();
-    console.log('✅ Booking saved:', booking._id);
 
-    // ✅ NEW: Add booking to service's bookedDates array
-    if (!service.bookedDates) {
-      service.bookedDates = [];
-    }
-    
-    service.bookedDates.push({
-      checkIn: checkInDate,
-      checkOut: checkOutDate,
-      bookingId: booking._id,
-      userId: req.user._id,
-      status: 'confirmed'
-    });
-
-    // ✅ NEW: Check if service is now fully booked
-    if (isServiceFullyBooked(service)) {
-      service.available = false;
-      console.log('⚠️ Service is now fully booked and marked as unavailable');
-    }
-
-    // Update service stats
-    service.totalBookings = (service.totalBookings || 0) + 1;
-    await service.save();
-    console.log('✅ Service updated with booking dates');
-
-    // Create earning record for host
-    const earning = new HostEarning({
-      hostId: actualHostId,
-      userId: host.userId,
-      bookingId: booking._id,
-      amount: totalAmount,
-      platformFee,
-      hostEarnings: hostEarningsAmount,
-      bookingDetails: {
-        guestName: req.user.fullName,
-        guestEmail: req.user.email,
-        checkIn,
-        checkOut,
-        guests,
-        location: host.location,
-        days
-      },
-      status: 'completed',
-      paymentMethod,
-      transactionId
-    });
-
-    await earning.save();
-    console.log('💰 Earning recorded:', earning._id, '৳' + hostEarningsAmount);
-
-    // Update host stats
-    host.totalBookings = (host.totalBookings || 0) + 1;
-    await host.save();
-
-    // Create trip record
+    // Also create a trip record
     const trip = new Trip({
       destination: host.location,
       date: checkIn,
       endDate: checkOut,
       host: host.name,
-      hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
-      image: service.propertyImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
+      hostAvatar: host.image,
+      image: host.propertyImage,
       services: selectedServices || [],
       guests,
       totalAmount: grandTotal,
-      hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
+      hostRating: host.rating,
       description: `Experience ${host.location} with ${host.name}`,
       userId: req.user._id,
       status: 'upcoming'
     });
 
     await trip.save();
-    console.log('✅ Trip saved:', trip._id);
 
     res.status(201).json({
       success: true,
-      message: 'Booking confirmed successfully!',
+      message: 'Booking created successfully',
       booking: {
         bookingId: booking.bookingId,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
-        transactionId,
-        totalAmount: grandTotal,
-        hostEarnings: hostEarningsAmount,
-        platformFee
+        transactionId: securePaymentDetails.transactionId
       }
     });
   } catch (error) {
-    console.error('❌ Booking error:', error);
+    console.error('❌ Create booking error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating booking: ' + error.message,
+      message: 'Error creating booking',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -3720,426 +3316,6 @@ const riskAnalysisSchema = new mongoose.Schema({
 });
 
 const RiskAnalysis = mongoose.model('RiskAnalysis', riskAnalysisSchema);
-
-// ============ ADD THIS SCHEMA AT TOP WITH OTHER SCHEMAS ============
-
-const hostEarningSchema = new mongoose.Schema({
-  hostId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Host',
-    required: true,
-    index: true
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  bookingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
-    required: true
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  platformFee: {
-    type: Number,
-    default: 0
-  },
-  hostEarnings: {
-    type: Number,
-    required: true
-  },
-  bookingDetails: {
-    guestName: String,
-    guestEmail: String,
-    checkIn: Date,
-    checkOut: Date,
-    guests: Number,
-    location: String,
-    days: Number
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'completed', 'paid', 'refunded'],
-    default: 'completed'
-  },
-  paymentMethod: String,
-  transactionId: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
-
-hostEarningSchema.index({ hostId: 1, createdAt: -1 });
-const HostEarning = mongoose.model('HostEarning', hostEarningSchema);
-
-// ============ REPLACE THE ENTIRE POST /api/bookings ENDPOINT ============
-
-// Create host booking
-app.post('/api/bookings', authenticate, async (req, res) => {
-  try {
-    const {
-      bookingType,
-      hostId,
-      serviceId,
-      checkIn,
-      checkOut,
-      guests,
-      selectedServices,
-      notes,
-      paymentMethod,
-      paymentDetails
-    } = req.body;
-
-    console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut });
-
-    // Validate basic input
-    if (!bookingType || bookingType !== 'host') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking type'
-      });
-    }
-
-    // Get service first to find actual host
-    let service = null;
-    if (serviceId) {
-      service = await HostService.findById(serviceId).populate('hostId');
-    }
-
-    if (!service) {
-      return res.status(404).json({
-        success: false,
-        message: 'Service not found. Cannot complete booking.'
-      });
-    }
-
-    const actualHostId = service.hostId._id;
-    console.log('✅ Service found, Host ID:', actualHostId);
-
-    // Get actual host document
-    const host = await Host.findById(actualHostId);
-    
-    if (!host) {
-      return res.status(404).json({
-        success: false,
-        message: 'Host profile not found'
-      });
-    }
-
-    console.log('🏠 Host:', host.name, 'Available:', host.available);
-
-    if (!host.available) {
-      return res.status(400).json({
-        success: false,
-        message: 'Host is not currently available for bookings'
-      });
-    }
-
-    // Validate dates
-    if (!checkIn || !checkOut) {
-      return res.status(400).json({
-        success: false,
-        message: 'Check-in and check-out dates are required'
-      });
-    }
-
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (days <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Check-out date must be after check-in date'
-      });
-    }
-
-    // Validate guests
-    if (guests > host.maxGuests) {
-      return res.status(400).json({
-        success: false,
-        message: `Maximum ${host.maxGuests} guests allowed. You selected ${guests} guests.`
-      });
-    }
-
-    // Calculate amounts
-    const totalAmount = service.price * days;
-    const platformFee = Math.round(totalAmount * 0.15);
-    const hostEarningsAmount = totalAmount - platformFee;
-    const grandTotal = totalAmount + platformFee;
-
-    console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
-
-    // Validate payment details
-    if (paymentMethod === 'card') {
-      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Card number and holder name are required'
-        });
-      }
-
-      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
-      if (!cardValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: cardValidation.message
-        });
-      }
-    } else if (paymentMethod === 'bkash') {
-      if (!paymentDetails?.bkashNumber) {
-        return res.status(400).json({
-          success: false,
-          message: 'bKash number is required'
-        });
-      }
-
-      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
-      if (!bkashValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: `bKash ${bkashValidation.message}`
-        });
-      }
-    }
-
-    // Prepare secure payment details
-    const securePaymentDetails = {};
-    if (paymentMethod === 'card') {
-      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
-      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
-      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
-    } else if (paymentMethod === 'bkash') {
-      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
-    }
-    const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    securePaymentDetails.transactionId = transactionId;
-
-    // Create booking
-    const booking = new Booking({
-      userId: req.user._id,
-      bookingType: 'host',
-      hostId: actualHostId,
-      checkIn,
-      checkOut,
-      guests,
-      selectedServices: selectedServices || [],
-      totalAmount,
-      platformFee,
-      grandTotal,
-      notes,
-      status: 'confirmed',
-      paymentStatus: 'paid',
-      paymentMethod,
-      paymentDetails: securePaymentDetails
-    });
-
-    await booking.save();
-    console.log('✅ Booking saved:', booking._id);
-
-    // Create earning record for host
-    const earning = new HostEarning({
-      hostId: actualHostId,
-      userId: host.userId,
-      bookingId: booking._id,
-      amount: totalAmount,
-      platformFee,
-      hostEarnings: hostEarningsAmount,
-      bookingDetails: {
-        guestName: req.user.fullName,
-        guestEmail: req.user.email,
-        checkIn,
-        checkOut,
-        guests,
-        location: host.location,
-        days
-      },
-      status: 'completed',
-      paymentMethod,
-      transactionId
-    });
-
-    await earning.save();
-    console.log('💰 Earning recorded:', earning._id, '৳' + hostEarningsAmount);
-
-    // Update host stats
-    host.totalBookings = (host.totalBookings || 0) + 1;
-    await host.save();
-
-    /// Create trip record
-const trip = new Trip({
-  destination: host.location,
-  date: checkIn,
-  endDate: checkOut,
-  host: host.name,
-  hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
-  // ✅ FIX: Use service.propertyImage with fallback to location image
-  image: service.propertyImage || getLocationImage(host.location) || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
-  services: selectedServices || [],
-  guests,
-  totalAmount: grandTotal,
-  // ✅ FIX: Ensure hostRating is at least 1
-  hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
-  description: `Experience ${host.location} with ${host.name}`,
-  userId: req.user._id,
-  status: 'upcoming'
-});
-
-    await trip.save();
-    console.log('✅ Trip saved:', trip._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Booking confirmed successfully!',
-      booking: {
-        bookingId: booking.bookingId,
-        status: booking.status,
-        paymentStatus: booking.paymentStatus,
-        transactionId,
-        totalAmount: grandTotal,
-        hostEarnings: hostEarningsAmount,
-        platformFee
-      }
-    });
-  } catch (error) {
-    console.error('❌ Booking error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating booking: ' + error.message,
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// ============ NEW ENDPOINT: Get Host Earnings ============
-
-app.get('/api/hosts/earnings', authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== 'host') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only hosts can view earnings'
-      });
-    }
-
-    const hostProfile = await Host.findOne({ userId: req.user._id });
-
-    if (!hostProfile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Host profile not found'
-      });
-    }
-
-    // Get all earnings
-    const earnings = await HostEarning.find({ hostId: hostProfile._id })
-      .sort({ createdAt: -1 })
-      .limit(100);
-
-    // Calculate totals
-    const totalEarnings = earnings.reduce((sum, e) => sum + e.hostEarnings, 0);
-    const totalBookings = earnings.length;
-    const completedBookings = earnings.filter(e => e.status === 'completed').length;
-    const paidEarnings = earnings.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.hostEarnings, 0);
-    const pendingEarnings = earnings.filter(e => e.status === 'pending').reduce((sum, e) => sum + e.hostEarnings, 0);
-
-    res.json({
-      success: true,
-      earnings: {
-        totalEarnings,
-        totalBookings,
-        completedBookings,
-        paidEarnings,
-        pendingEarnings,
-        recentTransactions: earnings.map(e => ({
-          _id: e._id,
-          amount: e.hostEarnings,
-          totalAmount: e.amount,
-          platformFee: e.platformFee,
-          guestName: e.bookingDetails.guestName,
-          location: e.bookingDetails.location,
-          days: e.bookingDetails.days,
-          status: e.status,
-          transactionId: e.transactionId,
-          date: e.createdAt
-        }))
-      }
-    });
-  } catch (error) {
-    console.error('❌ Get earnings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching earnings'
-    });
-  }
-});
-
-// ============ NEW ENDPOINT: Get Earnings Summary ============
-
-app.get('/api/hosts/earnings/summary', authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== 'host') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only hosts can view earnings'
-      });
-    }
-
-    const hostProfile = await Host.findOne({ userId: req.user._id });
-
-    if (!hostProfile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Host profile not found'
-      });
-    }
-
-    // Get earnings from last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const allTimeEarnings = await HostEarning.find({ hostId: hostProfile._id });
-    const thisMonthEarnings = await HostEarning.find({
-      hostId: hostProfile._id,
-      createdAt: { $gte: thirtyDaysAgo }
-    });
-
-    const totalEarnings = allTimeEarnings.reduce((sum, e) => sum + e.hostEarnings, 0);
-    const thisMonthTotal = thisMonthEarnings.reduce((sum, e) => sum + e.hostEarnings, 0);
-    const thisMonthBookings = thisMonthEarnings.length;
-
-    res.json({
-      success: true,
-      summary: {
-        allTime: {
-          totalEarnings: Math.round(totalEarnings),
-          totalBookings: allTimeEarnings.length,
-          averagePerBooking: allTimeEarnings.length > 0 ? Math.round(totalEarnings / allTimeEarnings.length) : 0
-        },
-        thisMonth: {
-          earnings: Math.round(thisMonthTotal),
-          bookings: thisMonthBookings,
-          averagePerBooking: thisMonthBookings > 0 ? Math.round(thisMonthTotal / thisMonthBookings) : 0
-        }
-      }
-    });
-  } catch (error) {
-    console.error('❌ Get earnings summary error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching earnings summary'
-    });
-  }
-});
-
 
 // AI Configuration
 const AI_CONFIG = {
@@ -5446,354 +4622,6 @@ app.post('/api/ai/destinations/seed', authenticate, async (req, res) => {
 });
 
 
-// Helper function to check if dates overlap
-function datesOverlap(start1, end1, start2, end2) {
-  return start1 < end2 && end1 > start2;
-}
-
-// Helper function to check service availability
-const checkServiceAvailability = (service, checkIn, checkOut) => {
-  const requestedCheckIn = new Date(checkIn);
-  const requestedCheckOut = new Date(checkOut);
-  
-  const availFrom = new Date(service.availableFromDate);
-  const availTo = new Date(service.availableToDate);
-  
-  // Check if dates are within service availability period
-  if (requestedCheckIn < availFrom || requestedCheckOut > availTo) {
-    return {
-      available: false,
-      reason: 'Dates outside service availability period',
-      conflictingBookings: []
-    };
-  }
-  
-  // Check if bookedDates exists and is an array
-  if (!service.bookedDates || !Array.isArray(service.bookedDates) || service.bookedDates.length === 0) {
-    return { 
-      available: true, 
-      reason: 'Available', 
-      conflictingBookings: [] 
-    };
-  }
-  
-  // Filter out cancelled bookings
-  const activeBookings = service.bookedDates.filter(booking => 
-    booking && booking.status !== 'cancelled'
-  );
-  
-  if (activeBookings.length === 0) {
-    return { 
-      available: true, 
-      reason: 'Available', 
-      conflictingBookings: [] 
-    };
-  }
-  
-  // Check for date conflicts with active bookings
-  const conflicts = activeBookings.filter(booking => {
-    const bookedCheckIn = new Date(booking.checkIn);
-    const bookedCheckOut = new Date(booking.checkOut);
-    return datesOverlap(requestedCheckIn, requestedCheckOut, bookedCheckIn, bookedCheckOut);
-  });
-  
-  if (conflicts.length > 0) {
-    return {
-      available: false,
-      reason: 'Service already booked for these dates',
-      conflictingBookings: conflicts
-    };
-  }
-  
-  return { available: true, reason: 'Available', conflictingBookings: [] };
-};
-
-// Helper function to check if service is fully booked
-const isServiceFullyBooked = (service) => {
-  if (!service.bookedDates || !Array.isArray(service.bookedDates) || service.bookedDates.length === 0) {
-    return false;
-  }
-  
-  // Filter active (non-cancelled) bookings
-  const activeBookings = service.bookedDates.filter(booking => 
-    booking && booking.status !== 'cancelled'
-  );
-  
-  if (activeBookings.length === 0) {
-    return false;
-  }
-  
-  const availFrom = new Date(service.availableFromDate);
-  const availTo = new Date(service.availableToDate);
-  
-  // Check if there's a booking that covers the entire availability period
-  const fullyBooking = activeBookings.some(booking => {
-    const bookedCheckIn = new Date(booking.checkIn);
-    const bookedCheckOut = new Date(booking.checkOut);
-    
-    // Check if this booking covers the entire available period
-    return bookedCheckIn <= availFrom && bookedCheckOut >= availTo;
-  });
-  
-  return fullyBooking;
-};
-
-
-// Add these endpoints to your server.js file
-
-// ==================== REVIEW AND RECEIPT ENDPOINTS ====================
-
-// Review Schema (add to schemas section)
-const reviewSchema = new mongoose.Schema({
-  bookingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
-    required: true
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  hostId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Host',
-    required: true
-  },
-  rating: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 5
-  },
-  review: {
-    type: String,
-    maxlength: 1000
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
-
-const Review = mongoose.model('Review', reviewSchema);
-
-// Submit a review for a booking (Protected)
-app.post('/api/bookings/:id/review', authenticate, async (req, res) => {
-  try {
-    const { rating, review } = req.body;
-
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rating must be between 1 and 5'
-      });
-    }
-
-    const booking = await Booking.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    }).populate('hostId');
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
-
-    // ✅ FIX: Check if booking date has passed OR if it's cancelled
-    // Instead of checking booking.status === 'completed'
-    const bookingDate = new Date(booking.checkIn);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    bookingDate.setHours(0, 0, 0, 0);
-    
-    const hasStarted = bookingDate <= today;
-    const isCancelled = booking.status === 'cancelled';
-    
-    if (!hasStarted && !isCancelled) {
-      return res.status(400).json({
-        success: false,
-        message: 'You can only review bookings that have started or been cancelled'
-      });
-    }
-
-    // Check if review already exists
-    const existingReview = await Review.findOne({
-      bookingId: booking._id,
-      userId: req.user._id
-    });
-
-    if (existingReview) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already reviewed this booking'
-      });
-    }
-
-    // Create review
-    const newReview = new Review({
-      bookingId: booking._id,
-      userId: req.user._id,
-      hostId: booking.hostId._id,
-      rating: parseInt(rating),
-      review: review?.trim() || null
-    });
-
-    await newReview.save();
-
-    // Update host rating
-    const host = await Host.findById(booking.hostId._id);
-    if (host) {
-      const allReviews = await Review.find({ hostId: host._id });
-      const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-      
-      host.rating = Math.round(avgRating * 10) / 10; // Round to 1 decimal
-      host.reviews = allReviews.length;
-      await host.save();
-    }
-
-    console.log(`✅ Review submitted for booking: ${booking.bookingId}`);
-
-    res.status(201).json({
-      success: true,
-      message: 'Review submitted successfully',
-      review: newReview
-    });
-  } catch (error) {
-    console.error('❌ Submit review error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error submitting review',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get receipt for a booking (Protected)
-app.get('/api/bookings/:id/receipt', authenticate, async (req, res) => {
-  try {
-    const booking = await Booking.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    }).populate('hostId', 'name location');
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
-
-    const receipt = {
-      bookingId: booking.bookingId,
-      hostName: booking.hostId?.name || 'Host',
-      location: booking.hostId?.location || 'Location',
-      checkIn: booking.checkIn ? new Date(booking.checkIn).toLocaleDateString() : 'N/A',
-      checkOut: booking.checkOut ? new Date(booking.checkOut).toLocaleDateString() : 'N/A',
-      guests: booking.guests,
-      services: booking.selectedServices,
-      paymentMethod: booking.paymentMethod === 'card' ? 'Credit/Debit Card' : 'bKash',
-      totalAmount: booking.grandTotal,
-      bookingDate: new Date(booking.createdAt).toLocaleDateString(),
-      status: booking.status
-    };
-
-    res.json({
-      success: true,
-      receipt
-    });
-  } catch (error) {
-    console.error('❌ Get receipt error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching receipt',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get e-ticket for a transport booking (Protected)
-app.get('/api/transport-tickets/:bookingId/ticket', authenticate, async (req, res) => {
-  try {
-    const ticket = await TransportTicket.findOne({
-      bookingId: req.params.bookingId,
-      userId: req.user._id
-    });
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ticket not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      ticket: {
-        bookingId: ticket.bookingId,
-        pnr: ticket.pnr,
-        transportType: ticket.transportType,
-        provider: ticket.provider,
-        from: ticket.from,
-        to: ticket.to,
-        journeyDate: ticket.journeyDate,
-        departureTime: ticket.departureTime,
-        arrivalTime: ticket.arrivalTime,
-        duration: ticket.duration,
-        passengers: ticket.passengers,
-        totalAmount: ticket.totalAmount,
-        contactEmail: ticket.contactEmail,
-        contactPhone: ticket.contactPhone,
-        status: ticket.status
-      }
-    });
-  } catch (error) {
-    console.error('❌ Get e-ticket error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching e-ticket',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get all reviews for a host (Public)
-app.get('/api/hosts/:id/reviews', async (req, res) => {
-  try {
-    const reviews = await Review.find({ hostId: req.params.id })
-      .populate('userId', 'fullName username')
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.json({
-      success: true,
-      count: reviews.length,
-      reviews: reviews.map(r => ({
-        id: r._id,
-        rating: r.rating,
-        review: r.review,
-        author: {
-          name: r.userId.fullName,
-          username: r.userId.username
-        },
-        createdAt: r.createdAt
-      }))
-    });
-  } catch (error) {
-    console.error('❌ Get host reviews error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching reviews',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-
 // ==================== BOOKING ROUTES ====================
 
 // Create booking (Protected)
@@ -6017,16 +4845,15 @@ app.post('/api/trips', authenticate, async (req, res) => {
   }
 });
 
-// ==================== UPDATED PUT /api/bookings/:id/cancel ENDPOINT ====================
-// Replace the existing cancellation endpoint (around line 2675) with this:
-
-// Cancel booking (Protected)
-app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
+// Get booking by ID (Protected)
+app.get('/api/bookings/:id', authenticate, async (req, res) => {
   try {
     const booking = await Booking.findOne({
       _id: req.params.id,
       userId: req.user._id
-    });
+    })
+    .populate('hostId')
+    .populate('transportationId');
 
     if (!booking) {
       return res.status(404).json({
@@ -6035,67 +4862,15 @@ app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
       });
     }
 
-    if (booking.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: 'Booking already cancelled'
-      });
-    }
-
-    // Mark booking as cancelled
-    booking.status = 'cancelled';
-    await booking.save();
-
-    // ✅ NEW: Update service bookedDates to mark this booking as cancelled
-    if (booking.bookingType === 'host' && booking.hostId) {
-      const host = await Host.findById(booking.hostId);
-      if (host) {
-        // Find all services for this host
-        const services = await HostService.find({ hostId: host._id });
-        
-        for (const service of services) {
-          if (service.bookedDates && Array.isArray(service.bookedDates)) {
-            // Find and update the booking status
-            const bookingIndex = service.bookedDates.findIndex(b => 
-              b.bookingId && b.bookingId.toString() === booking._id.toString()
-            );
-            
-            if (bookingIndex !== -1) {
-              service.bookedDates[bookingIndex].status = 'cancelled';
-              
-              // Check if service should become available again
-              if (!isServiceFullyBooked(service)) {
-                service.available = true;
-                console.log('✅ Service is now available again after cancellation');
-              }
-              
-              await service.save();
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // Handle transportation booking cancellation (existing code)
-    if (booking.bookingType === 'transportation' && booking.transportationId) {
-      const transportation = await Transportation.findById(booking.transportationId);
-      if (transportation) {
-        transportation.availableSeats += booking.passengers || 1;
-        await transportation.save();
-      }
-    }
-
     res.json({
       success: true,
-      message: 'Booking cancelled successfully',
       booking
     });
   } catch (error) {
-    console.error('❌ Cancel booking error:', error);
+    console.error('❌ Get booking error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error cancelling booking',
+      message: 'Error fetching booking',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -6154,33 +4929,6 @@ app.put('/api/bookings/:id/cancel', authenticate, async (req, res) => {
 //============ HOST SERVICES ROUTES ============
 
 // Get all services for a specific host (Protected)
-async function getOrCreateHostProfile(user) {
-  let hostProfile = await Host.findOne({ userId: user._id });
-
-  if (!hostProfile) {
-    // Auto-create a minimal host profile so service creation doesn't fail
-    hostProfile = new Host({
-      name: user.fullName || user.username,
-      userId: user._id,
-      location: '',
-      rating: 0,
-      reviews: 0,
-      verified: false,
-      languages: [],
-      image: user.profilePicture || null,
-      available: false,
-      description: '',
-      experience: 'Beginner',
-      responseTime: 'Within 1 hour',
-    });
-    await hostProfile.save();
-    console.log(`✅ Auto-created Host profile for user: ${user.email}`);
-  }
-
-  return hostProfile;
-}
-
-// GET /api/host-services/my-services — Get all services for current host
 app.get('/api/host-services/my-services', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'host') {
@@ -6190,12 +4938,22 @@ app.get('/api/host-services/my-services', authenticate, async (req, res) => {
       });
     }
 
-    const hostProfile = await getOrCreateHostProfile(req.user);
+    // Find host profile
+    const hostProfile = await Host.findOne({ userId: req.user._id });
 
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found. Please complete your host profile first.'
+      });
+    }
+
+    // Get all services for this host
     const services = await HostService.find({
       hostId: hostProfile._id,
       active: true
-    }).sort({ createdAt: -1 });
+    })
+    .sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -6212,7 +4970,7 @@ app.get('/api/host-services/my-services', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/host-services — Create a new service
+// Create a new service (Protected)
 app.post('/api/host-services', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'host') {
@@ -6238,65 +4996,74 @@ app.post('/api/host-services', authenticate, async (req, res) => {
       availableToDate
     } = req.body;
 
-    // ── Validation ──────────────────────────────────────────
-    if (!name || !String(name).trim()) {
-      return res.status(400).json({ success: false, message: 'Service name is required' });
+    // Validation
+    if (!name || !price || !serviceType || !location || !availableFromDate || !availableToDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: name, price, serviceType, location, availableFromDate, availableToDate'
+      });
     }
 
-    if (!location || !String(location).trim()) {
-      return res.status(400).json({ success: false, message: 'Location is required' });
-    }
-
-    if (price === undefined || price === null || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-      return res.status(400).json({ success: false, message: 'Price must be a positive number' });
-    }
-
+    // Check if serviceType is an array
     if (!Array.isArray(serviceType) || serviceType.length === 0) {
-      return res.status(400).json({ success: false, message: 'At least one service type is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'At least one service type is required'
+      });
     }
 
-    if (!availableFromDate || !availableToDate) {
-      return res.status(400).json({ success: false, message: 'Available from date and to date are required' });
-    }
-
+    // Validate dates
     const fromDate = new Date(availableFromDate);
     const toDate = new Date(availableToDate);
-
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
-      return res.status(400).json({ success: false, message: 'Invalid date format' });
-    }
-
+    
     if (fromDate > toDate) {
-      return res.status(400).json({ success: false, message: 'Available from date must be before available to date' });
+      return res.status(400).json({
+        success: false,
+        message: 'Available from date must be before available to date'
+      });
     }
 
-    // Property image required only for accommodation
+    // Find host profile
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found. Please complete your host profile first.'
+      });
+    }
+
+    // Check if offering accommodation
     const offersAccommodation = serviceType.includes('Accommodation');
-    if (offersAccommodation && (!propertyImage || !String(propertyImage).trim())) {
-      return res.status(400).json({ success: false, message: 'Property image is required when offering accommodation' });
+    
+    if (offersAccommodation && !propertyImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Property image is required when offering accommodation'
+      });
     }
 
     // Validate property image URL if provided
-    if (propertyImage && String(propertyImage).trim() !== '') {
+    if (propertyImage) {
       try {
         new URL(propertyImage);
-      } catch {
-        return res.status(400).json({ success: false, message: 'Invalid property image URL' });
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid property image URL'
+        });
       }
     }
-    // ── End Validation ──────────────────────────────────────
 
-    // Auto-create host profile if missing — no more 404 errors
-    const hostProfile = await getOrCreateHostProfile(req.user);
-
+    // Create service
     const service = new HostService({
       hostId: hostProfile._id,
       userId: req.user._id,
-      name: String(name).trim(),
-      description: description ? String(description).trim() : '',
+      name: name.trim(),
+      description: description ? description.trim() : '',
       price: parseFloat(price),
       serviceType,
-      location: String(location).trim(),
+      location: location.trim(),
       maxGuests: maxGuests ? parseInt(maxGuests) : 4,
       minStay: minStay ? parseInt(minStay) : 1,
       propertyImage: propertyImage || '',
@@ -6311,7 +5078,7 @@ app.post('/api/host-services', authenticate, async (req, res) => {
 
     await service.save();
 
-    console.log(`✅ Service created: "${service.name}" for host: ${req.user.email}`);
+    console.log(`✅ Service created: ${service.name} for host: ${req.user.email}`);
 
     res.status(201).json({
       success: true,
@@ -6320,12 +5087,16 @@ app.post('/api/host-services', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Create service error:', error);
-
+    
+    // Handle validation errors
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({ success: false, message: messages.join(', ') });
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
     }
-
+    
     res.status(500).json({
       success: false,
       message: 'Error creating service',
@@ -6334,107 +5105,44 @@ app.post('/api/host-services', authenticate, async (req, res) => {
   }
 });
 
-// ==================== NEW ENDPOINT: Check Service Availability ====================
-// Add this NEW endpoint to allow frontend to verify availability before showing booking form
-// Add this AFTER the GET /api/host-services endpoint
-
-// GET /api/host-services/:id/availability — Check if a specific service is available
-app.get('/api/host-services/:id/availability', async (req, res) => {
+// Get a single service by ID (Protected)
+app.get('/api/host-services/:id', authenticate, async (req, res) => {
   try {
-    const { checkIn, checkOut } = req.query;
-    
     const service = await HostService.findOne({
       _id: req.params.id,
-      active: true
-    }).populate('hostId', 'name location verified');
+      userId: req.user._id
+    })
+    .populate('hostId', 'name location rating reviews');
 
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found or inactive'
+        message: 'Service not found'
       });
     }
 
-    // Check if service is explicitly unavailable
-    if (!service.available) {
-      return res.json({
-        success: true,
-        available: false,
-        reason: 'Service is currently unavailable',
-        service: {
-          id: service._id,
-          name: service.name,
-          location: service.location
-        }
-      });
-    }
-
-    // Check if service is fully booked
-    if (isServiceFullyBooked(service)) {
-      return res.json({
-        success: true,
-        available: false,
-        reason: 'Service is fully booked for its entire availability period',
-        service: {
-          id: service._id,
-          name: service.name,
-          location: service.location,
-          availableFrom: service.availableFromDate,
-          availableTo: service.availableToDate
-        }
-      });
-    }
-
-    // If specific dates are provided, check those dates
-    if (checkIn && checkOut) {
-      const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
-      
-      return res.json({
-        success: true,
-        available: availabilityCheck.available,
-        reason: availabilityCheck.reason,
-        conflictingBookings: availabilityCheck.conflictingBookings,
-        service: {
-          id: service._id,
-          name: service.name,
-          location: service.location,
-          availableFrom: service.availableFromDate,
-          availableTo: service.availableToDate
-        }
-      });
-    }
-
-    // Service is available
     res.json({
       success: true,
-      available: true,
-      reason: 'Service is available',
-      service: {
-        id: service._id,
-        name: service.name,
-        location: service.location,
-        availableFrom: service.availableFromDate,
-        availableTo: service.availableToDate,
-        price: service.price,
-        maxGuests: service.maxGuests
-      }
+      service
     });
-
   } catch (error) {
-    console.error('❌ Check availability error:', error);
+    console.error('❌ Get service error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error checking availability',
+      message: 'Error fetching service',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-// PUT /api/host-services/:id — Update a service
+// Update a service (Protected)
 app.put('/api/host-services/:id', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'host') {
-      return res.status(403).json({ success: false, message: 'Only hosts can update services' });
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can update services'
+      });
     }
 
     const service = await HostService.findOne({
@@ -6443,60 +5151,65 @@ app.put('/api/host-services/:id', authenticate, async (req, res) => {
     });
 
     if (!service) {
-      return res.status(404).json({ success: false, message: 'Service not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
     }
 
     const {
-      name, description, price, serviceType, location,
-      maxGuests, minStay, propertyImage, experience,
-      responseTime, cancellationPolicy, availableFromDate,
-      availableToDate, available
+      name,
+      description,
+      price,
+      serviceType,
+      location,
+      maxGuests,
+      minStay,
+      propertyImage,
+      experience,
+      responseTime,
+      cancellationPolicy,
+      availableFromDate,
+      availableToDate,
+      available
     } = req.body;
 
-    // Validate dates if both provided
-    if (availableFromDate && availableToDate) {
-      const from = new Date(availableFromDate);
-      const to = new Date(availableToDate);
-      if (from > to) {
-        return res.status(400).json({ success: false, message: 'Available from date must be before available to date' });
-      }
-    }
-
-    // Check accommodation image requirement
-    const newServiceType = serviceType || service.serviceType;
-    const newPropertyImage = propertyImage !== undefined ? propertyImage : service.propertyImage;
-    if (newServiceType.includes('Accommodation') && !newPropertyImage) {
-      return res.status(400).json({ success: false, message: 'Property image is required when offering accommodation' });
-    }
-
-    if (name !== undefined) service.name = String(name).trim();
-    if (description !== undefined) service.description = String(description).trim();
+    // Update fields
+    if (name) service.name = name.trim();
+    if (description !== undefined) service.description = description.trim();
     if (price !== undefined) service.price = parseFloat(price);
-    if (serviceType !== undefined) service.serviceType = serviceType;
-    if (location !== undefined) service.location = String(location).trim();
+    if (serviceType) service.serviceType = serviceType;
+    if (location) service.location = location.trim();
     if (maxGuests !== undefined) service.maxGuests = parseInt(maxGuests);
     if (minStay !== undefined) service.minStay = parseInt(minStay);
     if (propertyImage !== undefined) service.propertyImage = propertyImage;
-    if (experience !== undefined) service.experience = experience;
-    if (responseTime !== undefined) service.responseTime = responseTime;
-    if (cancellationPolicy !== undefined) service.cancellationPolicy = cancellationPolicy;
+    if (experience) service.experience = experience;
+    if (responseTime) service.responseTime = responseTime;
+    if (cancellationPolicy) service.cancellationPolicy = cancellationPolicy;
     if (availableFromDate) service.availableFromDate = new Date(availableFromDate);
     if (availableToDate) service.availableToDate = new Date(availableToDate);
     if (available !== undefined) service.available = available;
 
     await service.save();
 
-    console.log(`✅ Service updated: "${service.name}" for host: ${req.user.email}`);
+    console.log(`✅ Service updated: ${service.name} for host: ${req.user.email}`);
 
-    res.json({ success: true, message: 'Service updated successfully', service });
+    res.json({
+      success: true,
+      message: 'Service updated successfully',
+      service
+    });
   } catch (error) {
     console.error('❌ Update service error:', error);
-
+    
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({ success: false, message: messages.join(', ') });
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
     }
-
+    
     res.status(500).json({
       success: false,
       message: 'Error updating service',
@@ -6505,11 +5218,14 @@ app.put('/api/host-services/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/host-services/:id — Soft delete a service
+// Delete a service (Soft delete - mark as inactive) (Protected)
 app.delete('/api/host-services/:id', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'host') {
-      return res.status(403).json({ success: false, message: 'Only hosts can delete services' });
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can delete services'
+      });
     }
 
     const service = await HostService.findOne({
@@ -6518,16 +5234,23 @@ app.delete('/api/host-services/:id', authenticate, async (req, res) => {
     });
 
     if (!service) {
-      return res.status(404).json({ success: false, message: 'Service not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
     }
 
+    // Soft delete - mark as inactive instead of removing
     service.active = false;
     service.available = false;
     await service.save();
 
-    console.log(`✅ Service deleted: "${service.name}" for host: ${req.user.email}`);
+    console.log(`✅ Service deleted (soft): ${service.name} for host: ${req.user.email}`);
 
-    res.json({ success: true, message: 'Service deleted successfully' });
+    res.json({
+      success: true,
+      message: 'Service deleted successfully'
+    });
   } catch (error) {
     console.error('❌ Delete service error:', error);
     res.status(500).json({
@@ -6538,30 +5261,40 @@ app.delete('/api/host-services/:id', authenticate, async (req, res) => {
   }
 });
 
-
-
-// ==================== ENHANCED GET /api/host-services ENDPOINT ====================
-// This version ensures fully booked services NEVER appear in Book Travel page
-// Replace the existing GET /api/host-services endpoint (around line 3290) with this:
-
-// GET /api/host-services — Public listing with filters (ENHANCED VERSION)
+// Get all services (Public - for browsing/searching)
 app.get('/api/host-services', async (req, res) => {
   try {
-    const {
-      location, minPrice, maxPrice, serviceType,
-      availableFrom, availableTo, limit = 20, page = 1
+    const { 
+      location, 
+      minPrice, 
+      maxPrice, 
+      serviceType,
+      availableFrom,
+      availableTo,
+      limit = 20,
+      page = 1 
     } = req.query;
 
-    // ✅ CRITICAL: Only fetch services that are active
-    let query = { active: true };
+    let query = { active: true, available: true };
 
-    if (location) query.location = { $regex: location, $options: 'i' };
+    // Location filter
+    if (location) {
+      query.location = { $regex: location, $options: 'i' };
+    }
+
+    // Price range filter
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = parseFloat(minPrice);
       if (maxPrice) query.price.$lte = parseFloat(maxPrice);
     }
-    if (serviceType) query.serviceType = serviceType;
+
+    // Service type filter
+    if (serviceType) {
+      query.serviceType = serviceType;
+    }
+
+    // Availability date filter
     if (availableFrom && availableTo) {
       query.availableFromDate = { $lte: new Date(availableFrom) };
       query.availableToDate = { $gte: new Date(availableTo) };
@@ -6569,51 +5302,21 @@ app.get('/api/host-services', async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch all matching services
-    const allServices = await HostService.find(query)
+    const services = await HostService.find(query)
       .populate('hostId', 'name location rating reviews verified hostBadge')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    // ✅ CRITICAL: Filter out fully booked services BEFORE pagination
-    const availableServices = allServices.filter(service => {
-      // 1. If service is explicitly marked unavailable, exclude it
-      if (service.available === false) {
-        console.log(`🚫 Service "${service.name}" excluded: marked unavailable`);
-        return false;
-      }
-      
-      // 2. Check if service is fully booked
-      if (isServiceFullyBooked(service)) {
-        console.log(`🚫 Service "${service.name}" excluded: fully booked`);
-        return false;
-      }
-      
-      // 3. If host is not available, exclude the service
-      if (service.hostId && !service.hostId.verified) {
-        // Optional: You can also filter by host verification status
-        // Uncomment the line below if you want to hide unverified hosts
-        // return false;
-      }
-      
-      console.log(`✅ Service "${service.name}" included: available for booking`);
-      return true;
-    });
-
-    // Apply pagination to filtered results
-    const paginatedServices = availableServices.slice(skip, skip + parseInt(limit));
-    const total = availableServices.length;
-
-    console.log(`📊 Services Summary: ${allServices.length} total, ${availableServices.length} available, ${paginatedServices.length} returned`);
+    const total = await HostService.countDocuments(query);
 
     res.json({
       success: true,
-      count: paginatedServices.length,
+      count: services.length,
       total,
-      totalAvailable: availableServices.length,
-      totalInDatabase: allServices.length,
       page: parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
-      services: paginatedServices
+      services
     });
   } catch (error) {
     console.error('❌ Get all services error:', error);
@@ -6625,16 +5328,32 @@ app.get('/api/host-services', async (req, res) => {
   }
 });
 
-// GET /api/host-services/stats/my-stats — Service statistics
+// Get service statistics for current host (Protected)
 app.get('/api/host-services/stats/my-stats', authenticate, async (req, res) => {
   try {
     if (req.user.role !== 'host') {
-      return res.status(403).json({ success: false, message: 'Only hosts can access service statistics' });
+      return res.status(403).json({
+        success: false,
+        message: 'Only hosts can access service statistics'
+      });
     }
 
-    const hostProfile = await getOrCreateHostProfile(req.user);
+    const hostProfile = await Host.findOne({ userId: req.user._id });
 
-    const [totalServices, activeServices, totalBookingsAgg, avgRatingAgg] = await Promise.all([
+    if (!hostProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    // Get statistics
+    const [
+      totalServices,
+      activeServices,
+      totalBookings,
+      avgRating
+    ] = await Promise.all([
       HostService.countDocuments({ hostId: hostProfile._id }),
       HostService.countDocuments({ hostId: hostProfile._id, active: true, available: true }),
       HostService.aggregate([
@@ -6653,8 +5372,8 @@ app.get('/api/host-services/stats/my-stats', authenticate, async (req, res) => {
         totalServices,
         activeServices,
         inactiveServices: totalServices - activeServices,
-        totalBookings: totalBookingsAgg[0]?.total || 0,
-        averageRating: avgRatingAgg[0]?.avg || 0
+        totalBookings: totalBookings[0]?.total || 0,
+        averageRating: avgRating[0]?.avg || 0
       }
     });
   } catch (error) {
@@ -6664,272 +5383,120 @@ app.get('/api/host-services/stats/my-stats', authenticate, async (req, res) => {
       message: 'Error fetching statistics',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
-  }
+  }   
 });
 
 // ==================== MESSAGE ROUTES ====================
 
-// REPLACE the existing GET /api/messages/conversations endpoint in your server.js with this:
-
-// Get conversations for current user (Protected) - IMPROVED VERSION
+// Get conversations for current user (Protected)
 app.get('/api/messages/conversations', authenticate, async (req, res) => {
   try {
-    console.log('📬 Fetching conversations for user:', req.user.email, req.user._id);
-
-    // Find all conversations where user is a participant
     const conversations = await Conversation.find({
       participants: req.user._id,
       isActive: true
     })
     .populate({
       path: 'participants',
-      select: 'username fullName email profilePicture role'
+      select: 'username fullName email profilePicture'
     })
     .populate({
       path: 'lastMessage',
-      select: 'content type createdAt senderId'
+      select: 'content type createdAt'
     })
-    .sort({ updatedAt: -1 })
-    .lean(); // Use lean() for better performance
+    .sort({ updatedAt: -1 });
 
-    console.log(`Found ${conversations.length} conversations`);
-
-    if (conversations.length === 0) {
-      return res.json({
-        success: true,
-        conversations: [],
-        message: 'No conversations found'
-      });
-    }
-
-    // Format conversations for frontend
+    // Format conversations
     const formattedConversations = await Promise.all(
       conversations.map(async (conv) => {
-        try {
-          // Find the other participant (not the current user)
-          const otherParticipant = conv.participants.find(
-            p => p._id.toString() !== req.user._id.toString()
-          );
+        const otherParticipant = conv.participants.find(
+          p => p._id.toString() !== req.user._id.toString()
+        );
 
-          if (!otherParticipant) {
-            console.log(`⚠️ No other participant found for conversation ${conv._id}`);
-            return null;
-          }
-
-          console.log(`Processing conversation with ${otherParticipant.email}`);
-
-          // Count unread messages for this conversation
-          const unreadMessages = await Message.countDocuments({
-            conversationId: conv._id,
-            receiverId: req.user._id,
-            read: false
-          });
-
-          // Get host info if the other participant is a host
-          let hostInfo = null;
-          if (otherParticipant.role === 'host') {
-            const host = await Host.findOne({ userId: otherParticipant._id })
-              .select('name location rating reviews verified propertyImage')
-              .lean();
-            
-            if (host) {
-              hostInfo = {
-                hostName: host.name,
-                location: host.location,
-                rating: host.rating || 0,
-                reviews: host.reviews || 0,
-                verified: host.verified || false,
-                propertyImage: host.propertyImage
-              };
-            }
-          }
-
-          // Format the conversation
-          const formatted = {
-            _id: conv._id,
-            participantId: otherParticipant._id,
-            hostName: otherParticipant.fullName || otherParticipant.username,
-            hostAvatar: otherParticipant.profilePicture || 
-                       `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.username}`,
-            lastMessage: conv.lastMessage?.content || 'No messages yet',
-            time: formatTimeAgo(conv.lastMessage?.createdAt || conv.updatedAt),
-            unread: unreadMessages,
-            online: false, // Would require WebSocket implementation
-            hostInfo: hostInfo,
-            updatedAt: conv.updatedAt
-          };
-
-          console.log(`✅ Formatted conversation:`, {
-            id: formatted._id,
-            with: formatted.hostName,
-            unread: formatted.unread
-          });
-
-          return formatted;
-        } catch (convError) {
-          console.error(`Error formatting conversation ${conv._id}:`, convError);
+        if (!otherParticipant) {
           return null;
         }
+
+        const unreadMessages = await Message.countDocuments({
+          conversationId: conv._id,
+          receiverId: req.user._id,
+          read: false
+        });
+
+        // Get host info if available
+        let hostInfo = {};
+        const host = await Host.findOne({ userId: otherParticipant._id });
+        if (host) {
+          hostInfo = {
+            hostName: host.name,
+            location: host.location,
+            rating: host.rating,
+            propertyImage: host.propertyImage
+          };
+        }
+
+        return {
+          _id: conv._id,
+          participantId: otherParticipant._id,
+          hostName: otherParticipant.fullName,
+          hostAvatar: otherParticipant.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.username}`,
+          lastMessage: conv.lastMessage?.content || 'No messages yet',
+          time: formatTimeAgo(conv.lastMessage?.createdAt || conv.updatedAt),
+          unread: unreadMessages,
+          online: false, // This would require WebSocket implementation
+          hostInfo
+        };
       })
     );
 
-    // Filter out null values (failed formatting)
-    const validConversations = formattedConversations.filter(conv => conv !== null);
-
-    console.log(`✅ Returning ${validConversations.length} valid conversations`);
+    const filteredConversations = formattedConversations.filter(conv => conv !== null);
 
     res.json({
       success: true,
-      conversations: validConversations,
-      count: validConversations.length
+      conversations: filteredConversations
     });
-
   } catch (error) {
     console.error('❌ Get conversations error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching conversations',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error fetching conversations'
     });
   }
 });
 
-// Helper function for time formatting (if not already present)
-function formatTimeAgo(date) {
-  if (!date) return '';
-  
-  try {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    
-    let interval = Math.floor(seconds / 31536000);
-    if (interval >= 1) return interval + 'y ago';
-    
-    interval = Math.floor(seconds / 2592000);
-    if (interval >= 1) return interval + 'mo ago';
-    
-    interval = Math.floor(seconds / 86400);
-    if (interval >= 1) return interval + 'd ago';
-    
-    interval = Math.floor(seconds / 3600);
-    if (interval >= 1) return interval + 'h ago';
-    
-    interval = Math.floor(seconds / 60);
-    if (interval >= 1) return interval + 'm ago';
-    
-    return 'Just now';
-  } catch (e) {
-    console.error('Error formatting time:', e);
-    return '';
-  }
-}
-
-// REPLACE the existing GET /api/messages/conversations/:conversationId endpoint with this:
-
-// Get messages for a conversation (Protected) - IMPROVED VERSION
+// Get messages for a conversation (Protected)
 app.get('/api/messages/conversations/:conversationId', authenticate, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { limit = 50, before } = req.query;
 
-    console.log('📨 Fetching messages for conversation:', conversationId);
-    console.log('User:', req.user.email, req.user._id);
-
-    // Verify conversation exists and user is a participant
+    // Verify user is participant
     const conversation = await Conversation.findOne({
       _id: conversationId,
       participants: req.user._id
-    }).lean();
+    });
 
     if (!conversation) {
-      console.log('❌ Conversation not found or user not a participant');
       return res.status(404).json({
         success: false,
-        message: 'Conversation not found or you do not have access'
+        message: 'Conversation not found'
       });
     }
 
-    console.log('✅ Conversation found, participants:', conversation.participants);
-
-    // Build query for messages
     let query = { conversationId };
     if (before) {
       query.createdAt = { $lt: new Date(before) };
     }
 
-    // Fetch messages with populated sender and receiver
     const messages = await Message.find(query)
-      .populate({
-        path: 'senderId',
-        select: 'username fullName email profilePicture'
-      })
-      .populate({
-        path: 'receiverId',
-        select: 'username fullName email profilePicture'
-      })
+      .populate('senderId', 'username fullName')
+      .populate('receiverId', 'username fullName')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit) + 1)
-      .lean();
+      .limit(parseInt(limit) + 1);
 
-    console.log(`Found ${messages.length} messages`);
-
-    // Check if there are more messages
     const hasMore = messages.length > parseInt(limit);
     if (hasMore) {
       messages.pop(); // Remove extra message used to check hasMore
     }
-
-    // Get the other participant for conversation info
-    const otherParticipantId = conversation.participants.find(
-      p => p.toString() !== req.user._id.toString()
-    );
-
-    const otherUser = await User.findById(otherParticipantId)
-      .select('fullName username email profilePicture role')
-      .lean();
-
-    // Get host info if available
-    let conversationInfo = {
-      id: conversation._id,
-      hostName: otherUser?.fullName || otherUser?.username || 'Unknown',
-      hostAvatar: otherUser?.profilePicture || 
-                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser?.username || 'default'}`,
-      hostRating: 0,
-      hostReviews: 0,
-      hostLocation: '',
-      hostVerified: false
-    };
-
-    if (otherUser?.role === 'host') {
-      const host = await Host.findOne({ userId: otherUser._id })
-        .select('rating reviews location verified')
-        .lean();
-      
-      if (host) {
-        conversationInfo.hostRating = host.rating || 0;
-        conversationInfo.hostReviews = host.reviews || 0;
-        conversationInfo.hostLocation = host.location || '';
-        conversationInfo.hostVerified = host.verified || false;
-      }
-    }
-
-    // Format messages for frontend
-    const formattedMessages = messages.reverse().map(msg => {
-      const isMe = msg.senderId?._id?.toString() === req.user._id.toString();
-      
-      return {
-        id: msg._id,
-        sender: isMe ? 'me' : 'host',
-        text: msg.content || '',
-        time: formatTime(msg.createdAt),
-        type: msg.type || 'text',
-        read: msg.read || false,
-        createdAt: msg.createdAt,
-        senderId: msg.senderId?._id,
-        receiverId: msg.receiverId?._id
-      };
-    });
-
-    console.log(`✅ Returning ${formattedMessages.length} formatted messages`);
 
     // Mark messages as read
     await Message.updateMany(
@@ -6941,55 +5508,49 @@ app.get('/api/messages/conversations/:conversationId', authenticate, async (req,
       { read: true }
     );
 
-    console.log('✅ Marked messages as read');
+    // Format messages for frontend
+    const formattedMessages = messages.reverse().map(msg => ({
+      id: msg._id,
+      sender: msg.senderId._id.toString() === req.user._id.toString() ? 'me' : 'host',
+      text: msg.content,
+      time: formatTime(msg.createdAt),
+      type: msg.type,
+      read: msg.read
+    }));
+
+    const otherParticipant = conversation.participants.find(
+      p => p.toString() !== req.user._id.toString()
+    );
+
+    // Get host info with profile picture
+    const host = await Host.findOne({ userId: otherParticipant });
+    const user = await User.findById(otherParticipant).select('fullName username profilePicture');
 
     res.json({
       success: true,
       messages: formattedMessages,
-      conversationInfo,
+      conversationInfo: {
+        id: conversation._id,
+        hostName: user?.fullName || 'Unknown',
+        hostAvatar: user?.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'default'}`,
+        hostRating: host?.rating || 0,
+        hostReviews: host?.reviews || 0,
+        hostLocation: host?.location || '',
+        hostVerified: host?.verified || false
+      },
       pagination: {
         hasMore,
         nextCursor: hasMore ? messages[messages.length - 1]?.createdAt : null
       }
     });
-
   } catch (error) {
     console.error('❌ Get messages error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching messages',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error fetching messages'
     });
   }
 });
-
-// Helper function for message time formatting
-function formatTime(date) {
-  if (!date) return '';
-  
-  try {
-    const messageDate = new Date(date);
-    const now = new Date();
-    const diffMs = now - messageDate;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return messageDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  } catch (e) {
-    console.error('Error formatting message time:', e);
-    return '';
-  }
-}
 
 // Send message (Protected)
 app.post('/api/messages/send', authenticate, async (req, res) => {
@@ -8803,8 +7364,6 @@ app.use('*', (req, res) => {
     message: 'Route not found' 
   });
 });
-
-
 
 // Error handling middleware
 app.use((err, req, res, next) => {

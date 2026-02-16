@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, ArrowLeft, Search, Cloud, Loader2, AlertCircle } from 'lucide-react';
 import { TripDetails } from './TripDetails';
 
@@ -10,59 +10,63 @@ export function AllTrips({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ✅ FIX: Use useCallback to prevent unnecessary re-renders
-  const fetchTrips = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('No authentication token found. Please login.');
-      }
-      
-      const response = await fetch('http://localhost:5000/api/trips', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.status === 401) {
-        localStorage.removeItem('token');
-        throw new Error('Session expired. Please login again.');
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch trips: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setTrips(data.trips || []);
-        console.log('✅ Trips fetched:', data.trips?.length, 'trips');
-      } else {
-        throw new Error(data.message || 'Failed to fetch trips');
-      }
-    } catch (err) {
-      console.error('Error fetching trips:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // ✅ FIX: Fetch trips only once on mount
+  // Fetch trips from backend API
   useEffect(() => {
     fetchTrips();
-  }, [fetchTrips]);
+    
+    // Also refresh trips every 5 seconds to get updated statuses
+    const interval = setInterval(() => {
+      fetchTrips();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
-  // Function to manually refresh trips (for future use)
-  const handleRefresh = () => {
-    fetchTrips();
-  };
+  const fetchTrips = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get token from localStorage (assuming you store it there after login)
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          throw new Error('No authentication token found. Please login.');
+        }
+        
+        const response = await fetch('http://localhost:5000/api/trips', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.status === 401) {
+          // Token expired or invalid
+          localStorage.removeItem('token');
+          throw new Error('Session expired. Please login again.');
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch trips: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setTrips(data.trips || []);
+          console.log('✅ Trips fetched:', data.trips?.length, 'trips');
+          console.log('Trip statuses:', data.trips?.map(t => ({ destination: t.destination, status: t.status })));
+        } else {
+          throw new Error(data.message || 'Failed to fetch trips');
+        }
+      } catch (err) {
+        console.error('Error fetching trips:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   // Function to seed sample trips (for development)
   const seedSampleTrips = async () => {
@@ -174,7 +178,7 @@ export function AllTrips({ onBack }) {
             <p className="text-sm text-gray-600 mt-2 mb-6">{error}</p>
             <div className="flex gap-4">
               <button
-                onClick={handleRefresh}
+                onClick={() => window.location.reload()}
                 className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
                 Try Again

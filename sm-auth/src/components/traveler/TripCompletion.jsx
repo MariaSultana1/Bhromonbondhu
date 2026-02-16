@@ -1,273 +1,272 @@
 import { useState } from 'react';
-import { X, Star, Upload, Loader } from 'lucide-react';
-
-const API_URL = 'http://localhost:5000/api';
+import { Star, MessageSquare, Upload, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import axios from 'axios';
 
 export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
+  const [step, setStep] = useState('confirmation'); // confirmation, review, success
   const [rating, setRating] = useState(0);
-  const [hoveredRating, setHoveredRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
   const [review, setReview] = useState('');
   const [photos, setPhotos] = useState([]);
+  const [photoPreview, setPhotoPreview] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files);
-    const photoPromises = files.map(file => {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target.result);
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(photoPromises).then(base64Photos => {
-      setPhotos(prev => [...prev, ...base64Photos].slice(0, 3)); // Max 3 photos
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPhotoPreview(prev => [...prev, event.target.result]);
+        setPhotos(prev => [...prev, event.target.result]);
+      };
+      reader.readAsDataURL(file);
     });
   };
 
   const removePhoto = (index) => {
+    setPhotoPreview(prev => prev.filter((_, i) => i !== index));
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (rating === 0) {
-      setError('Please provide a rating');
-      return;
-    }
-
+  const handleCompleteTrip = async () => {
     try {
       setLoading(true);
       setError(null);
 
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found. Please login again.');
-      }
-
-      const endpoint = `${API_URL}/trips/${tripId}/complete`;
-      console.log('📤 Submitting trip completion to:', endpoint);
-      console.log('📤 Data:', {
-        tripId,
-        rating,
-        review: review.trim() || null,
-        photosCount: photos.length
-      });
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          rating,
+      
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/trips/${tripId}/complete`,
+        {
+          rating: rating > 0 ? rating : null,
           review: review.trim() || null,
-          photos
-        })
-      });
-
-      console.log('📥 Response status:', response.status);
-
-      if (!response.ok) {
-        // Try to get error message from response
-        let errorMessage = 'Failed to complete trip';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-          console.error('❌ Server error:', errorData);
-        } catch (parseError) {
-          console.error('❌ Could not parse error response');
+          photos: photos
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
-        throw new Error(errorMessage);
-      }
+      );
 
-      const data = await response.json();
-      console.log('✅ Trip completed successfully:', data);
-
-      // Call onCompleted callback with response data
-      if (onCompleted) {
-        onCompleted(data);
+      if (response.data.success) {
+        setStep('success');
+        
+        // Call the callback if provided
+        if (onCompleted) {
+          setTimeout(() => {
+            onCompleted(response.data);
+          }, 2000);
+        }
       }
     } catch (err) {
-      console.error('❌ Error completing trip:', err);
-      
-      // Provide more helpful error messages
-      if (err.message === 'Failed to fetch') {
-        setError('Cannot connect to server. Please check if the backend is running on http://localhost:5000');
-      } else if (err.message.includes('token')) {
-        setError('Authentication error. Please login again.');
-      } else {
-        setError(err.message);
-      }
+      console.error('Error completing trip:', err);
+      setError(err.response?.data?.message || 'Failed to complete trip. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999] overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
-          disabled={loading}
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Complete Your Journey</h2>
-          <p className="text-gray-600 mt-1">
-            {tripData.source} → {tripData.destination}
+  if (step === 'success') {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg p-8 max-w-md w-full text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Trip Completed!</h2>
+          <p className="text-gray-600 mb-4">
+            Thank you for completing your journey. Your trip has been recorded and stats updated.
           </p>
-          <p className="text-sm text-gray-500 mt-1">
-            {new Date(tripData.date).toLocaleDateString()}
-          </p>
+          <div className="bg-blue-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-600">📍 {tripData?.destination || 'Your Destination'}</p>
+            <p className="text-lg font-semibold text-blue-600">Status: Completed</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium"
+          >
+            Done
+          </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Rating */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Rate Your Experience <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(0)}
-                  className="transition-transform hover:scale-110 focus:outline-none"
-                >
-                  <Star
-                    className={`w-10 h-10 ${
-                      star <= (hoveredRating || rating)
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
-                    }`}
-                  />
-                </button>
-              ))}
-            </div>
-            {rating > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                {rating === 1 && '😞 Poor'}
-                {rating === 2 && '😐 Fair'}
-                {rating === 3 && '🙂 Good'}
-                {rating === 4 && '😊 Very Good'}
-                {rating === 5 && '🤩 Excellent'}
-              </p>
-            )}
+  if (step === 'confirmation') {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-4">Complete Trip?</h2>
+          
+          <div className="bg-blue-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-600 mb-1">📍 Destination</p>
+            <p className="text-lg font-semibold text-blue-600">{tripData?.destination || 'Unknown'}</p>
+            <p className="text-sm text-gray-600 mt-2">📅 Date: {tripData?.date || 'N/A'}</p>
           </div>
 
-          {/* Review */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Share Your Experience (Optional)
-            </label>
-            <textarea
-              value={review}
-              onChange={(e) => setReview(e.target.value)}
-              placeholder="Tell us about your journey..."
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              maxLength={500}
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {review.length}/500 characters
-            </p>
-          </div>
+          <p className="text-gray-600 mb-6">
+            Mark this trip as completed? You can optionally add a review and photos.
+          </p>
 
-          {/* Photos */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Add Photos (Optional, max 3)
-            </label>
-            
-            {photos.length < 3 && (
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <div className="text-center">
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload photos</p>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                  disabled={loading}
-                />
-              </label>
-            )}
-
-            {/* Photo Preview */}
-            {photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                {photos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={photo}
-                      alt={`Upload ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      disabled={loading}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <AlertCircle className="w-4 h-4 text-red-600 inline mr-2" />
+              <span className="text-red-600 text-sm">{error}</span>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3">
             <button
-              type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-              disabled={loading}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={loading || rating === 0}
-              className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              onClick={() => setStep('review')}
+              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"
             >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Completing...
-                </>
-              ) : (
-                'Complete Trip'
-              )}
+              Continue
             </button>
           </div>
-        </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Review step
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full my-8">
+        <h2 className="text-2xl font-bold mb-4">Share Your Experience</h2>
+        
+        {/* Star Rating */}
+        <div className="mb-6">
+          <label className="block text-gray-700 font-semibold mb-3">Rate Your Trip</label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoverRating(star)}
+                onMouseLeave={() => setHoverRating(0)}
+                className="focus:outline-none transition-transform hover:scale-110"
+              >
+                <Star
+                  className={`w-8 h-8 ${
+                    star <= (hoverRating || rating)
+                      ? 'fill-yellow-400 text-yellow-400'
+                      : 'text-gray-300'
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+          {rating > 0 && (
+            <p className="text-sm text-gray-600 mt-2">
+              {rating === 1 && 'Poor Experience'}
+              {rating === 2 && 'Fair Experience'}
+              {rating === 3 && 'Good Experience'}
+              {rating === 4 && 'Great Experience'}
+              {rating === 5 && 'Excellent Experience'}
+            </p>
+          )}
+        </div>
+
+        {/* Review Text */}
+        <div className="mb-6">
+          <label className="block text-gray-700 font-semibold mb-2">
+            <MessageSquare className="w-4 h-4 inline mr-2" />
+            Write a Review (Optional)
+          </label>
+          <textarea
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            placeholder="Share your experience, highlights, recommendations..."
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            rows="4"
+          />
+          <p className="text-sm text-gray-600 mt-1">{review.length}/500 characters</p>
+        </div>
+
+        {/* Photo Upload */}
+        <div className="mb-6">
+          <label className="block text-gray-700 font-semibold mb-2">
+            <Upload className="w-4 h-4 inline mr-2" />
+            Upload Photos (Optional)
+          </label>
+          
+          {/* Photo Preview */}
+          {photoPreview.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {photoPreview.map((photo, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={photo}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-24 object-cover rounded-lg"
+                  />
+                  <button
+                    onClick={() => removePhoto(index)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handlePhotoUpload}
+            className="block w-full text-sm text-gray-500
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-lg file:border-0
+              file:text-sm file:font-semibold
+              file:bg-blue-50 file:text-blue-700
+              hover:file:bg-blue-100"
+          />
+          <p className="text-sm text-gray-600 mt-1">{photoPreview.length} photos uploaded</p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <AlertCircle className="w-4 h-4 text-red-600 inline mr-2" />
+            <span className="text-red-600 text-sm">{error}</span>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setStep('confirmation')}
+            disabled={loading}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium disabled:opacity-50"
+          >
+            Back
+          </button>
+          <button
+            onClick={handleCompleteTrip}
+            disabled={loading}
+            className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                Completing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                Complete Trip
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
