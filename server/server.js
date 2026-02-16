@@ -17,6 +17,7 @@ app.use(cors({
   credentials: true
 }));
 
+
 // MongoDB Atlas Connection
 const connectDB = async () => {
   try {
@@ -508,6 +509,9 @@ tripSchema.pre('save', function(next) {
 });
 
 const Trip = mongoose.model('Trip', tripSchema);
+
+
+
 
 // Transportation Schema
 const transportationSchema = new mongoose.Schema({
@@ -8799,6 +8803,7 @@ app.use('*', (req, res) => {
     message: 'Route not found' 
   });
 });
+
 
 
 // Error handling middleware
