@@ -10,6 +10,7 @@ import {
   X,
   Settings,
   Loader,
+  MessageSquare,
 } from "lucide-react";
 
 import { HostHome } from './host/HostHome';
@@ -17,6 +18,7 @@ import { HostBookingsComplete } from './host/HostBookingsComplete';
 import { HostEarnings } from './host/HostEarnings';
 import { HostServicesComplete } from './host/HostServicesComplete';
 import { HostProfileComplete } from './host/HostProfileComplete';
+import { HostMessages } from './host/HostMessages';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -27,10 +29,13 @@ export default function HostDashboard({ user, onLogout }) {
   const [unreadBookings, setUnreadBookings] = useState(0);
   const [notifications, setNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedGuestId, setSelectedGuestId] = useState(null);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   const navigation = [
     { id: "home", label: "Dashboard", icon: Home },
     { id: "bookings", label: "Bookings", icon: Calendar },
+    { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "earnings", label: "Earnings", icon: DollarSign },
     { id: "services", label: "Services", icon: Settings },
     { id: "profile", label: "Profile", icon: UserIcon },
@@ -221,7 +226,8 @@ export default function HostDashboard({ user, onLogout }) {
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           {activeTab === "home" && <HostHome user={user} hostData={hostData} />}
-          {activeTab === "bookings" && <HostBookingsComplete hostData={hostData} />}
+          {activeTab === "bookings" && <HostBookingsComplete hostData={hostData} onMessageClick={(guestId, bookingId) => { setSelectedGuestId(guestId); setSelectedBookingId(bookingId); setActiveTab("messages"); }} />}
+          {activeTab === "messages" && <HostMessages selectedGuestId={selectedGuestId} selectedBookingId={selectedBookingId} />}
           {activeTab === "earnings" && <HostEarnings hostData={hostData} />}
           {activeTab === "services" && <HostServicesComplete hostData={hostData} />}
           {activeTab === "profile" && <HostProfileComplete user={user} hostData={hostData} onUpdate={() => fetchHostData()} />}

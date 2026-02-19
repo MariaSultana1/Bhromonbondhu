@@ -17,6 +17,7 @@ app.use(cors({
   credentials: true
 }));
 
+
 // MongoDB Atlas Connection
 const connectDB = async () => {
   try {
@@ -508,6 +509,9 @@ tripSchema.pre('save', function(next) {
 });
 
 const Trip = mongoose.model('Trip', tripSchema);
+
+
+
 
 // Transportation Schema
 const transportationSchema = new mongoose.Schema({
@@ -1804,6 +1808,10 @@ app.get('/api/traveler/stats', authenticate, async (req, res) => {
 // Book Transport Tickets (Store booking in database)
 app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
   try {
+    console.log('📥 Transport booking request received');
+    console.log('User:', req.user.email);
+    console.log('Body:', JSON.stringify(req.body, null, 2).substring(0, 500));
+
     const {
       bookingId,
       pnr,
@@ -1829,13 +1837,15 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
 
     // Validation
     if (!bookingId || !pnr || !transportType || !provider || !from || !to || !journeyDate) {
+      console.error('❌ Missing required booking information');
       return res.status(400).json({
         success: false,
-        message: 'Missing required booking information'
+        message: 'Missing required booking information: bookingId, pnr, transportType, provider, from, to, journeyDate'
       });
     }
 
     if (!passengers || passengers.length === 0) {
+      console.error('❌ No passengers provided');
       return res.status(400).json({
         success: false,
         message: 'At least one passenger is required'
@@ -1959,6 +1969,11 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
     // Generate transaction ID
     securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
+    console.log('💾 Creating TransportTicket document...');
+    console.log('TransportType:', transportType);
+    console.log('BookingID:', bookingId);
+    console.log('Passengers count:', passengers.length);
+
     // Create ticket booking in database
     const ticketBooking = new TransportTicket({
       userId: req.user._id,
@@ -1985,9 +2000,10 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
       status: 'confirmed'
     });
 
+    console.log('📝 Document created, now saving to database...');
     await ticketBooking.save();
 
-    console.log(`✅ Transport ticket booked: ${bookingId} for user: ${req.user.email}`);
+    console.log(`✅ Transport ticket booked successfully: ${bookingId} for user: ${req.user.email}`);
 
     res.status(201).json({
       success: true,
@@ -2000,18 +2016,32 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Transport ticket booking error:', error);
+    console.error('❌ Transport ticket booking error:', error.message);
+    console.error('Error stack:', error.stack);
     
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      console.error(`Duplicate key error on field: ${field}`);
       return res.status(400).json({
         success: false,
-        message: 'This booking ID or PNR already exists'
+        message: `This ${field} already exists. Please use a unique value.`
       });
     }
     
+    // Better error message
+    let errorMessage = 'Error saving ticket booking';
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      errorMessage = 'Validation Error: ' + messages.join(', ');
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    console.error('Error message:', errorMessage);
+    
     res.status(500).json({
       success: false,
-      message: 'Error saving ticket booking',
+      message: errorMessage,
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -4163,6 +4193,14 @@ const AI_CONFIG = {
 // Helper function to call OpenAI
 async function callOpenAI(messages, options = {}) {
   try {
+    // Validate API key exists
+    if (!AI_CONFIG.openai.apiKey) {
+      console.error('OpenAI API Key is missing or undefined');
+      throw new Error('OpenAI API key not configured');
+    }
+
+    console.log('Calling OpenAI API with model:', options.model || AI_CONFIG.openai.model);
+    
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
       model: options.model || AI_CONFIG.openai.model,
       messages: messages,
@@ -4175,10 +4213,23 @@ async function callOpenAI(messages, options = {}) {
       }
     });
 
+    console.log('OpenAI API call successful, tokens used:', response.data.usage?.total_tokens);
     return response.data;
   } catch (error) {
-    console.error('OpenAI API Error:', error.response?.data || error.message);
-    throw error;
+    console.error('OpenAI API Error Details:');
+    console.error('Status:', error.response?.status);
+    console.error('Status Text:', error.response?.statusText);
+    console.error('Data:', error.response?.data);
+    console.error('Message:', error.message);
+    
+    // Don't throw - let caller handle it
+    return {
+      error: true,
+      details: {
+        status: error.response?.status,
+        message: error.response?.data?.error?.message || error.message
+      }
+    };
   }
 }
 
@@ -4249,6 +4300,43 @@ app.post('/api/ai/mood-analysis', authenticate, async (req, res) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ]);
+
+    // Check if AI call failed
+    if (aiResponse.error) {
+      console.warn('OpenAI API call failed, using fallback database recommendations');
+      // Use fallback recommendations from database
+      const fallbackDestinations = await Destination.find()
+        .select('name description image coordinates safetyScore estimatedCost highlights')
+        .limit(4);
+      
+      const destinationsWithImages = fallbackDestinations.map((dest, index) => ({
+        id: index + 1,
+        name: dest.name,
+        description: dest.description,
+        image: dest.image,
+        coordinates: dest.coordinates,
+        safetyScore: dest.safetyScore || 70,
+        matchScore: 75,
+        bestTime: 'Throughout the year',
+        estimatedCost: dest.estimatedCost || 'Varies',
+        highlights: dest.highlights || [],
+        recommendations: ['Check local weather', 'Book in advance', 'Visit local markets']
+      }));
+
+      res.json({
+        success: true,
+        message: 'Recommendations generated with fallback method',
+        analysisId: null,
+        destinations: destinationsWithImages,
+        usingFallback: true,
+        personalization: {
+          basedOnTrips: userTrips.length,
+          accuracy: 70
+        },
+        processingTime: Date.now() - startTime
+      });
+      return;
+    }
 
     const content = aiResponse.choices[0]?.message?.content;
     let destinations = [];
@@ -4408,6 +4496,60 @@ app.post('/api/ai/itineraries', authenticate, async (req, res) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ]);
+
+    // Check if AI call failed
+    if (aiResponse.error) {
+      console.warn('OpenAI API call failed for itinerary, using fallback template');
+      // Use fallback itinerary template
+      const fallbackDays = [];
+      const daysCount = parseInt(duration.split(' ')[0]) || 3;
+      
+      for (let i = 1; i <= daysCount; i++) {
+        fallbackDays.push({
+          dayNumber: i,
+          title: `Day ${i} - Exploration`,
+          activities: [
+            { time: '09:00', activity: 'Early morning travel', duration: '1 hour' },
+            { time: '10:00', activity: 'Local attractions and sightseeing', duration: '3 hours' },
+            { time: '13:00', activity: 'Lunch break', duration: '1 hour' },
+            { time: '14:00', activity: 'Cultural immersion activities', duration: '3 hours' },
+            { time: '19:00', activity: 'Dinner at local restaurant', duration: '1.5 hours' }
+          ],
+          totalCost: Math.floor(parseInt(budget) / daysCount)
+        });
+      }
+
+      const itinerary = new Itinerary({
+        userId: req.user._id,
+        title: `${duration} Trip to ${destination}`,
+        destinationName: destination,
+        duration: {
+          days: daysCount,
+          nights: daysCount - 1
+        },
+        budget: {
+          total: parseInt(budget),
+          currency: 'BDT'
+        },
+        travelers: { adults: travelers },
+        days: fallbackDays,
+        aiGenerated: true,
+        status: 'draft',
+        usingFallback: true
+      });
+
+      await itinerary.save();
+
+      res.status(201).json({
+        success: true,
+        message: 'Itinerary generated with fallback method',
+        itineraryId: itinerary._id,
+        itinerary: itinerary,
+        usingFallback: true,
+        processingTime: Date.now() - startTime
+      });
+      return;
+    }
 
     const content = aiResponse.choices[0]?.message?.content;
     let itineraryData;
@@ -4590,6 +4732,61 @@ app.post('/api/ai/risk-analyses', authenticate, async (req, res) => {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ]);
+
+    // Check if AI call failed
+    if (aiResponse.error) {
+      console.warn('OpenAI API call failed for risk analysis, using fallback assessment');
+      // Use fallback risk assessment
+      const riskAnalysis = new RiskAnalysis({
+        userId: req.user._id,
+        destination,
+        travelDates: {
+          from: new Date(travelDate),
+          to: duration ? 
+            new Date(new Date(travelDate).getTime() + (parseInt(duration.split(' ')[0]) || 3) * 24 * 60 * 60 * 1000) :
+            new Date(new Date(travelDate).getTime() + 3 * 24 * 60 * 60 * 1000)
+        },
+        riskFactors: [
+          { factor: 'Weather', score: 60, description: 'Check local forecast before travel' },
+          { factor: 'Transportation', score: 65, description: 'Use registered taxis and ride-sharing apps' },
+          { factor: 'Health', score: 55, description: 'Ensure vaccinations are up to date' }
+        ],
+        overallRisk: {
+          level: 'medium',
+          score: 60,
+          colorCode: '#FFA500'
+        },
+        alerts: ['Check local travel advisories', 'Register with embassy'],
+        recommendations: [
+          'Register with your embassy',
+          'Carry travel insurance',
+          'Share itinerary with family',
+          'Avoid isolated areas at night'
+        ],
+        monitoring: {
+          active: true,
+          frequency: 'daily',
+          lastChecked: new Date(),
+          nextCheck: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        }
+      });
+
+      await riskAnalysis.save();
+
+      res.json({
+        success: true,
+        message: 'Risk analysis completed with fallback method',
+        riskAnalysisId: riskAnalysis._id,
+        destination,
+        travelDate,
+        overallRisk: riskAnalysis.overallRisk,
+        riskFactors: riskAnalysis.riskFactors,
+        alerts: riskAnalysis.alerts,
+        recommendations: riskAnalysis.recommendations,
+        usingFallback: true
+      });
+      return;
+    }
 
     const content = aiResponse.choices[0]?.message?.content;
     let riskData;
@@ -8164,7 +8361,7 @@ app.get('/api/community/posts', authenticate, async (req, res) => {
     const posts = await CommunityPost.find(query)
       .populate({
         path: 'userId',
-        select: 'username fullName'
+        select: 'username fullName profilePicture'
       })
       .populate({
         path: 'likes.userId',
@@ -8172,7 +8369,7 @@ app.get('/api/community/posts', authenticate, async (req, res) => {
       })
       .populate({
         path: 'comments.userId',
-        select: 'username fullName'
+        select: 'username fullName profilePicture'
       })
       .sort(sortOptions)
       .skip(skip)
@@ -8188,6 +8385,7 @@ app.get('/api/community/posts', authenticate, async (req, res) => {
         id: post.userId._id,
         name: post.userId.fullName,
         username: post.userId.username,
+        profilePicture: post.userId.profilePicture || null,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.userId.username}`
       },
       likes: post.likes.length,
@@ -8265,6 +8463,77 @@ app.post('/api/community/posts/:id/like', authenticate, async (req, res) => {
   }
 });
 
+// Get full post with all comments populated
+app.get('/api/community/posts/:id/full', authenticate, async (req, res) => {
+  try {
+    const post = await CommunityPost.findById(req.params.id)
+      .populate({
+        path: 'userId',
+        select: 'username fullName profilePicture'
+      })
+      .populate({
+        path: 'likes.userId',
+        select: '_id'
+      })
+      .populate({
+        path: 'comments.userId',
+        select: 'username fullName profilePicture'
+      });
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    // Format the full post with comments array
+    const formattedPost = {
+      _id: post._id,
+      content: post.content,
+      image: post.image,
+      location: post.location,
+      author: {
+        id: post.userId._id,
+        name: post.userId.fullName,
+        username: post.userId.username,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.userId.username}`
+      },
+      likes: post.likes.length,
+      shares: post.shares,
+      liked: post.likes.some(like => like.userId?._id?.toString() === req.user._id.toString()),
+      tags: post.tags,
+      createdAt: post.createdAt,
+      timeAgo: getTimeAgo(post.createdAt),
+      comments: post.comments.map(comment => ({
+        id: comment._id,
+        content: comment.content,
+        author: {
+          id: comment.userId._id,
+          name: comment.userId.fullName,
+          username: comment.userId.username,
+          profilePicture: comment.userId.profilePicture || null,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.userId.username}`
+        },
+        createdAt: comment.createdAt,
+        timeAgo: getTimeAgo(comment.createdAt)
+      }))
+    };
+
+    res.json({
+      success: true,
+      post: formattedPost
+    });
+  } catch (error) {
+    console.error('Error fetching full post:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching post',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Add comment to post
 app.post('/api/community/posts/:id/comments', authenticate, async (req, res) => {
   try {
@@ -8297,7 +8566,7 @@ app.post('/api/community/posts/:id/comments', authenticate, async (req, res) => 
     // Populate user for the new comment
     await post.populate({
       path: 'comments.userId',
-      select: 'username fullName'
+      select: 'username fullName profilePicture'
     });
 
     const newComment = post.comments[post.comments.length - 1];
@@ -8312,6 +8581,7 @@ app.post('/api/community/posts/:id/comments', authenticate, async (req, res) => 
           id: newComment.userId._id,
           name: newComment.userId.fullName,
           username: newComment.userId.username,
+          profilePicture: newComment.userId.profilePicture || null,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newComment.userId.username}`
         },
         createdAt: newComment.createdAt,
@@ -8799,6 +9069,7 @@ app.use('*', (req, res) => {
     message: 'Route not found' 
   });
 });
+
 
 
 // Error handling middleware

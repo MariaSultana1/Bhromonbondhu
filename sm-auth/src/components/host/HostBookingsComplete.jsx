@@ -80,12 +80,12 @@ const bookings = [
   }
 ];
 
-export function HostBookingsComplete() {
+export function HostBookingsComplete({ onMessageClick }) {
   const [filterType, setFilterType] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showViewDetails, setShowViewDetails] = useState(false);
   const [showModify, setShowModify] = useState(false);
-  const [showMessageGuest, setShowMessageGuest] = useState(false);
+
   const [showReceipt, setShowReceipt] = useState(false);
   const [showRequestReview, setShowRequestReview] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -255,7 +255,9 @@ export function HostBookingsComplete() {
                   <button
                     onClick={() => {
                       setSelectedBooking(booking);
-                      setShowMessageGuest(true);
+                      if (onMessageClick) {
+                        onMessageClick(booking.userId?._id || booking.userId, booking._id);
+                      }
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                   >
@@ -606,59 +608,7 @@ export function HostBookingsComplete() {
       )}
 
       
-      {showMessageGuest && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-500 text-white p-6">
-              <h3 className="text-2xl">Message Guest</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                <img
-                  src={selectedBooking.avatar}
-                  alt={selectedBooking.traveler}
-                  className="w-12 h-12 rounded-full"
-                />
-                <div>
-                  <div>{selectedBooking.traveler}</div>
-                  <div className="text-sm text-gray-600">{selectedBooking.email}</div>
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Subject</label>
-                <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500">
-                  <option>Check-in Instructions</option>
-                  <option>Service Details</option>
-                  <option>Schedule Change</option>
-                  <option>General Message</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Message</label>
-                <textarea
-                  placeholder="Type your message here..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                  rows={5}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowMessageGuest(false)}
-                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600">
-                  Send Message
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       
       {showReceipt && selectedBooking && (

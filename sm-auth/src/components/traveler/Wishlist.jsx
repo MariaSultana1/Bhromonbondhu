@@ -1,92 +1,133 @@
-import { Heart, MapPin, DollarSign, Calendar, ArrowLeft, Plus, Trash2, ExternalLink, Sun, Star } from 'lucide-react';
-import { useState } from 'react';
-
-const wishlistItems = [
-  {
-    id: 1,
-    destination: 'Bandarban',
-    image: 'https://images.unsplash.com/photo-1578592391689-0e3d1a1b52b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3VudGFpbiUyMGhpa2luZ3xlbnwxfHx8fDE3NjU0MzkxNzd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    estimatedCost: '৳15,000',
-    duration: '3-4 days',
-    bestTime: 'Nov - Feb',
-    description: 'Experience the hills, tribal culture, and breathtaking mountain views',
-    activities: ['Trekking', 'Hiking', 'Photography', 'Cultural Tour'],
-    rating: 4.8,
-    difficulty: 'Moderate'
-  },
-  {
-    id: 2,
-    destination: 'Kuakata',
-    image: 'https://images.unsplash.com/photo-1647962431451-d0fdaf1cf21c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldHxlbnwxfHx8fDE3NjU0MjY2MDl8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    estimatedCost: '৳8,000',
-    duration: '2-3 days',
-    bestTime: 'Oct - Mar',
-    description: 'Panoramic sea beach where you can see both sunrise and sunset',
-    activities: ['Beach', 'Photography', 'Relaxation', 'Seafood'],
-    rating: 4.6,
-    difficulty: 'Easy'
-  },
-  {
-    id: 3,
-    destination: 'Sajek Valley',
-    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
-    estimatedCost: '৳12,000',
-    duration: '2-3 days',
-    bestTime: 'Oct - Apr',
-    description: 'Queen of hills with spectacular cloud views and tribal villages',
-    activities: ['Cloud Watching', 'Camping', 'Trekking', 'Sunrise View'],
-    rating: 4.9,
-    difficulty: 'Moderate'
-  },
-  {
-    id: 4,
-    destination: 'Saint Martin',
-    image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
-    estimatedCost: '৳18,000',
-    duration: '3-4 days',
-    bestTime: 'Nov - Mar',
-    description: 'Only coral island in Bangladesh with crystal clear water',
-    activities: ['Swimming', 'Snorkeling', 'Beach', 'Island Tour'],
-    rating: 4.7,
-    difficulty: 'Easy'
-  },
-  {
-    id: 5,
-    destination: 'Sreemangal',
-    image: 'https://images.unsplash.com/photo-1564890109542-586e1beb7461?w=800',
-    estimatedCost: '৳10,000',
-    duration: '2-3 days',
-    bestTime: 'Oct - Mar',
-    description: 'Tea capital with lush green gardens and serene natural beauty',
-    activities: ['Tea Garden Tour', 'Wildlife', 'Nature Walk', 'Bird Watching'],
-    rating: 4.5,
-    difficulty: 'Easy'
-  },
-  {
-    id: 6,
-    destination: 'Paharpur',
-    image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?w=800',
-    estimatedCost: '৳7,000',
-    duration: '1-2 days',
-    bestTime: 'Oct - Feb',
-    description: 'Ancient Buddhist monastery and UNESCO World Heritage Site',
-    activities: ['History', 'Architecture', 'Photography', 'Cultural Tour'],
-    rating: 4.4,
-    difficulty: 'Easy'
-  }
-];
+import { Heart, MapPin, DollarSign, Calendar, ArrowLeft, Plus, Trash2, ExternalLink, Sun, Star, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export function Wishlist({ onBack }) {
-  const [items, setItems] = useState(wishlistItems);
+  const [items, setItems] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    destination: '',
+    description: '',
+    image: '',
+    estimatedCost: '',
+    duration: '',
+    bestTime: '',
+    activities: [],
+    difficulty: 'Moderate',
+    rating: 5
+  });
 
-  const removeFromWishlist = (id) => {
-    setItems(items.filter(item => item.id !== id));
+  const API_URL = 'http://localhost:5000/api';
+
+  // Fetch wishlists on mount
+  useEffect(() => {
+    fetchWishlists();
+  }, []);
+
+  const fetchWishlists = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/wishlists`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch wishlist');
+      }
+
+      const data = await response.json();
+      setItems(data.wishlists || []);
+    } catch (err) {
+      console.error('Error fetching wishlists:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addToWishlist = async (e) => {
+    e.preventDefault();
+    if (!formData.destination.trim()) {
+      alert('Please enter a destination');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(`${API_URL}/wishlists`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add to wishlist');
+      }
+
+      const data = await response.json();
+      setItems([...items, data.wishlist]);
+      setFormData({
+        destination: '',
+        description: '',
+        image: '',
+        estimatedCost: '',
+        duration: '',
+        bestTime: '',
+        activities: [],
+        difficulty: 'Moderate',
+        rating: 5
+      });
+      setShowAddModal(false);
+    } catch (err) {
+      console.error('Error adding to wishlist:', err);
+      alert(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const removeFromWishlist = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/wishlists/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove from wishlist');
+      }
+
+      setItems(items.filter(item => item._id !== id));
+    } catch (err) {
+      console.error('Error removing from wishlist:', err);
+      alert(err.message);
+    }
   };
 
   const totalEstimatedCost = items.reduce((sum, item) => {
-    const cost = parseInt(item.estimatedCost.replace(/[৳,]/g, ''));
-    return sum + cost;
+    const costStr = typeof item.estimatedCost === 'number' ? item.estimatedCost : parseInt(String(item.estimatedCost).replace(/[৳,]/g, '')) || 0;
+    return sum + (costStr || 0);
   }, 0);
 
   return (
@@ -159,9 +200,31 @@ export function Wishlist({ onBack }) {
       </div>
 
 
+      {loading && (
+        <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading wishlist...</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-red-200 bg-red-50">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <p className="text-red-700 font-semibold">{error}</p>
+          </div>
+          <button
+            onClick={fetchWishlists}
+            className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map((item) => (
-          <div key={item.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group">
+          <div key={item._id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 group">
             <div className="relative h-56 overflow-hidden">
               <img
                 src={item.image}
@@ -169,7 +232,7 @@ export function Wishlist({ onBack }) {
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
               <button
-                onClick={() => removeFromWishlist(item.id)}
+                onClick={() => removeFromWishlist(item._id)}
                 className="absolute top-4 right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-red-50 transition-all"
               >
                 <Heart className="w-5 h-5 text-red-500 fill-red-500" />
@@ -192,7 +255,7 @@ export function Wishlist({ onBack }) {
                     <DollarSign className="w-4 h-4" />
                     <span>Estimated Cost</span>
                   </div>
-                  <span className="text-green-600">{item.estimatedCost}</span>
+                  <span className="text-green-600">৳{typeof item.estimatedCost === 'number' ? item.estimatedCost.toLocaleString() : item.estimatedCost}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
@@ -213,12 +276,12 @@ export function Wishlist({ onBack }) {
               <div className="mb-4">
                 <div className="text-xs text-gray-500 mb-2">Activities</div>
                 <div className="flex flex-wrap gap-2">
-                  {item.activities.slice(0, 3).map((activity, idx) => (
+                  {(item.activities || []).slice(0, 3).map((activity, idx) => (
                     <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg">
                       {activity}
                     </span>
                   ))}
-                  {item.activities.length > 3 && (
+                  {(item.activities || []).length > 3 && (
                     <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg">
                       +{item.activities.length - 3} more
                     </span>
@@ -255,54 +318,166 @@ export function Wishlist({ onBack }) {
         </div>
       )}
 
-      {items.length > 0 && (
+      {!loading && !error && items.length > 0 && (
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
           <h4 className="text-blue-900 mb-3">Trip Planning Helper</h4>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white/50 p-4 rounded-xl">
-              <div className="text-xs text-gray-600 mb-1">Budget Range</div>
-              <div className="text-lg text-blue-600">৳7K - ৳18K</div>
+              <div className="text-xs text-gray-600 mb-1">Total Budget</div>
+              <div className="text-lg text-blue-600">৳{(totalEstimatedCost / 1000).toFixed(0)}K</div>
             </div>
             <div className="bg-white/50 p-4 rounded-xl">
-              <div className="text-xs text-gray-600 mb-1">Avg Duration</div>
-              <div className="text-lg text-blue-600">2-3 days</div>
+              <div className="text-xs text-gray-600 mb-1">Destinations Count</div>
+              <div className="text-lg text-blue-600">{items.length}</div>
             </div>
             <div className="bg-white/50 p-4 rounded-xl">
-              <div className="text-xs text-gray-600 mb-1">Best Season</div>
-              <div className="text-lg text-blue-600">Nov - Mar</div>
+              <div className="text-xs text-gray-600 mb-1">Avg Rating</div>
+              <div className="text-lg text-blue-600">{(items.reduce((sum, item) => sum + (item.rating || 0), 0) / items.length).toFixed(1)}</div>
             </div>
           </div>
           <p className="text-sm text-blue-800 mt-4">
-            Based on your wishlist, we recommend planning 3-4 trips to cover all destinations. Start with easier destinations during the best season!
+            Based on your wishlist, we recommend starting with your highest-rated destinations during their best seasons!
           </p>
         </div>
       )}
 
  
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl my-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl">Add Destination</h3>
+              <h3 className="text-2xl font-bold">Add to Wishlist</h3>
               <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <Plus className="w-6 h-6 rotate-45" />
               </button>
             </div>
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Destination name"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-              <textarea
-                placeholder="Why do you want to visit?"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                rows={3}
-              />
-              <button className="w-full py-4 bg-red-500 text-white rounded-xl hover:bg-red-600 shadow-md transition-all">
-                Add to Wishlist
+            <form onSubmit={addToWishlist} className="space-y-4">
+              {/* Destination */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Destination *</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Cox's Bazar, Sylhet"
+                  value={formData.destination}
+                  onChange={(e) => setFormData({...formData, destination: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  placeholder="Why do you want to visit? What interests you about this place?"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Image URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.image}
+                  onChange={(e) => setFormData({...formData, image: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Estimated Cost */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Est. Cost (৳)</label>
+                  <input
+                    type="number"
+                    placeholder="10000"
+                    value={formData.estimatedCost}
+                    onChange={(e) => setFormData({...formData, estimatedCost: parseInt(e.target.value) || ''})}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 2-3 days"
+                    value={formData.duration}
+                    onChange={(e) => setFormData({...formData, duration: e.target.value})}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Best Time */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Best Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Oct - Mar"
+                    value={formData.bestTime}
+                    onChange={(e) => setFormData({...formData, bestTime: e.target.value})}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                {/* Difficulty */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Difficulty</label>
+                  <select
+                    value={formData.difficulty}
+                    onChange={(e) => setFormData({...formData, difficulty: e.target.value})}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option>Easy</option>
+                    <option>Moderate</option>
+                    <option>Hard</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rating (1-5)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="0.1"
+                  value={formData.rating}
+                  onChange={(e) => setFormData({...formData, rating: parseFloat(e.target.value) || 5})}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              {/* Activities */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Activities (comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Trekking, Photography, Cultural Tour"
+                  value={formData.activities.join(', ')}
+                  onChange={(e) => setFormData({...formData, activities: e.target.value.split(',').map(a => a.trim()).filter(a => a)})}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-4 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:opacity-50 shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Heart className="w-5 h-5" />}
+                {submitting ? 'Adding...' : 'Add to Wishlist'}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

@@ -76,7 +76,7 @@ const apiService = {
 
   getTrendingDestinations: async () => {
     try {
-      const response = await fetch(`${API_URL}/community/trending`, {
+      const response = await fetch(`${API_URL}/trips/trending`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -84,16 +84,28 @@ const apiService = {
       if (!response.ok) throw new Error('Failed to fetch trending');
       const data = await response.json();
       
-      if (data.success && data.trendingTopics) {
-        return data.trendingTopics.slice(0, 3).map((topic, idx) => ({
-          id: idx + 1,
-          name: topic.tag.replace('#', ''),
-          rating: 4.5 + Math.random() * 0.5
-        }));
+      if (data.success && data.destinations) {
+        return data.destinations;
       }
       return [];
     } catch (error) {
       console.error('Error fetching trending destinations:', error);
+      return [];
+    }
+  },
+
+  getWishlists: async () => {
+    try {
+      const response = await fetch(`${API_URL}/wishlists`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch wishlists');
+      const data = await response.json();
+      return data.wishlists || [];
+    } catch (error) {
+      console.error('Error fetching wishlists:', error);
       return [];
     }
   },
@@ -150,11 +162,13 @@ export function TravelerHome({ user }) {
     travelPoints: 0
   });
   const [trendingDestinations, setTrendingDestinations] = useState([]);
+  const [wishlists, setWishlists] = useState([]);
   const [loading, setLoading] = useState({
     trips: false,
     community: false,
     stats: false,
-    trending: false
+    trending: false,
+    wishlists: false
   });
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -167,14 +181,16 @@ export function TravelerHome({ user }) {
         trips: true,
         community: true,
         stats: true,
-        trending: true
+        trending: true,
+        wishlists: true
       });
       
-      const [tripsData, allTripsData, postsData, trendingData] = await Promise.allSettled([
+      const [tripsData, allTripsData, postsData, trendingData, wishlistsData] = await Promise.allSettled([
         apiService.getUpcomingTrips(user.id),
         apiService.getAllTrips(user.id), // ✅ NEW: Fetch all trips
         apiService.getCommunityPosts(user.id),
-        apiService.getTrendingDestinations()
+        apiService.getTrendingDestinations(),
+        apiService.getWishlists()
       ]);
 
       if (tripsData.status === 'fulfilled') {
@@ -203,6 +219,14 @@ export function TravelerHome({ user }) {
         setTrendingDestinations(trendingData.value || []);
       }
 
+      if (wishlistsData.status === 'fulfilled') {
+        setWishlists(wishlistsData.value || []);
+        console.log('✅ Wishlists loaded:', wishlistsData.value.length);
+      } else {
+        console.error('Failed to load wishlists:', wishlistsData.reason);
+        setWishlists([]);
+      }
+
     } catch (err) {
       setError('Failed to load data. Please check your connection and try again.');
       console.error('Error in fetchAllData:', err);
@@ -212,7 +236,8 @@ export function TravelerHome({ user }) {
         trips: false,
         community: false,
         stats: false,
-        trending: false
+        trending: false,
+        wishlists: false
       });
     }
   }, [user?.id]);
@@ -476,10 +501,11 @@ export function TravelerHome({ user }) {
             ) : communityPosts.length > 0 ? (
               <div className="space-y-4">
                 {communityPosts.slice(0, 2).map((post) => (
-                  <div key={post._id || post.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                  <div key={post._id || post.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors" onClick={() => setView('community')}>
                     <div className="flex items-center gap-3 mb-3">
                       <img
-                        src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.name}`}
+                        src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`}
+                        onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}` }}
                         alt={post.author?.name}
                         className="w-10 h-10 rounded-full"
                       />
@@ -499,12 +525,17 @@ export function TravelerHome({ user }) {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <button 
                         className={`flex items-center gap-1 transition-colors ${post.liked ? 'text-red-500' : 'hover:text-red-500'}`}
-                        onClick={() => handleLikePost(post._id || post.id)}
+                        onClick={(e) => { e.stopPropagation(); handleLikePost(post._id || post.id); }}
                       >
                         <Heart className={`w-4 h-4 ${post.liked ? 'fill-current' : ''}`} />
                         {post.likes || 0}
                       </button>
-                      <span>{post.comments || 0} comments</span>
+                      <button 
+                        className="flex items-center gap-1 hover:text-blue-500 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); setView('community'); }}
+                      >
+                        {Array.isArray(post.comments) ? post.comments.length : post.comments || 0} comments
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -525,6 +556,29 @@ export function TravelerHome({ user }) {
 
         {/* Right Column */}
         <div className="space-y-6">
+          {/* Trending Now */}
+          <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 shadow-sm border border-blue-100">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-blue-900">Trending Now</h3>
+            </div>
+            <div className="space-y-2">
+              {trendingDestinations.length > 0 ? (
+                trendingDestinations.slice(0, 5).map((dest, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 hover:bg-white rounded-lg transition-colors cursor-pointer">
+                    <div>
+                      <p className="font-medium text-blue-900">{dest.destination}</p>
+                      <p className="text-xs text-blue-600">{dest.count} people visiting</p>
+                    </div>
+                    <span className="text-lg font-bold text-blue-300">#{idx + 1}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-blue-600 text-center py-3">No trending destinations yet</p>
+              )}
+            </div>
+          </section>
+
           {/* Stats */}
           <section className="bg-white rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-semibold mb-4">Your Stats</h3>
@@ -564,19 +618,69 @@ export function TravelerHome({ user }) {
                 className="text-sm text-blue-500 hover:underline"
                 onClick={() => setView('wishlist')}
               >
-                Edit
+                {wishlists.length > 0 ? 'See All' : 'Add'}
               </button>
             </div>
-            <div className="text-center py-8 text-gray-500">
-              <Heart className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-              <p>Your wishlist is empty</p>
-              <button 
-                className="mt-2 text-blue-500 hover:underline text-sm"
-                onClick={() => setView('wishlist')}
-              >
-                Add your first destination
-              </button>
-            </div>
+            
+            {loading.wishlists ? (
+              <LoadingSkeleton type="card" count={2} />
+            ) : wishlists.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {wishlists.slice(0, 3).map((item) => (
+                  <div 
+                    key={item._id} 
+                    className="p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setView('wishlist')}
+                  >
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.destination}
+                        className="w-full h-32 object-cover rounded-lg mb-2"
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080';
+                        }}
+                      />
+                    )}
+                    <h4 className="font-medium text-gray-900 mb-1 line-clamp-1">{item.destination}</h4>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      {item.estimatedCost > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span>Est. Cost:</span>
+                          <span className="text-gray-800">৳{item.estimatedCost.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {item.duration && (
+                        <div className="flex items-center justify-between">
+                          <span>Duration:</span>
+                          <span className="text-gray-800">{item.duration}</span>
+                        </div>
+                      )}
+                      {item.rating > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span>Rating:</span>
+                          <div className="flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                            <span className="text-gray-800">{item.rating}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Heart className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">Your wishlist is empty</p>
+                <button 
+                  className="mt-2 text-blue-500 hover:underline text-sm"
+                  onClick={() => setView('wishlist')}
+                >
+                  Add your first destination
+                </button>
+              </div>
+            )}
           </section>
 
           {/* Trending */}
