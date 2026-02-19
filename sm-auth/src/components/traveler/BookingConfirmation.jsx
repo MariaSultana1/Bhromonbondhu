@@ -114,8 +114,8 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl sm:max-w-3xl my-4 sm:my-8">
         {/* Success Header */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-8 rounded-t-xl text-center">
           <CheckCircle className="w-20 h-20 mx-auto mb-4" />
@@ -125,9 +125,9 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
           </p>
         </div>
 
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {/* PNR and Booking ID */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-700 mb-1">Booking ID</p>
               <p className="text-xl font-bold text-blue-900">{booking.bookingId}</p>
@@ -174,14 +174,14 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4">
               <div>
                 <div className="flex items-center gap-2 text-gray-600 mb-2">
                   <MapPin className="w-4 h-4" />
                   <span className="text-sm">From</span>
                 </div>
-                <p className="text-xl font-semibold text-gray-900">{ticket.from}</p>
-                <p className="text-gray-600">
+                <p className="text-lg sm:text-xl font-semibold text-gray-900">{ticket.from}</p>
+                <p className="text-gray-600 text-sm">
                   {new Date(`2000-01-01T${ticket.departureTime}`).toLocaleTimeString('en-US', { 
                     hour: '2-digit', 
                     minute: '2-digit',
@@ -195,8 +195,8 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
                   <MapPin className="w-4 h-4" />
                   <span className="text-sm">To</span>
                 </div>
-                <p className="text-xl font-semibold text-gray-900">{ticket.to}</p>
-                <p className="text-gray-600">
+                <p className="text-lg sm:text-xl font-semibold text-gray-900">{ticket.to}</p>
+                <p className="text-gray-600 text-sm">
                   {new Date(`2000-01-01T${ticket.arrivalTime}`).toLocaleTimeString('en-US', { 
                     hour: '2-digit', 
                     minute: '2-digit',
@@ -205,18 +205,24 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
                 </p>
               </div>
             </div>
+            
+            {/* Journey Date */}
+            <div className="flex items-center gap-2 text-gray-600 mt-4 pt-4 border-t border-gray-200">
+              <Calendar className="w-4 h-4" />
+              <span className="text-sm">Journey Date: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            </div>
           </div>
 
           {/* Passenger Details */}
-          <div className="border border-gray-200 rounded-lg p-6 mb-6">
+          <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-gray-600" />
               <h3 className="font-semibold text-lg text-gray-900">Passenger Details</h3>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {booking.tickets.map((passengerTicket, index) => (
-                <div key={index} className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+                <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-gray-50 p-3 sm:p-4 rounded-lg gap-2">
                   <div>
                     <p className="font-medium text-gray-900">{passengerTicket.passengerName}</p>
                     <p className="text-sm text-gray-600">Ticket: {passengerTicket.ticketNumber}</p>
@@ -231,7 +237,7 @@ export function BookingConfirmation({ booking, ticket, onClose }) {
           </div>
 
           {/* Payment Summary */}
-          <div className="border border-gray-200 rounded-lg p-6 mb-6">
+          <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard className="w-5 h-5 text-gray-600" />
               <h3 className="font-semibold text-lg text-gray-900">Payment Summary</h3>

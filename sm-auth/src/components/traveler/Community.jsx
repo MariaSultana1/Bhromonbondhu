@@ -1,7 +1,73 @@
-import { Heart, MessageCircle, Share2, ArrowLeft, Send, Image as ImageIcon, MapPin, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { Heart, MessageCircle, Share2, ArrowLeft, Send, Image as ImageIcon, MapPin, TrendingUp, Loader2, AlertCircle, X, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
+// Helper to get initials from name
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
+// Generate color based on name
+const getColorFromName = (name) => {
+  const colors = [
+    'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  ];
+  const hash = (name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
+// Avatar component with fallbacks
+const AvatarDisplay = ({ profilePicture, name, username, className = 'w-12 h-12' }) => {
+  const [imageError, setImageError] = useState(false);
+  const [useInitials, setUseInitials] = useState(!profilePicture);
+
+  if (profilePicture && !imageError && !useInitials) {
+    return (
+      <img
+        src={profilePicture}
+        alt={name}
+        className={`${className} rounded-full object-cover border-2 border-gray-200`}
+        onError={() => setImageError(true)}
+      />
+    );
+  }
+
+  if (!useInitials) {
+    return (
+      <img
+        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`}
+        alt={name}
+        className={`${className} rounded-full object-cover border-2 border-gray-200`}
+        onError={() => setUseInitials(true)}
+      />
+    );
+  }
+
+  // Fallback: Show initials or user icon
+  const initials = getInitials(name);
+  if (initials && initials !== '?') {
+    return (
+      <div className={`${className} rounded-full ${getColorFromName(name)} flex items-center justify-center text-white font-bold text-sm border-2 border-gray-200`}>
+        {initials}
+      </div>
+    );
+  }
+
+  // Final fallback: User icon
+  return (
+    <div className={`${className} rounded-full bg-gray-300 flex items-center justify-center border-2 border-gray-200`}>
+      <User className="w-6 h-6 text-gray-600" />
+    </div>
+  );
+};
+
 export function Community({ onBack }) {
+  const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [trendingTopics, setTrendingTopics] = useState([]);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
@@ -13,9 +79,35 @@ export function Community({ onBack }) {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+  const [newComment, setNewComment] = useState('');
+  const [followingLoading, setFollowingLoading] = useState({});
+  const [commentPostId, setCommentPostId] = useState(null);
+
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('http://localhost:5000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+  };
 
   // Fetch community data
   useEffect(() => {
+    fetchUserProfile();
     fetchCommunityData();
     fetchTrendingTopics();
     fetchSuggestedUsers();
@@ -216,6 +308,145 @@ export function Community({ onBack }) {
     }
   };
 
+  const handleFollow = async (userId) => {
+    try {
+      setFollowingLoading(prev => ({ ...prev, [userId]: true }));
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`http://localhost:5000/api/community/users/${userId}/follow`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update suggested users
+        setSuggestedUsers(suggestedUsers.map(user => 
+          user.id === userId 
+            ? { ...user, following: true }
+            : user
+        ));
+      } else {
+        setError(data.message || 'Error following user');
+      }
+    } catch (err) {
+      console.error('Error following user:', err);
+      setError(err.message);
+    } finally {
+      setFollowingLoading(prev => {
+        const newState = { ...prev };
+        delete newState[userId];
+        return newState;
+      });
+    }
+  };
+
+  const handleUnfollow = async (userId) => {
+    try {
+      setFollowingLoading(prev => ({ ...prev, [userId]: true }));
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`http://localhost:5000/api/community/users/${userId}/follow`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update suggested users
+        setSuggestedUsers(suggestedUsers.map(user => 
+          user.id === userId 
+            ? { ...user, following: false }
+            : user
+        ));
+      } else {
+        setError(data.message || 'Error unfollowing user');
+      }
+    } catch (err) {
+      console.error('Error unfollowing user:', err);
+      setError(err.message);
+    } finally {
+      setFollowingLoading(prev => {
+        const newState = { ...prev };
+        delete newState[userId];
+        return newState;
+      });
+    }
+  };
+
+  // Fetch full post with comments array
+  const fetchPostWithComments = async (postId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/community/posts/${postId}/full`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        return data.post;
+      }
+    } catch (err) {
+      console.error('Error fetching post with comments:', err);
+    }
+    return null;
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !commentPostId) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/community/posts/${commentPostId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: newComment
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Ensure comments array exists and is an array
+        const commentsArray = Array.isArray(selectedPostForComments?.comments) 
+          ? selectedPostForComments.comments 
+          : [];
+        
+        // Update the selected post with new comment
+        const updatedPost = {
+          ...selectedPostForComments,
+          comments: [data.comment, ...commentsArray]
+        };
+        
+        // Update posts list
+        setPosts(posts.map(post => 
+          post._id === commentPostId 
+            ? { ...post, comments: updatedPost.comments.length }
+            : post
+        ));
+        
+        setSelectedPostForComments(updatedPost);
+        setNewComment('');
+      }
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      setError(err.message);
+    }
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -288,11 +519,20 @@ export function Community({ onBack }) {
           {/* Create Post */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex gap-3">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=user"
-                alt="You"
-                className="w-12 h-12 rounded-full border-2 border-gray-200"
-              />
+              {user?.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt={user.fullName}
+                  className="w-12 h-12 rounded-full border-2 border-gray-200 object-cover"
+                  onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`; }}
+                />
+              ) : (
+                <img
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'user'}`}
+                  alt={user?.fullName}
+                  className="w-12 h-12 rounded-full border-2 border-gray-200"
+                />
+              )}
               <div className="flex-1">
                 <textarea
                   value={newPost}
@@ -400,10 +640,11 @@ export function Community({ onBack }) {
             <div key={post._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <img
-                    src={post.author.avatar}
-                    alt={post.author.name}
-                    className="w-12 h-12 rounded-full border-2 border-gray-200"
+                  <AvatarDisplay
+                    profilePicture={post.author.profilePicture}
+                    name={post.author.name}
+                    username={post.author.username}
+                    className="w-12 h-12"
                   />
                   <div className="flex-1">
                     <h4 className="font-semibold">{post.author.name}</h4>
@@ -448,9 +689,22 @@ export function Community({ onBack }) {
                     <Heart className={`w-5 h-5 ${post.liked ? 'fill-red-500' : ''}`} />
                     <span className="text-sm">{post.likes}</span>
                   </button>
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-all">
+                  <button 
+                    onClick={async () => {
+                      // Fetch full post with comments array
+                      const fullPost = await fetchPostWithComments(post._id);
+                      if (fullPost) {
+                        setSelectedPostForComments(fullPost);
+                      } else {
+                        // Fallback: use current post but ensure comments is an array
+                        setSelectedPostForComments({ ...post, comments: Array.isArray(post.comments) ? post.comments : [] });
+                      }
+                      setCommentPostId(post._id);
+                    }}
+                    className="flex items-center gap-2 text-gray-600 hover:text-blue-500 transition-all"
+                  >
                     <MessageCircle className="w-5 h-5" />
-                    <span className="text-sm">{post.comments}</span>
+                    <span className="text-sm">{typeof post.comments === 'number' ? post.comments : (post.comments?.length || 0)}</span>
                   </button>
                   <button
                     onClick={() => handleShare(post._id)}
@@ -532,21 +786,106 @@ export function Community({ onBack }) {
               {suggestedUsers.map((user, index) => (
                 <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
+                    <img 
+                      src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} 
+                      alt={user.name} 
+                      className="w-10 h-10 rounded-full" 
+                      onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}` }}
+                    />
                     <div>
                       <div className="text-sm font-medium">{user.name}</div>
                       <div className="text-xs text-gray-500">{user.trips} trips • {user.joined}</div>
                     </div>
                   </div>
-                  <button className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm transition-colors">
-                    Follow
-                  </button>
+                  {user.following ? (
+                    <button 
+                      onClick={() => handleUnfollow(user.id)}
+                      disabled={followingLoading[user.id]}
+                      className="px-4 py-1.5 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm transition-colors disabled:opacity-50"
+                    >
+                      {followingLoading[user.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Following'}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleFollow(user.id)}
+                      disabled={followingLoading[user.id]}
+                      className="px-4 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm transition-colors disabled:opacity-50"
+                    >
+                      {followingLoading[user.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Follow'}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Comments Modal */}
+      {selectedPostForComments && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+              <h3 className="text-lg font-semibold">Comments</h3>
+              <button
+                onClick={() => {
+                  setSelectedPostForComments(null);
+                  setCommentPostId(null);
+                  setNewComment('');
+                }}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Comments List */}
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {Array.isArray(selectedPostForComments.comments) && selectedPostForComments.comments.length > 0 ? (
+                  selectedPostForComments.comments.map((comment, idx) => (
+                    <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AvatarDisplay
+                          profilePicture={comment.author?.profilePicture}
+                          name={comment.author?.name || 'User'}
+                          username={comment.author?.username}
+                          className="w-6 h-6"
+                        />
+                        <span className="text-sm font-medium">{comment.author?.name || 'User'}</span>
+                      </div>
+                      <p className="text-sm text-gray-700">{comment.content}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 text-sm py-4">No comments yet. Be the first!</p>
+                )}
+              </div>
+
+              {/* Add Comment */}
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                  />
+                  <button
+                    onClick={handleAddComment}
+                    disabled={!newComment.trim()}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

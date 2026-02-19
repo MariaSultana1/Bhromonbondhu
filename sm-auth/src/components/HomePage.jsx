@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
+import { ChevronDown, Star, MapPin, Users, MessageSquare, Heart, TrendingUp, Award } from "lucide-react";
 
 const HomePage = ({ goLogin, goSignup }) => {
+  const [expandedFaq, setExpandedFaq] = useState(null);
+  const [highlightedDestination, setHighlightedDestination] = useState(null);
 
   const featuredDestinations = [
     {

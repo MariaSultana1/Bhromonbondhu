@@ -94,52 +94,73 @@ export function TransportBookingFlow() {
       const token = getAuthToken();
       if (token) {
         try {
+          console.log('📤 Sending booking to database...', {
+            bookingId: confirmation.bookingId,
+            pnr: confirmation.pnr,
+            transportType: selectedTicket.transportType,
+            totalAmount: selectedTicket.price * passengers.length,
+            numPassengers: passengers.length
+          });
+
+          const payloadData = {
+            bookingId: confirmation.bookingId,
+            pnr: confirmation.pnr,
+            transportType: selectedTicket.transportType,
+            provider: selectedTicket.provider,
+            from: selectedTicket.from,
+            to: selectedTicket.to,
+            journeyDate: searchParams.date,
+            departureTime: selectedTicket.departureTime,
+            arrivalTime: selectedTicket.arrivalTime,
+            duration: selectedTicket.duration,
+            vehicleNumber: selectedTicket.vehicleNumber,
+            trainNumber: selectedTicket.trainNumber,
+            flightNumber: selectedTicket.flightNumber,
+            passengers: passengers.map((p, idx) => ({
+              firstName: p.firstName,
+              lastName: p.lastName,
+              age: p.age,
+              gender: p.gender,
+              nid: p.nid || '',
+              passport: p.passport || '',
+              seat: selectedSeats[idx],
+              ticketNumber: confirmation.tickets[idx].ticketNumber,
+              class: confirmation.tickets[idx].class
+            })),
+            contactEmail: contactEmail,
+            contactPhone: contactPhone,
+            totalAmount: selectedTicket.price * passengers.length,
+            pricePerTicket: selectedTicket.price,
+            paymentMethod: paymentMethod || 'cash',
+            paymentDetails: paymentDetails || {}
+          };
+
+          console.log('📦 Payload being sent:', JSON.stringify(payloadData, null, 2));
+
           const saveResponse = await fetch(`${API_URL}/transport-tickets/book`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              bookingId: confirmation.bookingId,
-              pnr: confirmation.pnr,
-              transportType: selectedTicket.transportType,
-              provider: selectedTicket.provider,
-              from: selectedTicket.from,
-              to: selectedTicket.to,
-              journeyDate: searchParams.date,
-              departureTime: selectedTicket.departureTime,
-              arrivalTime: selectedTicket.arrivalTime,
-              duration: selectedTicket.duration,
-              vehicleNumber: selectedTicket.vehicleNumber,
-              trainNumber: selectedTicket.trainNumber,
-              flightNumber: selectedTicket.flightNumber,
-              passengers: passengers.map((p, idx) => ({
-                firstName: p.firstName,
-                lastName: p.lastName,
-                age: p.age,
-                gender: p.gender,
-                nid: p.nid || '',
-                passport: p.passport || '',
-                seat: selectedSeats[idx],
-                ticketNumber: confirmation.tickets[idx].ticketNumber,
-                class: confirmation.tickets[idx].class
-              })),
-              contactEmail: contactEmail,
-              contactPhone: contactPhone,
-              totalAmount: selectedTicket.price * passengers.length,
-              pricePerTicket: selectedTicket.price,
-              paymentMethod: paymentMethod,
-              paymentDetails: paymentDetails
-            })
+            body: JSON.stringify(payloadData)
           });
 
+          console.log(`📥 Response status: ${saveResponse.status} ${saveResponse.statusText}`);
+
+          if (!saveResponse.ok) {
+            const errorText = await saveResponse.text();
+            console.error('❌ HTTP Error:', saveResponse.status, errorText);
+            throw new Error(`HTTP ${saveResponse.status}: ${errorText.substring(0, 200)}`);
+          }
+
           const saveData = await saveResponse.json();
+          console.log('📨 Response data:', saveData);
           
           if (!saveData.success) {
-            console.error('Failed to save booking to database:', saveData.message);
+            console.error('❌ Failed to save booking to database:', saveData.message);
             // Show error but still proceed with booking confirmation
-            setError('Booking confirmed but failed to save to your account. Please contact support with booking ID: ' + confirmation.bookingId);
+            setError('Booking confirmed but failed to save to your account. ' + (saveData.message || 'Please contact support with booking ID: ' + confirmation.bookingId));
           } else {
             console.log('✅ Booking saved to database:', saveData.booking);
             
@@ -190,21 +211,19 @@ export function TransportBookingFlow() {
           console.error('Database save error:', dbError);
           setError('Booking confirmed but failed to save to your account. Please contact support with booking ID: ' + confirmation.bookingId);
         }
+      } else {
+        console.warn('⚠️ No authentication token found! Booking will not be saved to database.');
+        setError('⚠️ You are not logged in. Your booking cannot be saved. Please log in and try again.');
       }
       // ===== END DATABASE INTEGRATION =====
       
       setBookingConfirmation(confirmation);
       setCurrentStep('confirmation');
     } catch (error) {
-      console.error('Booking error:', error);
-      // For demo purposes, create mock confirmation
-      const mockConfirmation = generateMockConfirmation(
-        selectedTicket,
-        passengers,
-        selectedSeats
-      );
-      setBookingConfirmation(mockConfirmation);
-      setCurrentStep('confirmation');
+      console.error('❌ Booking error:', error);
+      setError('Failed to complete booking: ' + (error.message || 'Unknown error'));
+      setLoading(false);
+      return;
     } finally {
       setLoading(false);
     }
@@ -323,6 +342,12 @@ function generateMockTickets(params) {
       const basePrice = params.transportType === 'flight' ? 3000 : params.transportType === 'train' ? 500 : 800;
       const classMultiplier = clsIndex + 1;
       
+      // Generate zero-padded time values for proper date parsing
+      const depHour = String(8 + index * 2).padStart(2, '0');
+      const depMin = String((clsIndex * 15) % 60).padStart(2, '0');
+      const arrHour = String(12 + index * 2).padStart(2, '0');
+      const arrMin = String((clsIndex * 15) % 60).padStart(2, '0');
+      
       mockTickets.push({
         id: `${params.transportType}-${index}-${clsIndex}`,
         provider,
@@ -330,8 +355,8 @@ function generateMockTickets(params) {
         transportType: params.transportType,
         from: params.from,
         to: params.to,
-        departureTime: `${8 + index * 2}:${(clsIndex * 15) % 60}:00`,
-        arrivalTime: `${12 + index * 2}:${(clsIndex * 15) % 60}:00`,
+        departureTime: `${depHour}:${depMin}:00`,
+        arrivalTime: `${arrHour}:${arrMin}:00`,
         duration: `${4 + index}h ${(clsIndex * 15) % 60}m`,
         price: basePrice * classMultiplier,
         currency: 'BDT',

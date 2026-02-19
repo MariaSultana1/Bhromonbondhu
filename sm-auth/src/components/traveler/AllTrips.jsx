@@ -1,14 +1,137 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, ArrowLeft, Search, Cloud, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, ArrowLeft, Search, Cloud, Loader2, AlertCircle, Plus, CheckCircle } from 'lucide-react';
 import { TripDetails } from './TripDetails';
+
+// Weather API service
+const weatherService = {
+  getWeatherForDestination: async (destination, date) => {
+    try {
+      // Using Open-Meteo API (free, no key required)
+      const response = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=en&format=json`
+      );
+      const geoData = await response.json();
+      
+      if (!geoData.results || geoData.results.length === 0) {
+        return 'Clear'; // Default weather
+      }
+
+      const { latitude, longitude, name } = geoData.results[0];
+      
+      // Get weather forecast
+      const weatherResponse = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`
+      );
+      const weatherData = await weatherResponse.json();
+      
+      // Map weather codes to descriptions
+      const weatherCodes = {
+        0: 'Clear',
+        1: 'Mostly Clear',
+        2: 'Partly Cloudy',
+        3: 'Overcast',
+        45: 'Foggy',
+        48: 'Foggy',
+        51: 'Light Drizzle',
+        53: 'Drizzle',
+        55: 'Heavy Drizzle',
+        61: 'Light Rain',
+        63: 'Rain',
+        65: 'Heavy Rain',
+        71: 'Light Snow',
+        73: 'Snow',
+        75: 'Heavy Snow',
+        80: 'Light Showers',
+        81: 'Showers',
+        82: 'Heavy Showers',
+        85: 'Light Snow Showers',
+        86: 'Snow Showers',
+        95: 'Thunderstorm',
+        96: 'Thunderstorm with Hail',
+        99: 'Thunderstorm with Hail'
+      };
+
+      const code = weatherData.daily.weather_code[0];
+      const maxTemp = weatherData.daily.temperature_2m_max[0];
+      const minTemp = weatherData.daily.temperature_2m_min[0];
+      
+      return `${weatherCodes[code] || 'Clear'} (${minTemp}°-${maxTemp}°C)`;
+    } catch (error) {
+      console.error('Weather API error:', error);
+      return 'Check forecast';
+    }
+  }
+};
 
 export function AllTrips({ onBack }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [trips, setTrips] = useState([]);
+  const [consolidatedTrips, setConsolidatedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [weatherCache, setWeatherCache] = useState({});
+
+  // ✅ Consolidate trips: combine ticket + host into single trip
+  const consolidateTrips = useCallback((rawTrips) => {
+    const tripMap = new Map();
+
+    rawTrips.forEach(trip => {
+      // Create a unique key based on destination + date range
+      const key = `${trip.destination}_${trip.date}_${trip.endDate}`;
+      
+      if (!tripMap.has(key)) {
+        tripMap.set(key, {
+          _id: trip._id,
+          destination: trip.destination,
+          location: trip.location,
+          date: trip.date,
+          endDate: trip.endDate,
+          image: trip.image,
+          totalAmount: trip.totalAmount || 0,
+          guests: trip.guests,
+          nights: trip.nights,
+          services: trip.services || [],
+          bookingId: trip.bookingId,
+          status: trip.status,
+          weather: trip.weather,
+          // Booking tracking
+          hostBooked: trip.host && trip.host !== 'pending' ? true : false,
+          hostName: trip.host && trip.host !== 'pending' ? trip.host : null,
+          hostInfo: trip.hostInfo || null,
+          ticketBooked: trip.transportProvider ? true : false,
+          ticketInfo: {
+            type: trip.transportType,
+            provider: trip.transportProvider,
+            from: trip.transportFrom,
+            to: trip.transportTo,
+            bookingId: trip.ticketBookingId
+          },
+          // Completion tracking
+          completionDate: trip.completionDate || null
+        });
+      } else {
+        // Merge booking info if this is a duplicate
+        const existing = tripMap.get(key);
+        if (trip.host && trip.host !== 'pending') {
+          existing.hostBooked = true;
+          existing.hostName = trip.host;
+        }
+        if (trip.transportProvider) {
+          existing.ticketBooked = true;
+          existing.ticketInfo = {
+            type: trip.transportType,
+            provider: trip.transportProvider,
+            from: trip.transportFrom,
+            to: trip.transportTo
+          };
+        }
+      }
+    });
+
+    return Array.from(tripMap.values());
+  }, []);
 
   // ✅ FIX: Use useCallback to prevent unnecessary re-renders
   const fetchTrips = useCallback(async () => {
@@ -41,8 +164,22 @@ export function AllTrips({ onBack }) {
       const data = await response.json();
       
       if (data.success) {
-        setTrips(data.trips || []);
-        console.log('✅ Trips fetched:', data.trips?.length, 'trips');
+        const rawTrips = data.trips || [];
+        const consolidated = consolidateTrips(rawTrips);
+        
+        // Fetch weather for all trips
+        const weatherPromises = consolidated.map(trip =>
+          weatherService.getWeatherForDestination(trip.destination, trip.date)
+            .then(weather => {
+              trip.weather = weather;
+              return trip;
+            })
+        );
+
+        const tripsWithWeather = await Promise.all(weatherPromises);
+        setTrips(tripsWithWeather);
+        setConsolidatedTrips(tripsWithWeather);
+        console.log('✅ Trips fetched and consolidated:', tripsWithWeather.length, 'trips');
       } else {
         throw new Error(data.message || 'Failed to fetch trips');
       }
@@ -52,19 +189,17 @@ export function AllTrips({ onBack }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [consolidateTrips]);
 
   // ✅ FIX: Fetch trips only once on mount
   useEffect(() => {
     fetchTrips();
   }, [fetchTrips]);
 
-  // Function to manually refresh trips (for future use)
   const handleRefresh = () => {
     fetchTrips();
   };
 
-  // Function to seed sample trips (for development)
   const seedSampleTrips = async () => {
     try {
       setLoading(true);
@@ -93,16 +228,44 @@ export function AllTrips({ onBack }) {
     }
   };
 
+  // Mark trip as completed
+  const markTripAsCompleted = async (tripId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/trips/${tripId}/complete`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          completionDate: new Date().toISOString()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update local state
+        setTrips(prevTrips => prevTrips.map(trip =>
+          trip._id === tripId ? { ...trip, status: 'completed', completionDate: new Date() } : trip
+        ));
+        setSelectedTrip(null);
+      }
+    } catch (err) {
+      console.error('Error completing trip:', err);
+    }
+  };
+
   const filteredTrips = trips.filter(trip => {
     const matchesStatus = filterStatus === 'all' || trip.status === filterStatus;
     const matchesSearch = trip.destination?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          trip.host?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          trip.hostName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           trip.location?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
   if (selectedTrip) {
-    return <TripDetails trip={selectedTrip} onBack={() => setSelectedTrip(null)} />;
+    return <TripDetails trip={selectedTrip} onBack={() => setSelectedTrip(null)} onMarkComplete={() => markTripAsCompleted(selectedTrip._id)} />;
   }
 
   return (
@@ -255,13 +418,14 @@ export function AllTrips({ onBack }) {
                     }}
                   />
                   <div className="absolute top-4 right-4">
-                    <span className={`px-3 py-1.5 rounded-full text-xs backdrop-blur-md shadow-lg ${
+                    <span className={`px-3 py-1.5 rounded-full text-xs backdrop-blur-md shadow-lg flex items-center gap-1 ${
                       trip.status === 'upcoming'
                         ? 'bg-green-500/90 text-white'
                         : trip.status === 'completed'
                         ? 'bg-blue-500/90 text-white'
                         : 'bg-red-500/90 text-white'
                     }`}>
+                      {trip.status === 'completed' && <CheckCircle className="w-3 h-3" />}
                       {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
                     </span>
                   </div>
@@ -271,25 +435,30 @@ export function AllTrips({ onBack }) {
                   </div>
                 </div>
                 <div className="p-6">
-                  {trip.host === 'pending' ? (
-                    <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
-                      <p className="text-blue-800 font-medium text-sm">Transportation Details</p>
-                      <div className="text-blue-700 text-xs mt-2 space-y-1">
-                        <p><span className="font-semibold">Type:</span> {trip.transportType?.charAt(0).toUpperCase() + trip.transportType?.slice(1) || 'N/A'}</p>
-                        <p><span className="font-semibold">Provider:</span> {trip.transportProvider || 'N/A'}</p>
-                        <p><span className="font-semibold">Route:</span> {trip.transportFrom} → {trip.transportTo}</p>
-                        <p className="mt-2 text-blue-900 font-medium">Host: Pending</p>
-                        <p className="text-blue-600 text-xs">Select a host below to complete your trip booking.</p>
-                      </div>
+                  {/* Booking Status Cards */}
+                  <div className="space-y-2 mb-4">
+                    <div className={`rounded-lg p-3 flex items-center gap-2 ${
+                      trip.hostBooked 
+                        ? 'bg-green-50 border-2 border-green-200' 
+                        : 'bg-yellow-50 border-2 border-yellow-200'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${trip.hostBooked ? 'bg-green-600' : 'bg-yellow-600'}`} />
+                      <span className={`text-sm font-medium ${trip.hostBooked ? 'text-green-800' : 'text-yellow-800'}`}>
+                        {trip.hostBooked ? `Host: ${trip.hostName}` : 'Host: Not Booked'}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
-                      <p className="text-green-800 font-medium text-sm">Host Information</p>
-                      <div className="text-green-700 text-xs mt-2">
-                        <p><span className="font-semibold">Hosted by:</span> {trip.host}</p>
-                      </div>
+                    <div className={`rounded-lg p-3 flex items-center gap-2 ${
+                      trip.ticketBooked 
+                        ? 'bg-green-50 border-2 border-green-200' 
+                        : 'bg-yellow-50 border-2 border-yellow-200'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${trip.ticketBooked ? 'bg-green-600' : 'bg-yellow-600'}`} />
+                      <span className={`text-sm font-medium ${trip.ticketBooked ? 'text-green-800' : 'text-yellow-800'}`}>
+                        {trip.ticketBooked ? `Ticket: ${trip.ticketInfo.provider}` : 'Ticket: Not Booked'}
+                      </span>
                     </div>
-                  )}
+                  </div>
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
@@ -304,6 +473,7 @@ export function AllTrips({ onBack }) {
                       <span className="text-gray-500"> • {trip.guests} guest{trip.guests !== 1 ? 's' : ''} • {trip.nights} night{trip.nights !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
+
                   <div className="flex flex-wrap gap-2 mb-4">
                     {trip.services?.slice(0, 3).map((service, idx) => (
                       <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-lg">
@@ -316,19 +486,30 @@ export function AllTrips({ onBack }) {
                       </span>
                     )}
                   </div>
-                  <div className="flex gap-3">
+
+                  <div className="flex gap-2 flex-wrap">
                     <button
-                      className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md hover:shadow-lg"
+                      className="flex-1 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-sm"
                       onClick={() => setSelectedTrip(trip)}
                     >
                       View Details
                     </button>
-                    {trip.host === 'pending' && (
+                    {!trip.hostBooked && trip.status === 'upcoming' && (
                       <button
-                        className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all shadow-md hover:shadow-lg"
-                        onClick={() => window.location.href = '/traveler/book-travel'}
+                        className="py-2 px-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-sm flex items-center gap-1"
+                        onClick={() => window.location.href = `/traveler/book-travel?dest=${trip.destination}`}
                       >
-                        Book a Host
+                        <Plus className="w-4 h-4" />
+                        Host
+                      </button>
+                    )}
+                    {!trip.ticketBooked && trip.status === 'upcoming' && (
+                      <button
+                        className="py-2 px-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition-all text-sm flex items-center gap-1"
+                        onClick={() => window.location.href = `/traveler/book-tickets?dest=${trip.destination}`}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Ticket
                       </button>
                     )}
                   </div>
