@@ -31,23 +31,20 @@ const connectDB = async () => {
 
 connectDB();
 
-// Clean up TransportTicket collection indexes to fix duplicate key errors
 mongoose.connection.on('connected', async () => {
+  const db = mongoose.connection.db;
+
+  // ── Fix 1: TransportTicket bad index ──────────────────────
   try {
-    const db = mongoose.connection.db;
     const collection = db.collection('transporttickets');
-    
-    // Drop the old incorrect index if it exists
     const indexes = await collection.listIndexes().toArray();
     const ticketIdIndex = indexes.find(idx => idx.name === 'ticketId_1');
-    
+
     if (ticketIdIndex) {
       console.log('🔧 Fixing TransportTicket indexes...');
-      // Drop the old index
       await collection.dropIndex('ticketId_1');
       console.log('✅ Dropped old ticketId_1 index');
-      
-      // Clean up existing null ticketIds by generating unique ones
+
       const docsWithNullTicketId = await collection.find({ ticketId: null }).toArray();
       if (docsWithNullTicketId.length > 0) {
         console.log(`🧹 Cleaning up ${docsWithNullTicketId.length} documents with null ticketIds...`);
@@ -57,16 +54,30 @@ mongoose.connection.on('connected', async () => {
         }
         console.log('✅ Cleaned up null ticketIds');
       }
-      
-      // The new index will be created by Mongoose with sparse: true
+
       await collection.createIndex({ ticketId: 1 }, { sparse: true, unique: true });
       console.log('✅ Created new sparse ticketId index');
     }
   } catch (error) {
-    if (error.message.includes('index not found')) {
-      // Index doesn't exist yet, which is fine
-    } else {
-      console.warn('⚠️ Index cleanup warning:', error.message);
+    if (!error.message.includes('index not found')) {
+      console.warn('⚠️ TransportTicket index cleanup warning:', error.message);
+    }
+  }
+
+  // ── Fix 2: Travelers stale 'user_1' index ─────────────────
+  try {
+    const travelersCollection = db.collection('travelers');
+    const travelerIndexes = await travelersCollection.listIndexes().toArray();
+    const badIndex = travelerIndexes.find(idx => idx.name === 'user_1');
+
+    if (badIndex) {
+      console.log('🔧 Fixing travelers collection stale index...');
+      await travelersCollection.dropIndex('user_1');
+      console.log('✅ Dropped stale user_1 index from travelers');
+    }
+  } catch (error) {
+    if (!error.message.includes('index not found')) {
+      console.warn('⚠️ Travelers index cleanup warning:', error.message);
     }
   }
 });
