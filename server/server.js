@@ -31,6 +31,45 @@ const connectDB = async () => {
 
 connectDB();
 
+// Clean up TransportTicket collection indexes to fix duplicate key errors
+mongoose.connection.on('connected', async () => {
+  try {
+    const db = mongoose.connection.db;
+    const collection = db.collection('transporttickets');
+    
+    // Drop the old incorrect index if it exists
+    const indexes = await collection.listIndexes().toArray();
+    const ticketIdIndex = indexes.find(idx => idx.name === 'ticketId_1');
+    
+    if (ticketIdIndex) {
+      console.log('🔧 Fixing TransportTicket indexes...');
+      // Drop the old index
+      await collection.dropIndex('ticketId_1');
+      console.log('✅ Dropped old ticketId_1 index');
+      
+      // Clean up existing null ticketIds by generating unique ones
+      const docsWithNullTicketId = await collection.find({ ticketId: null }).toArray();
+      if (docsWithNullTicketId.length > 0) {
+        console.log(`🧹 Cleaning up ${docsWithNullTicketId.length} documents with null ticketIds...`);
+        for (const doc of docsWithNullTicketId) {
+          const newTicketId = `TKT${Date.now()}${Math.floor(Math.random() * 100000)}`;
+          await collection.updateOne({ _id: doc._id }, { $set: { ticketId: newTicketId } });
+        }
+        console.log('✅ Cleaned up null ticketIds');
+      }
+      
+      // The new index will be created by Mongoose with sparse: true
+      await collection.createIndex({ ticketId: 1 }, { sparse: true, unique: true });
+      console.log('✅ Created new sparse ticketId index');
+    }
+  } catch (error) {
+    if (error.message.includes('index not found')) {
+      // Index doesn't exist yet, which is fine
+    } else {
+      console.warn('⚠️ Index cleanup warning:', error.message);
+    }
+  }
+});
 
 const BANGLADESH_OPERATORS = [
   'Grameenphone', 'Robi', 'Banglalink', 'Teletalk', 'Airtel'
@@ -238,6 +277,11 @@ const transportTicketSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  ticketId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   transportType: {
     type: String,
     enum: ['bus', 'train', 'flight'],
@@ -370,6 +414,16 @@ const transportTicketSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// Generate ticketId before saving to prevent null duplicate key errors
+transportTicketSchema.pre('save', function(next) {
+  if (!this.ticketId) {
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 100000);
+    this.ticketId = `TKT${timestamp}${randomNum}`;
+  }
+  next();
 });
 
 const TransportTicket = mongoose.model('TransportTicket', transportTicketSchema);
@@ -1210,6 +1264,166 @@ bookingSchema.pre('save', function(next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 
+// Dispute Schema
+const disputeSchema = new mongoose.Schema({
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking',
+    required: true
+  },
+  bookingRefId: {
+    type: String,
+    required: true
+  },
+  travelerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  hostId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  issue: {
+    type: String,
+    required: true,
+    enum: ['Service not provided as promised', 'Payment issue', 'Property damage', 'Safety concern', 'Communication issue', 'Other'],
+    default: 'Other'
+  },
+  description: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  amount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'medium'
+  },
+  status: {
+    type: String,
+    enum: ['open', 'in-progress', 'resolved', 'rejected', 'escalated'],
+    default: 'open'
+  },
+  resolution: {
+    type: String,
+    default: ''
+  },
+  resolvedAt: {
+    type: Date,
+    default: null
+  },
+  messages: [{
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    content: String,
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    attachments: [String]
+  }],
+  evidence: [{
+    type: String,
+    description: String
+  }],
+  adminNotes: {
+    type: String,
+    default: ''
+  },
+  refundAmount: {
+    type: Number,
+    default: 0
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+disputeSchema.index({ travelerId: 1, status: 1 });
+disputeSchema.index({ hostId: 1, status: 1 });
+disputeSchema.index({ status: 1 });
+disputeSchema.index({ createdAt: -1 });
+
+const Dispute = mongoose.model('Dispute', disputeSchema);
+
+
+// Wishlist Schema
+const wishlistSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  destination: {
+    type: String,
+    required: [true, 'Destination is required'],
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  image: {
+    type: String,
+    default: ''
+  },
+  estimatedCost: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  duration: {
+    type: String,
+    default: '3-5 days'
+  },
+  bestTime: {
+    type: String,
+    default: 'Oct - Mar'
+  },
+  activities: [{
+    type: String
+  }],
+  difficulty: {
+    type: String,
+    enum: ['Easy', 'Moderate', 'Hard'],
+    default: 'Moderate'
+  },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 4
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+wishlistSchema.index({ userId: 1, createdAt: -1 });
+
+const Wishlist = mongoose.model('Wishlist', wishlistSchema);
+
+
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
 const JWT_EXPIRE = '7d';
@@ -1277,6 +1491,352 @@ app.get('/api/health', (req, res) => {
     mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     timestamp: new Date().toISOString()
   });
+});
+
+// ============ WISHLIST ROUTES ============
+// Get all wishlists for a user
+app.get('/api/wishlists', authenticate, async (req, res) => {
+  try {
+    const wishlists = await Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    res.json({
+      success: true,
+      wishlists: wishlists
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching wishlists',
+      error: error.message
+    });
+  }
+});
+
+// Get single wishlist
+app.get('/api/wishlists/:id', authenticate, async (req, res) => {
+  try {
+    const wishlist = await Wishlist.findById(req.params.id);
+    if (!wishlist) {
+      return res.status(404).json({
+        success: false,
+        message: 'Wishlist not found'
+      });
+    }
+    if (wishlist.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this wishlist'
+      });
+    }
+    res.json({
+      success: true,
+      wishlist: wishlist
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching wishlist',
+      error: error.message
+    });
+  }
+});
+
+// Create wishlist
+app.post('/api/wishlists', authenticate, async (req, res) => {
+  try {
+    const { destination, description, image, estimatedCost, duration, bestTime, activities, difficulty, rating } = req.body;
+
+    if (!destination) {
+      return res.status(400).json({
+        success: false,
+        message: 'Destination is required'
+      });
+    }
+
+    const wishlist = await Wishlist.create({
+      userId: req.user._id,
+      destination,
+      description: description || '',
+      image: image || '',
+      estimatedCost: estimatedCost || 0,
+      duration: duration || '3-5 days',
+      bestTime: bestTime || 'Oct - Mar',
+      activities: activities || [],
+      difficulty: difficulty || 'Moderate',
+      rating: rating || 4
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Wishlist created successfully',
+      wishlist: wishlist
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error creating wishlist',
+      error: error.message
+    });
+  }
+});
+
+// Delete wishlist
+app.delete('/api/wishlists/:id', authenticate, async (req, res) => {
+  try {
+    const wishlist = await Wishlist.findById(req.params.id);
+    if (!wishlist) {
+      return res.status(404).json({
+        success: false,
+        message: 'Wishlist not found'
+      });
+    }
+    if (wishlist.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this wishlist'
+      });
+    }
+    await Wishlist.findByIdAndDelete(req.params.id);
+    res.json({
+      success: true,
+      message: 'Wishlist deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting wishlist',
+      error: error.message
+    });
+  }
+});
+
+// ============ ADMIN ROUTES ============
+// Check if user is admin
+const adminOnly = async (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin only.'
+    });
+  }
+  next();
+};
+
+// Get all users (admin only)
+app.get('/api/admin/users', authenticate, adminOnly, async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('-password')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      total: users.length,
+      users: users
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users',
+      error: error.message
+    });
+  }
+});
+
+// Get user statistics (admin only)
+app.get('/api/admin/users/stats', authenticate, adminOnly, async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const usersByRole = await User.aggregate([
+      { $group: { _id: '$role', count: { $sum: 1 } } }
+    ]);
+    const activeUsers = await User.countDocuments({ isActive: true });
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        activeUsers,
+        byRole: usersByRole
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user statistics',
+      error: error.message
+    });
+  }
+});
+
+// Update user status (admin only)
+app.put('/api/admin/users/:id/status', authenticate, adminOnly, async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isActive },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'User status updated',
+      user: user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating user',
+      error: error.message
+    });
+  }
+});
+
+// ============ DISPUTE ROUTES ============
+// Get all disputes (admin only)
+app.get('/api/admin/disputes', authenticate, adminOnly, async (req, res) => {
+  try {
+    const disputes = await Dispute.find()
+      .populate('travelerId', 'fullName email')
+      .populate('hostId', 'fullName email')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      total: disputes.length,
+      disputes: disputes
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching disputes',
+      error: error.message
+    });
+  }
+});
+
+// Get dispute statistics (admin only)
+app.get('/api/admin/disputes/stats', authenticate, adminOnly, async (req, res) => {
+  try {
+    const totalDisputes = await Dispute.countDocuments();
+    const disputesByStatus = await Dispute.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+    const openDisputes = await Dispute.countDocuments({ status: 'open' });
+    const highPriority = await Dispute.countDocuments({ priority: 'high', status: { $ne: 'resolved' } });
+
+    res.json({
+      success: true,
+      stats: {
+        totalDisputes,
+        openDisputes,
+        highPriority,
+        byStatus: disputesByStatus
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dispute statistics',
+      error: error.message
+    });
+  }
+});
+
+// Get single dispute (admin only)
+app.get('/api/admin/disputes/:id', authenticate, adminOnly, async (req, res) => {
+  try {
+    const dispute = await Dispute.findById(req.params.id)
+      .populate('travelerId', 'fullName email phone')
+      .populate('hostId', 'fullName email phone');
+
+    if (!dispute) {
+      return res.status(404).json({
+        success: false,
+        message: 'Dispute not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      dispute: dispute
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dispute',
+      error: error.message
+    });
+  }
+});
+
+// Update dispute status (admin only)
+app.put('/api/admin/disputes/:id/status', authenticate, adminOnly, async (req, res) => {
+  try {
+    const { status, resolution, refundAmount, adminNotes } = req.body;
+
+    const dispute = await Dispute.findByIdAndUpdate(
+      req.params.id,
+      {
+        status,
+        resolution: resolution || '',
+        refundAmount: refundAmount || 0,
+        adminNotes: adminNotes || '',
+        resolvedAt: status === 'resolved' ? new Date() : null
+      },
+      { new: true }
+    ).populate('travelerId', 'fullName email').populate('hostId', 'fullName email');
+
+    res.json({
+      success: true,
+      message: 'Dispute updated successfully',
+      dispute: dispute
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating dispute',
+      error: error.message
+    });
+  }
+});
+
+// Create dispute (for users)
+app.post('/api/disputes', authenticate, async (req, res) => {
+  try {
+    const { bookingId, hostId, issue, description, amount, priority, evidence } = req.body;
+
+    if (!bookingId || !hostId || !issue || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    const dispute = await Dispute.create({
+      bookingId,
+      bookingRefId: `DSP${Date.now()}`,
+      travelerId: req.user._id,
+      hostId,
+      issue,
+      description,
+      amount: amount || 0,
+      priority: priority || 'medium',
+      evidence: evidence || []
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Dispute created successfully',
+      dispute: dispute
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error creating dispute',
+      error: error.message
+    });
+  }
 });
 
 // Register Route
@@ -2001,6 +2561,13 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
     });
 
     console.log('📝 Document created, now saving to database...');
+    
+    // Safety check: Ensure ticketId is generated (in case pre-save hook doesn't run)
+    if (!ticketBooking.ticketId) {
+      ticketBooking.ticketId = `TKT${Date.now()}${Math.floor(Math.random() * 100000)}`;
+      console.log('⚠️  Generated ticketId:', ticketBooking.ticketId);
+    }
+    
     await ticketBooking.save();
 
     console.log(`✅ Transport ticket booked successfully: ${bookingId} for user: ${req.user.email}`);
