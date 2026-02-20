@@ -427,6 +427,16 @@ export function TravelerHome({ user }) {
                           })}
                         </span>
                         <span className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          {trip.ticketInfo?.from ? (
+                            <>
+                              {trip.ticketInfo.from} 
+                              {trip.ticketInfo.type === 'train' ? '🚆' : trip.ticketInfo.type === 'flight' ? '✈️' : '🚌'} 
+                              {trip.ticketInfo.to}
+                            </>
+                          ) : trip.destination}
+                        </span>
+                        <span className="flex items-center gap-1">
                           <Cloud className="w-4 h-4" />
                           {trip.weather || 'Check forecast'}
                         </span>
@@ -504,10 +514,12 @@ export function TravelerHome({ user }) {
                   <div key={post._id || post.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors" onClick={() => setView('community')}>
                     <div className="flex items-center gap-3 mb-3">
                       <img
-                        src={post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}`}
-                        onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?.username}` }}
+                        src={post.author?.profilePicture || post.author?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?._id || post.author?.username || 'user'}`}
+                        onError={(e) => { 
+                          e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author?._id || post.author?.username || 'user'}`
+                        }}
                         alt={post.author?.name}
-                        className="w-10 h-10 rounded-full"
+                        className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <p className="font-medium">{post.author?.name || 'Anonymous'}</p>

@@ -1,113 +1,77 @@
-import { ArrowLeft, Search, AlertTriangle, CheckCircle, Clock, X, MessageSquare, FileText, User } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Search, AlertTriangle, CheckCircle, Clock, X, MessageSquare, FileText, User, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-const allDisputes = [
-  {
-    id: 1,
-    bookingId: 'BK2024001',
-    traveler: {
-      name: 'Riya Rahman',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=riya',
-      email: 'riya@example.com'
-    },
-    host: {
-      name: 'Karim Ahmed',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=karim',
-      email: 'karim@example.com'
-    },
-    issue: 'Service not provided as promised',
-    description: 'The host did not provide the local guide service that was included in the booking.',
-    amount: 7500,
-    status: 'open',
-    priority: 'high',
-    createdAt: '2 hours ago',
-    messages: 3
-  },
-  {
-    id: 2,
-    bookingId: 'BK2024002',
-    traveler: {
-      name: 'Mehedi Hassan',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mehedi',
-      email: 'mehedi@example.com'
-    },
-    host: {
-      name: 'Shahana Begum',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shahana',
-      email: 'shahana@example.com'
-    },
-    issue: 'Payment issue',
-    description: 'Payment was deducted but host claims it was not received.',
-    amount: 6000,
-    status: 'resolved',
-    priority: 'medium',
-    createdAt: '1 day ago',
-    resolvedAt: '12 hours ago',
-    resolution: 'Payment verified and confirmed. Technical glitch resolved.',
-    messages: 8
-  },
-  {
-    id: 3,
-    bookingId: 'BK2024003',
-    traveler: {
-      name: 'Nusrat Jahan',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nusrat',
-      email: 'nusrat@example.com'
-    },
-    host: {
-      name: 'Arif Hasan',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=arif',
-      email: 'arif@example.com'
-    },
-    issue: 'Cancellation dispute',
-    description: 'Host cancelled last minute, traveler wants full refund.',
-    amount: 8000,
-    status: 'investigating',
-    priority: 'high',
-    createdAt: '5 hours ago',
-    messages: 5
-  },
-  {
-    id: 4,
-    bookingId: 'BK2024004',
-    traveler: {
-      name: 'Aisha Khan',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=aisha',
-      email: 'aisha@example.com'
-    },
-    host: {
-      name: 'Rafiq Hassan',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rafiq',
-      email: 'rafiq@example.com'
-    },
-    issue: 'Quality of service complaint',
-    description: 'Meals provided were not as described in the listing.',
-    amount: 4500,
-    status: 'open',
-    priority: 'low',
-    createdAt: '3 days ago',
-    messages: 2
-  }
-];
+const API_URL = 'http://localhost:5000/api';
 
 export function AllDisputes({ onBack }) {
+
+  const [disputes, setDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDispute, setSelectedDispute] = useState(null);
   const [showDisputeDetail, setShowDisputeDetail] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
 
-  const filteredDisputes = allDisputes.filter(dispute => {
+  useEffect(() => {
+    fetchDisputes();
+  }, []);
+
+  const fetchDisputes = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/admin/disputes`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch disputes');
+      const data = await response.json();
+      setDisputes(data.disputes || []);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredDisputes = disputes.filter(dispute => {
     const matchesStatus = filterStatus === 'all' || dispute.status === filterStatus;
-    const matchesSearch = dispute.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          dispute.traveler.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          dispute.host.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (dispute.bookingRefId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dispute.travelerId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dispute.hostId?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesStatus && matchesSearch;
   });
 
-  const openCount = allDisputes.filter(d => d.status === 'open').length;
-  const investigatingCount = allDisputes.filter(d => d.status === 'investigating').length;
-  const resolvedCount = allDisputes.filter(d => d.status === 'resolved').length;
+  const openCount = disputes.filter(d => d.status === 'open').length;
+  const investigatingCount = disputes.filter(d => d.status === 'investigating' || d.status === 'in-progress').length;
+  const resolvedCount = disputes.filter(d => d.status === 'resolved').length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading disputes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <p className="text-red-700">Error loading disputes: {error}</p>
+        <button
+          onClick={fetchDisputes}
+          className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -128,7 +92,7 @@ export function AllDisputes({ onBack }) {
     
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="text-2xl mb-1">{allDisputes.length}</div>
+          <div className="text-2xl mb-1">{disputes.length}</div>
           <p className="text-sm text-gray-600">Total Disputes</p>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
