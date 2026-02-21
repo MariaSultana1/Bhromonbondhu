@@ -474,7 +474,7 @@ const tripSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['upcoming', 'completed', 'cancelled'],
+    enum: ['upcoming', 'completed', 'cancelled', ],
     default: 'upcoming'
   },
   services: [{
@@ -1188,7 +1188,7 @@ const Traveler = mongoose.model('Traveler', travelerSchema);
 
 
 
-// Booking Schema
+// Booking Schema - MODIFIED to make paymentMethod optional
 const bookingSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -1242,7 +1242,7 @@ const bookingSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     enum: ['card', 'bkash'],
-    required: true
+    required: false  // ✅ CHANGE THIS FROM 'required: true' TO 'required: false'
   },
   paymentDetails: {
     cardNumber: String,
@@ -3573,22 +3573,22 @@ app.post('/api/bookings', authenticate, async (req, res) => {
 
     // Create booking
     const booking = new Booking({
-      userId: req.user._id,
-      bookingType: 'host',
-      hostId: actualHostId,
-      checkIn,
-      checkOut,
-      guests,
-      selectedServices: selectedServices || [],
-      totalAmount,
-      platformFee,
-      grandTotal,
-      notes,
-      status: 'confirmed',
-      paymentStatus: 'paid',
-      paymentMethod,
-      paymentDetails: securePaymentDetails
-    });
+  userId: req.user._id,
+  bookingType: 'host',
+  hostId: actualHostId,
+  checkIn,
+  checkOut,
+  guests,
+  selectedServices: selectedServices || [],
+  totalAmount,
+  platformFee,
+  grandTotal,
+  notes,
+  status: 'pending',         // ✅ Traveler sends request, host must accept
+  paymentStatus: 'pending',  // ✅ Payment held until host accepts
+  paymentMethod,
+  paymentDetails: securePaymentDetails
+});
 
     await booking.save();
     console.log('✅ Booking saved:', booking._id);
@@ -3660,7 +3660,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
       description: `Experience ${host.location} with ${host.name}`,
       userId: req.user._id,
-      status: 'upcoming'
+      status: 'pending'
     });
 
     await trip.save();
@@ -4387,6 +4387,8 @@ const HostEarning = mongoose.model('HostEarning', hostEarningSchema);
 // ============ REPLACE THE ENTIRE POST /api/bookings ENDPOINT ============
 
 // Create host booking
+// ==================== COMPLETE FIXED POST /api/bookings ENDPOINT ====================
+
 app.post('/api/bookings', authenticate, async (req, res) => {
   try {
     const {
@@ -4397,9 +4399,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       checkOut,
       guests,
       selectedServices,
-      notes,
-      paymentMethod,
-      paymentDetails
+      notes
     } = req.body;
 
     console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut });
@@ -4412,7 +4412,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       });
     }
 
-    // Get service first to find actual host
+    // Get service first
     let service = null;
     if (serviceId) {
       service = await HostService.findById(serviceId).populate('hostId');
@@ -4427,6 +4427,20 @@ app.post('/api/bookings', authenticate, async (req, res) => {
 
     const actualHostId = service.hostId._id;
     console.log('✅ Service found, Host ID:', actualHostId);
+
+    // Check if service is available for requested dates
+    const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
+    
+    if (!availabilityCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availabilityCheck.reason,
+        conflictingBookings: availabilityCheck.conflictingBookings.map(b => ({
+          checkIn: b.checkIn,
+          checkOut: b.checkOut
+        }))
+      });
+    }
 
     // Get actual host document
     const host = await Host.findById(actualHostId);
@@ -4467,10 +4481,10 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     }
 
     // Validate guests
-    if (guests > host.maxGuests) {
+    if (guests > service.maxGuests) {
       return res.status(400).json({
         success: false,
-        message: `Maximum ${host.maxGuests} guests allowed. You selected ${guests} guests.`
+        message: `Maximum ${service.maxGuests} guests allowed. You selected ${guests} guests.`
       });
     }
 
@@ -4482,52 +4496,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
 
     console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
 
-    // Validate payment details
-    if (paymentMethod === 'card') {
-      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Card number and holder name are required'
-        });
-      }
-
-      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
-      if (!cardValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: cardValidation.message
-        });
-      }
-    } else if (paymentMethod === 'bkash') {
-      if (!paymentDetails?.bkashNumber) {
-        return res.status(400).json({
-          success: false,
-          message: 'bKash number is required'
-        });
-      }
-
-      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
-      if (!bkashValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: `bKash ${bkashValidation.message}`
-        });
-      }
-    }
-
-    // Prepare secure payment details
-    const securePaymentDetails = {};
-    if (paymentMethod === 'card') {
-      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
-      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
-      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
-    } else if (paymentMethod === 'bkash') {
-      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
-    }
-    const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    securePaymentDetails.transactionId = transactionId;
-
-    // Create booking
+    // ✅ FIX 1: Create booking with pending status (NO payment details required)
     const booking = new Booking({
       userId: req.user._id,
       bookingType: 'host',
@@ -4540,74 +4509,63 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       platformFee,
       grandTotal,
       notes,
-      status: 'confirmed',
-      paymentStatus: 'paid',
-      paymentMethod,
-      paymentDetails: securePaymentDetails
+      status: 'pending',         // Traveler sends request, host must accept
+      paymentStatus: 'pending'    // Payment held until host accepts
+      // ❌ NO paymentMethod or paymentDetails here
     });
 
     await booking.save();
-    console.log('✅ Booking saved:', booking._id);
+    console.log('✅ Booking request saved:', booking._id);
 
-    // Create earning record for host
-    const earning = new HostEarning({
-      hostId: actualHostId,
-      userId: host.userId,
+    // Add booking to service's bookedDates array with 'pending' status
+    if (!service.bookedDates) {
+      service.bookedDates = [];
+    }
+    
+    service.bookedDates.push({
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
       bookingId: booking._id,
-      amount: totalAmount,
-      platformFee,
-      hostEarnings: hostEarningsAmount,
-      bookingDetails: {
-        guestName: req.user.fullName,
-        guestEmail: req.user.email,
-        checkIn,
-        checkOut,
-        guests,
-        location: host.location,
-        days
-      },
-      status: 'completed',
-      paymentMethod,
-      transactionId
+      userId: req.user._id,
+      status: 'pending'
     });
 
-    await earning.save();
-    console.log('💰 Earning recorded:', earning._id, '৳' + hostEarningsAmount);
+    // Check if service is now fully booked
+    if (isServiceFullyBooked(service)) {
+      service.available = false;
+      console.log('⚠️ Service is now fully booked and marked as unavailable');
+    }
 
-    // Update host stats
-    host.totalBookings = (host.totalBookings || 0) + 1;
-    await host.save();
+    await service.save();
+    console.log('✅ Service updated with booking request');
 
-    /// Create trip record
-const trip = new Trip({
-  destination: host.location,
-  date: checkIn,
-  endDate: checkOut,
-  host: host.name,
-  hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
-  // ✅ FIX: Use service.propertyImage with fallback to location image
-  image: service.propertyImage || getLocationImage(host.location) || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
-  services: selectedServices || [],
-  guests,
-  totalAmount: grandTotal,
-  // ✅ FIX: Ensure hostRating is at least 1
-  hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
-  description: `Experience ${host.location} with ${host.name}`,
-  userId: req.user._id,
-  status: 'upcoming'
-});
+    // ✅ FIX 2: Create trip with 'pending' status (requires schema update)
+    const trip = new Trip({
+      destination: host.location,
+      date: checkIn,
+      endDate: checkOut,
+      host: host.name,
+      hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
+      image: service.propertyImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
+      services: selectedServices || [],
+      guests,
+      totalAmount: grandTotal,
+      hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
+      description: `Experience ${host.location} with ${host.name}`,
+      userId: req.user._id,
+      status: 'pending' // ✅ Now works after schema update
+    });
 
     await trip.save();
     console.log('✅ Trip saved:', trip._id);
 
     res.status(201).json({
       success: true,
-      message: 'Booking confirmed successfully!',
+      message: 'Booking request sent successfully! The host will review your request.',
       booking: {
         bookingId: booking.bookingId,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
-        transactionId,
         totalAmount: grandTotal,
         hostEarnings: hostEarningsAmount,
         platformFee
@@ -9206,6 +9164,8 @@ app.post('/api/community/posts/:id/share', authenticate, async (req, res) => {
   }
 });
 
+
+
 // Get trending topics
 app.get('/api/community/trending', async (req, res) => {
   try {
@@ -9637,6 +9597,376 @@ app.post('/api/transportation/seed', authenticate, async (req, res) => {
       message: 'Error seeding transportation',
       error: error.message
     });
+  }
+});
+
+app.get('/api/host/booking-requests', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can view booking requests' });
+    }
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const { status } = req.query;
+    let query = { hostId: hostProfile._id, bookingType: 'host' };
+    if (status) query.status = status;
+
+    const bookings = await Booking.find(query)
+      .populate('userId', 'fullName email phone profilePicture username')
+      .sort({ createdAt: -1 });
+
+    const formatted = bookings.map(b => ({
+      _id: b._id,
+      bookingId: b.bookingId,
+      traveler: {
+        id: b.userId._id,
+        name: b.userId.fullName,
+        email: b.userId.email,
+        phone: b.userId.phone,
+        avatar: b.userId.profilePicture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${b.userId.username}`
+      },
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      guests: b.guests,
+      selectedServices: b.selectedServices,
+      totalAmount: b.grandTotal,
+      hostEarnings: b.totalAmount,
+      platformFee: b.platformFee,
+      paymentMethod: b.paymentMethod,
+      status: b.status,
+      paymentStatus: b.paymentStatus,
+      notes: b.notes,
+      createdAt: b.createdAt,
+      nights: Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / (1000 * 60 * 60 * 24))
+    }));
+
+    res.json({ success: true, count: formatted.length, bookings: formatted });
+  } catch (error) {
+    console.error('❌ Get booking requests error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching booking requests' });
+  }
+});
+
+// Accept a booking request
+app.put('/api/host/booking-requests/:id/accept', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can accept bookings' });
+    }
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      hostId: hostProfile._id,
+      status: 'pending'
+    }).populate('userId', 'fullName email');
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found or already processed' });
+    }
+
+    // ✅ FIX: status = confirmed, paymentStatus stays PENDING
+    // The traveler must complete payment via the Pay button in MyHosts.
+    // The /api/payments/process endpoint will mark it paid and create HostEarning.
+    booking.status = 'confirmed';
+    booking.paymentStatus = 'pending';
+    await booking.save();
+
+    // Do NOT update trip status yet — wait for payment
+    // Do NOT create HostEarning yet — wait for payment
+
+    console.log(`✅ Booking ${booking.bookingId} accepted by host — awaiting traveler payment`);
+
+    res.json({
+      success: true,
+      message: 'Booking accepted! The traveler will be notified to complete payment.',
+      booking: { bookingId: booking.bookingId, status: 'confirmed', paymentStatus: 'pending' }
+    });
+  } catch (error) {
+    console.error('❌ Accept booking error:', error);
+    res.status(500).json({ success: false, message: 'Error accepting booking' });
+  }
+});
+
+
+// ==================== PAYMENT AFTER HOST ACCEPTANCE ====================
+
+// Get pending payments for user (bookings where host accepted but payment pending)
+app.get('/api/payments/pending', authenticate, async (req, res) => {
+  try {
+    const pendingBookings = await Booking.find({
+      userId: req.user._id,
+      status: 'confirmed',
+      paymentStatus: 'pending'
+    })
+    .populate({
+      path: 'hostId',
+      select: 'name location rating image'
+    })
+    .sort({ updatedAt: -1 });
+
+    res.json({
+      success: true,
+      count: pendingBookings.length,
+      bookings: pendingBookings
+    });
+  } catch (error) {
+    console.error('❌ Get pending payments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching pending payments',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Process payment for a confirmed booking
+app.post('/api/payments/process/:bookingId', authenticate, async (req, res) => {
+  try {
+    const { paymentMethod, paymentDetails } = req.body;
+    
+    const booking = await Booking.findOne({
+      _id: req.params.bookingId,
+      userId: req.user._id,
+      status: 'confirmed',
+      paymentStatus: 'pending'
+    }).populate('hostId');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found or already paid'
+      });
+    }
+
+    // Validate payment method
+    if (!paymentMethod || !['card', 'bkash'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid payment method required'
+      });
+    }
+
+    // Validate payment details
+    if (paymentMethod === 'card') {
+      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Card number and cardholder name are required'
+        });
+      }
+
+      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
+      if (!cardValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: cardValidation.message
+        });
+      }
+    } else if (paymentMethod === 'bkash') {
+      if (!paymentDetails?.bkashNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'bKash number is required'
+        });
+      }
+
+      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
+      if (!bkashValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: `bKash ${bkashValidation.message}`
+        });
+      }
+    }
+
+    // Prepare secure payment details
+    const securePaymentDetails = {};
+    const transactionId = `PAY${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    
+    if (paymentMethod === 'card') {
+      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
+      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
+      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
+    } else if (paymentMethod === 'bkash') {
+      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
+    }
+    securePaymentDetails.transactionId = transactionId;
+
+    // Update booking with payment info
+    booking.paymentMethod = paymentMethod;
+    booking.paymentDetails = securePaymentDetails;
+    booking.paymentStatus = 'paid';
+    booking.status = 'confirmed'; // Keep confirmed
+    await booking.save();
+
+    // Create earning record for host
+    const hostEarningsAmount = booking.totalAmount - booking.platformFee;
+    
+    const earning = new HostEarning({
+      hostId: booking.hostId._id,
+      userId: booking.hostId.userId,
+      bookingId: booking._id,
+      amount: booking.totalAmount,
+      platformFee: booking.platformFee,
+      hostEarnings: hostEarningsAmount,
+      bookingDetails: {
+        guestName: req.user.fullName,
+        guestEmail: req.user.email,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        guests: booking.guests,
+        location: booking.hostId.location,
+        days: Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24))
+      },
+      status: 'completed',
+      paymentMethod,
+      transactionId
+    });
+    
+    await earning.save();
+
+    // Update host stats
+    const host = await Host.findById(booking.hostId._id);
+    if (host) {
+      host.totalGuests = (host.totalGuests || 0) + booking.guests;
+      host.totalEarnings = (host.totalEarnings || 0) + hostEarningsAmount;
+      await host.save();
+    }
+
+    // Update associated trip to 'upcoming' if it exists
+    await Trip.updateOne(
+      { 
+        userId: req.user._id, 
+        destination: booking.hostId.location,
+        date: booking.checkIn,
+        status: 'pending'
+      },
+      { status: 'upcoming' }
+    );
+
+    console.log(`✅ Payment processed for booking ${booking.bookingId}`);
+    console.log(`💰 Host earnings: ৳${hostEarningsAmount}`);
+
+    res.json({
+      success: true,
+      message: 'Payment successful! Your booking is now confirmed.',
+      booking: {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        transactionId,
+        totalAmount: booking.grandTotal,
+        hostEarnings: hostEarningsAmount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Process payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing payment',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get payment status for a booking
+app.get('/api/payments/status/:bookingId', authenticate, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.bookingId,
+      userId: req.user._id
+    }).select('status paymentStatus paymentMethod grandTotal createdAt');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      paymentStatus: booking.paymentStatus,
+      bookingStatus: booking.status,
+      paymentMethod: booking.paymentMethod,
+      amount: booking.grandTotal,
+      bookedAt: booking.createdAt
+    });
+  } catch (error) {
+    console.error('❌ Get payment status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching payment status'
+    });
+  }
+});
+
+// Decline a booking request
+app.put('/api/host/booking-requests/:id/decline', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can decline bookings' });
+    }
+
+    const { reason, message: hostMessage } = req.body;
+
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      hostId: hostProfile._id,
+      status: 'pending'
+    });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found or already processed' });
+    }
+
+    booking.status = 'cancelled';
+    booking.paymentStatus = 'refunded';
+    booking.notes = `Declined by host. Reason: ${reason || 'Not specified'}. ${hostMessage || ''}`.trim();
+    await booking.save();
+
+    // Cancel associated trip
+    await Trip.updateOne(
+      { userId: booking.userId, date: booking.checkIn, status: 'pending' },
+      { status: 'cancelled' }
+    );
+
+    // Free up service dates
+    const service = await HostService.findOne({ hostId: hostProfile._id });
+    if (service && service.bookedDates) {
+      const idx = service.bookedDates.findIndex(b => b.bookingId?.toString() === booking._id.toString());
+      if (idx !== -1) {
+        service.bookedDates[idx].status = 'cancelled';
+        service.available = true;
+        await service.save();
+      }
+    }
+
+    console.log(`✅ Booking ${booking.bookingId} declined by host`);
+
+    res.json({
+      success: true,
+      message: 'Booking declined. The traveler will be notified and refunded.',
+      booking: { bookingId: booking.bookingId, status: 'cancelled' }
+    });
+  } catch (error) {
+    console.error('❌ Decline booking error:', error);
+    res.status(500).json({ success: false, message: 'Error declining booking' });
   }
 });
 

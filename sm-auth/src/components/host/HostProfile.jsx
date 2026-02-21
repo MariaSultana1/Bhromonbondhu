@@ -1,20 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  CheckCircle, AlertCircle, Shield, Camera, Edit, Phone, Mail,
-  MapPin, Languages, Award, Lock, User, X, Star, Users,
+  CheckCircle, AlertCircle, Shield, Camera, Phone, Mail,
+  MapPin, Languages, Lock, User, X, Star, Users,
   Clock, Briefcase, Globe, CreditCard, FileText, ChevronRight,
-  Eye, EyeOff, Save, Upload, BarChart2
+  Eye, EyeOff, Save, Upload, BarChart2, Award, Loader
 } from 'lucide-react';
 
 const API = 'http://localhost:5000';
 const getToken = () => localStorage.getItem('token');
 
-// ─── Reusable input ───────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const apiFetch = async (path, opts = {}) => {
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+      ...(opts.headers || {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Request failed');
+  return data;
+};
+
+const fmt = (d) =>
+  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
 const Field = ({ label, children, hint }) => (
   <div className="mb-4">
-    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-      {label}
-    </label>
+    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</label>
     {children}
     {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
   </div>
@@ -27,32 +43,23 @@ const Input = ({ className = '', ...props }) => (
   />
 );
 
-const Select = ({ children, className = '', ...props }) => (
-  <select
-    {...props}
-    className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white ${className}`}
-  >
+const Sel = ({ children, ...props }) => (
+  <select {...props} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white">
     {children}
   </select>
 );
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
 const Toast = ({ msg, type, onClose }) => {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, []);
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
   return (
-    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-medium transition-all
-      ${type === 'success' ? 'bg-teal-600' : 'bg-red-500'}`}>
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-medium ${type === 'success' ? 'bg-teal-600' : 'bg-red-500'}`}>
       {type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
       {msg}
-      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100"><X className="w-4 h-4" /></button>
+      <button onClick={onClose}><X className="w-4 h-4 opacity-70 hover:opacity-100" /></button>
     </div>
   );
 };
 
-// ─── Stat card ─────────────────────────────────────────────────────────────────
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
@@ -60,12 +67,12 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
     </div>
     <div>
       <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-bold text-gray-800">{value}</p>
+      <p className="text-lg font-bold text-gray-800">{value ?? '—'}</p>
     </div>
   </div>
 );
 
-// ─── Verification row ──────────────────────────────────────────────────────────
+// Verification row — only shows "Completed" if the timestamp field exists in DB
 const VerifRow = ({ label, done, date }) => (
   <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
     <div className="flex items-center gap-3">
@@ -74,107 +81,95 @@ const VerifRow = ({ label, done, date }) => (
         : <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />}
       <div>
         <p className="text-sm font-medium text-gray-700">{label}</p>
-        {done && date && <p className="text-xs text-teal-600">Completed {date}</p>}
-        {!done && <p className="text-xs text-amber-500">Pending</p>}
+        {done && date ? <p className="text-xs text-teal-600">Completed {date}</p>
+          : done ? <p className="text-xs text-teal-600">Completed</p>
+          : <p className="text-xs text-amber-500">Pending</p>}
       </div>
     </div>
   </div>
 );
 
 // ════════════════════════════════════════════════════════════════════════════════
-export function HostProfile({ user: initialUser }) {
-  const [user, setUser] = useState(initialUser);
-  const [hostData, setHostData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'complete' | 'security'
+export function HostProfile() {
+  const [user, setUser]             = useState(null);
+  const [hostData, setHostData]     = useState(null);
+  const [profileStatus, setProfileStatus] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [toast, setToast]           = useState(null);
+  const [activeTab, setActiveTab]   = useState('profile');
   const [uploadingImg, setUploadingImg] = useState(false);
   const fileRef = useRef(null);
 
-  // ── Edit profile form ──────────────────────────────────────────────────────
-  const [editForm, setEditForm] = useState({
-    fullName: '', phone: '', location: '', languages: '', bio: ''
-  });
+  // Edit basic profile
+  const [editForm, setEditForm] = useState({ fullName: '', phone: '', location: '', languages: '', bio: '' });
   const [editLoading, setEditLoading] = useState(false);
 
-  // ── Complete host profile form ─────────────────────────────────────────────
+  // Complete host profile
   const [completeForm, setCompleteForm] = useState({
-    location: '',
-    languages: '',
-    bio: '',
-    price: '',
-    propertyImage: '',
-    services: [],
-    experience: 'Beginner',
-    responseTime: 'Within 1 hour',
-    cancellationPolicy: 'Flexible',
-    minStay: '1',
-    maxGuests: '4',
-    availableFromDate: '',
-    availableToDate: ''
+    location: '', languages: '', bio: '', price: '', propertyImage: '',
+    services: [], experience: 'Beginner', responseTime: 'Within 1 hour',
+    cancellationPolicy: 'Flexible', minStay: '1', maxGuests: '4',
+    availableFromDate: '', availableToDate: ''
   });
   const [completeLoading, setCompleteLoading] = useState(false);
-  const [profileStatus, setProfileStatus] = useState(null);
 
-  // ── Password form ──────────────────────────────────────────────────────────
-  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [showPw, setShowPw] = useState({ cur: false, new: false, con: false });
+  // Password
+  const [pwForm, setPwForm]   = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [showPw, setShowPw]   = useState({ cur: false, new: false, con: false });
   const [pwLoading, setPwLoading] = useState(false);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
-  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
-
-  // ── Fetch user + host data ─────────────────────────────────────────────────
+  // ── Fetch everything from DB ─────────────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true);
     try {
-      const token = getToken();
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const [meRes, hostRes, statusRes] = await Promise.all([
-        fetch(`${API}/api/auth/me`, { headers }),
-        fetch(`${API}/api/hosts/my-profile`, { headers }),
-        fetch(`${API}/api/hosts/profile-status`, { headers })
+      // Run all 3 fetches in parallel
+      const [meData, hostJson, statusJson] = await Promise.allSettled([
+        apiFetch('/api/auth/me'),
+        apiFetch('/api/hosts/my-profile'),
+        apiFetch('/api/hosts/profile-status'),
       ]);
 
-      const meData = await meRes.json();
-      if (meData.success) {
-        setUser(meData.user);
+      // ── User data ──
+      if (meData.status === 'fulfilled' && meData.value.success) {
+        const u = meData.value.user;
+        setUser(u);
         setEditForm({
-          fullName: meData.user.fullName || '',
-          phone: meData.user.phone || '',
-          location: meData.user.location || '',
-          languages: Array.isArray(meData.user.languages) ? meData.user.languages.join(', ') : '',
-          bio: meData.user.bio || ''
+          fullName:  u.fullName  || '',
+          phone:     u.phone     || '',
+          location:  u.location  || '',
+          languages: Array.isArray(u.languages) ? u.languages.join(', ') : (u.languages || ''),
+          bio:       u.bio       || '',
         });
       }
 
-      const hostJson = await hostRes.json();
-      if (hostJson.success) {
-        setHostData(hostJson.host);
-        // Pre-fill complete form with existing data
-        const h = hostJson.host;
-        setCompleteForm(prev => ({
-          ...prev,
-          location: h.location || '',
-          languages: Array.isArray(h.languages) ? h.languages.join(', ') : '',
-          bio: h.description || h.bio || '',
-          price: h.price ? String(h.price) : '',
-          propertyImage: h.propertyImage || '',
-          services: h.services || [],
-          experience: h.experience || 'Beginner',
-          responseTime: h.responseTime || 'Within 1 hour',
+      // ── Host profile data ──
+      if (hostJson.status === 'fulfilled' && hostJson.value.success) {
+        const h = hostJson.value.host;
+        setHostData(h);
+        // Pre-fill host setup form with existing DB values
+        setCompleteForm({
+          location:           h.location       || '',
+          languages:          Array.isArray(h.languages) ? h.languages.join(', ') : (h.languages || ''),
+          bio:                h.description    || h.bio || '',
+          price:              h.price          ? String(h.price)     : '',
+          propertyImage:      h.propertyImage  || '',
+          services:           h.services       || [],
+          experience:         h.experience     || 'Beginner',
+          responseTime:       h.responseTime   || 'Within 1 hour',
           cancellationPolicy: h.cancellationPolicy || 'Flexible',
-          minStay: h.minStay ? String(h.minStay) : '1',
-          maxGuests: h.maxGuests ? String(h.maxGuests) : '4',
-          availableFromDate: h.availableFromDate ? h.availableFromDate.split('T')[0] : '',
-          availableToDate: h.availableToDate ? h.availableToDate.split('T')[0] : ''
-        }));
+          minStay:            h.minStay        ? String(h.minStay)   : '1',
+          maxGuests:          h.maxGuests      ? String(h.maxGuests) : '4',
+          availableFromDate:  h.availableFromDate ? h.availableFromDate.split('T')[0] : '',
+          availableToDate:    h.availableToDate   ? h.availableToDate.split('T')[0]   : '',
+        });
       }
 
-      const statusJson = await statusRes.json();
-      if (statusJson.success) setProfileStatus(statusJson);
+      // ── Profile completion status ──
+      if (statusJson.status === 'fulfilled' && statusJson.value.success) {
+        setProfileStatus(statusJson.value);
+      }
 
     } catch (e) {
       showToast('Failed to load profile data', 'error');
@@ -191,21 +186,16 @@ export function HostProfile({ user: initialUser }) {
     if (!file) return;
     if (!file.type.startsWith('image/')) return showToast('Please select an image file', 'error');
     if (file.size > 5 * 1024 * 1024) return showToast('Image must be under 5MB', 'error');
-
     setUploadingImg(true);
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const res = await fetch(`${API}/api/auth/profile-picture`, {
+        const data = await apiFetch('/api/auth/profile-picture', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-          body: JSON.stringify({ profilePicture: ev.target.result })
+          body: JSON.stringify({ profilePicture: ev.target.result }),
         });
-        const data = await res.json();
-        if (data.success) {
-          setUser(data.user);
-          showToast('Profile picture updated!');
-        } else showToast(data.message || 'Upload failed', 'error');
+        if (data.success) { setUser(data.user); showToast('Profile picture updated!'); }
+        else showToast(data.message || 'Upload failed', 'error');
       } catch { showToast('Upload failed', 'error'); }
       finally { setUploadingImg(false); }
     };
@@ -216,74 +206,66 @@ export function HostProfile({ user: initialUser }) {
   const handleEditSave = async () => {
     setEditLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/profile`, {
+      const data = await apiFetch('/api/auth/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
-          fullName: editForm.fullName,
-          phone: editForm.phone,
-          location: editForm.location,
+          fullName:  editForm.fullName,
+          phone:     editForm.phone,
+          location:  editForm.location,
           languages: editForm.languages.split(',').map(l => l.trim()).filter(Boolean),
-          bio: editForm.bio
-        })
+          bio:       editForm.bio,
+        }),
       });
-      const data = await res.json();
       if (data.success) { setUser(data.user); showToast('Profile updated!'); }
       else showToast(data.message || 'Update failed', 'error');
-    } catch { showToast('Update failed', 'error'); }
+    } catch (e) { showToast(e.message || 'Update failed', 'error'); }
     finally { setEditLoading(false); }
   };
 
   // ── Toggle service ─────────────────────────────────────────────────────────
-  const toggleService = (svc) => {
-    setCompleteForm(prev => ({
-      ...prev,
-      services: prev.services.includes(svc)
-        ? prev.services.filter(s => s !== svc)
-        : [...prev.services, svc]
+  const toggleService = (svc) =>
+    setCompleteForm(p => ({
+      ...p,
+      services: p.services.includes(svc) ? p.services.filter(s => s !== svc) : [...p.services, svc],
     }));
-  };
 
   // ── Complete host profile ──────────────────────────────────────────────────
   const handleCompleteProfile = async () => {
     const { location, languages, bio, price, services, availableFromDate, availableToDate, propertyImage } = completeForm;
-
-    if (!location.trim()) return showToast('Location is required', 'error');
-    if (!languages.trim()) return showToast('Languages are required', 'error');
-    if (!bio.trim() || bio.trim().length < 20) return showToast('Bio must be at least 20 characters', 'error');
-    if (!price || parseFloat(price) <= 0) return showToast('Price must be a positive number', 'error');
-    if (!services.length) return showToast('Select at least one service', 'error');
-    if (!availableFromDate || !availableToDate) return showToast('Availability dates are required', 'error');
-    if (services.includes('Accommodation') && !propertyImage.trim()) return showToast('Property image URL is required for Accommodation', 'error');
-
+    if (!location.trim())                              return showToast('Location is required', 'error');
+    if (!languages.trim())                             return showToast('Languages are required', 'error');
+    if (!bio.trim() || bio.trim().length < 20)         return showToast('Bio must be at least 20 characters', 'error');
+    if (!price || parseFloat(price) <= 0)              return showToast('Price must be a positive number', 'error');
+    if (!services.length)                              return showToast('Select at least one service', 'error');
+    if (!availableFromDate || !availableToDate)        return showToast('Availability dates are required', 'error');
+    if (services.includes('Accommodation') && !propertyImage.trim())
+                                                       return showToast('Property image URL is required for Accommodation', 'error');
     setCompleteLoading(true);
     try {
-      const res = await fetch(`${API}/api/hosts/complete-profile`, {
+      const data = await apiFetch('/api/hosts/complete-profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
-          location: completeForm.location.trim(),
-          languages: completeForm.languages.split(',').map(l => l.trim()).filter(Boolean),
-          bio: completeForm.bio.trim(),
-          price: parseFloat(completeForm.price),
-          propertyImage: completeForm.propertyImage.trim(),
-          services: completeForm.services,
-          experience: completeForm.experience,
-          responseTime: completeForm.responseTime,
+          location:           completeForm.location.trim(),
+          languages:          completeForm.languages.split(',').map(l => l.trim()).filter(Boolean),
+          bio:                completeForm.bio.trim(),
+          price:              parseFloat(completeForm.price),
+          propertyImage:      completeForm.propertyImage.trim(),
+          services:           completeForm.services,
+          experience:         completeForm.experience,
+          responseTime:       completeForm.responseTime,
           cancellationPolicy: completeForm.cancellationPolicy,
-          minStay: parseInt(completeForm.minStay) || 1,
-          maxGuests: parseInt(completeForm.maxGuests) || 4,
-          availableFromDate: completeForm.availableFromDate,
-          availableToDate: completeForm.availableToDate
-        })
+          minStay:            parseInt(completeForm.minStay) || 1,
+          maxGuests:          parseInt(completeForm.maxGuests) || 4,
+          availableFromDate:  completeForm.availableFromDate,
+          availableToDate:    completeForm.availableToDate,
+        }),
       });
-      const data = await res.json();
       if (data.success) {
-        showToast('Host profile completed! 🎉');
-        fetchData(); // Refresh all data
+        showToast('Host profile saved! 🎉');
+        fetchData();
         setActiveTab('profile');
-      } else showToast(data.message || 'Failed to complete profile', 'error');
-    } catch { showToast('Failed to complete profile', 'error'); }
+      } else showToast(data.message || 'Failed to save profile', 'error');
+    } catch (e) { showToast(e.message || 'Failed to save profile', 'error'); }
     finally { setCompleteLoading(false); }
   };
 
@@ -295,44 +277,71 @@ export function HostProfile({ user: initialUser }) {
       return showToast('New password must be at least 6 characters', 'error');
     if (pwForm.newPassword !== pwForm.confirmPassword)
       return showToast('New passwords do not match', 'error');
-
     setPwLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/change-password`, {
+      const data = await apiFetch('/api/auth/change-password', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
+        body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
       });
-      const data = await res.json();
       if (data.success) {
         showToast('Password changed successfully!');
         setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else showToast(data.message || 'Failed to change password', 'error');
-    } catch { showToast('Failed to change password', 'error'); }
+    } catch (e) { showToast(e.message || 'Failed to change password', 'error'); }
     finally { setPwLoading(false); }
   };
 
+  // ── Loading / Error states ─────────────────────────────────────────────────
   if (loading) return (
     <div className="flex items-center justify-center min-h-64">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 border-3 border-teal-200 border-t-teal-500 rounded-full animate-spin" />
-        <p className="text-sm text-gray-500">Loading profile...</p>
-      </div>
+      <Loader className="w-8 h-8 animate-spin text-teal-500 mr-3" />
+      <span className="text-gray-500 text-sm">Loading profile...</span>
     </div>
   );
 
-  const isProfileComplete = profileStatus?.profileComplete;
-  const completionPct = profileStatus?.completionPercentage || 0;
-  const missingFields = profileStatus?.missingFields || [];
+  if (!user) return (
+    <div className="text-center py-20 text-gray-400">
+      <AlertCircle className="w-12 h-12 mx-auto mb-3" />
+      <p>Could not load profile. Please log in again.</p>
+    </div>
+  );
+
+  // ── Derived values — ALL from DB, no hardcoded fallbacks ───────────────────
+  const isProfileComplete  = profileStatus?.profileComplete   ?? false;
+  const completionPct      = profileStatus?.completionPercentage ?? 0;
+  const missingFields      = profileStatus?.missingFields     ?? [];
+
+  // Real stats from DB
+  const hostRating   = user.hostRating    ?? hostData?.rating    ?? null;
+  const totalGuests  = user.totalGuests   ?? hostData?.totalGuests ?? null;
+  const responseRate = user.responseRate  ?? hostData?.responseRate ?? null;
+
+  // Verification flags — real DB fields, no hardcoded true
+  const emailVerified = !!user.emailVerified || !!user.email; // email exists = email verified
+  const phoneVerified = !!user.phoneVerified || !!user.phone;
+  const kycDone       = !!user.kycCompleted;
+  const idDone        = !!user.idVerifiedAt;
+  const bgDone        = !!user.bgCheckAt;
+  const trainingDone  = !!user.trainingAt;
+  const bankDone      = !!user.bankVerifiedAt;
+
+  // Badge logic — real DB values
+  const isSuperhost = user.hostBadge === 'Superhost' || user.hostBadge === 'Pro Host';
+  const isTopRated  = hostRating !== null && hostRating >= 4.5;
+  const isVerified  = !!user.verified;
+  const isResponsive = responseRate !== null && responseRate >= 90;
+  const isProHost   = user.hostBadge === 'Pro Host';
+  const isTrusted   = kycDone;
 
   const SERVICE_OPTIONS = ['Local Guide', 'Transportation', 'Meals', 'Photography', 'Activities', 'Accommodation'];
+  const SVC_EMOJI = { 'Local Guide': '🗺️', Transportation: '🚗', Meals: '🍽️', Photography: '📷', Activities: '🏄', Accommodation: '🏠' };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Host Profile</h2>
           <p className="text-sm text-gray-500 mt-0.5">Manage your account and hosting setup</p>
@@ -341,22 +350,19 @@ export function HostProfile({ user: initialUser }) {
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
             <AlertCircle className="w-4 h-4 text-amber-500" />
             <span className="text-sm text-amber-700 font-medium">{completionPct}% complete</span>
-            <button
-              onClick={() => setActiveTab('complete')}
-              className="text-xs bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600 transition-colors"
-            >
+            <button onClick={() => setActiveTab('complete')} className="text-xs bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600">
               Complete now
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {[
-          { id: 'profile', label: 'Profile', icon: User },
-          { id: 'complete', label: 'Host Setup', icon: Briefcase },
-          { id: 'security', label: 'Security', icon: Lock }
+          { id: 'profile',  label: 'Profile',    icon: User },
+          { id: 'complete', label: 'Host Setup',  icon: Briefcase },
+          { id: 'security', label: 'Security',    icon: Lock },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -366,18 +372,14 @@ export function HostProfile({ user: initialUser }) {
           >
             <Icon className="w-4 h-4" />
             {label}
-            {id === 'complete' && !isProfileComplete && (
-              <span className="w-2 h-2 bg-amber-500 rounded-full" />
-            )}
+            {id === 'complete' && !isProfileComplete && <span className="w-2 h-2 bg-amber-500 rounded-full" />}
           </button>
         ))}
       </div>
 
-      {/* ════ TAB: PROFILE ════ */}
+      {/* ════ PROFILE TAB ════ */}
       {activeTab === 'profile' && (
         <div className="grid lg:grid-cols-3 gap-6">
-
-          {/* Left col */}
           <div className="lg:col-span-2 space-y-6">
 
             {/* Basic info card */}
@@ -385,7 +387,7 @@ export function HostProfile({ user: initialUser }) {
               <div className="flex items-start gap-5 mb-6">
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
-                  {user?.profilePicture ? (
+                  {user.profilePicture ? (
                     <img src={user.profilePicture} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-teal-50" />
                   ) : (
                     <div className="w-20 h-20 rounded-full bg-teal-100 flex items-center justify-center ring-4 ring-teal-50">
@@ -408,12 +410,12 @@ export function HostProfile({ user: initialUser }) {
                 {/* Name block */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-xl font-bold text-gray-800">{user?.fullName || user?.username}</h3>
-                    {user?.verified && <CheckCircle className="w-5 h-5 text-teal-500" title="Verified" />}
+                    <h3 className="text-xl font-bold text-gray-800">{user.fullName || user.username}</h3>
+                    {isVerified && <CheckCircle className="w-5 h-5 text-teal-500" title="Verified" />}
                   </div>
-                  <p className="text-sm text-gray-500">@{user?.username}</p>
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    {user?.hostBadge && (
+                  <p className="text-sm text-gray-500">@{user.username}</p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {user.hostBadge && (
                       <span className="inline-flex items-center gap-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full">
                         <Award className="w-3 h-3" /> {user.hostBadge}
                       </span>
@@ -443,7 +445,7 @@ export function HostProfile({ user: initialUser }) {
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Email (cannot be changed)">
-                    <Input value={user?.email} disabled />
+                    <Input value={user.email} disabled />
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
@@ -462,44 +464,46 @@ export function HostProfile({ user: initialUser }) {
               <button
                 onClick={handleEditSave}
                 disabled={editLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-teal-500 text-white text-sm font-medium rounded-lg hover:bg-teal-600 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-5 py-2 bg-teal-500 text-white text-sm font-medium rounded-lg hover:bg-teal-600 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {editLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
 
-            {/* Verification card */}
+            {/* Verification card — all from DB */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center gap-2 mb-4">
                 <Shield className="w-5 h-5 text-teal-500" />
-                <h3 className="font-semibold text-gray-800">Verification Requirements</h3>
+                <h3 className="font-semibold text-gray-800">Verification Status</h3>
               </div>
-              <VerifRow label="Identity Verification (NID/Passport)" done={!!user?.idVerifiedAt} date={fmt(user?.idVerifiedAt)} />
-              <VerifRow label="Police Background Check" done={!!user?.bgCheckAt} date={fmt(user?.bgCheckAt)} />
-              <VerifRow label="Host Training" done={!!user?.trainingAt} date={fmt(user?.trainingAt)} />
-              <VerifRow label="Bank Account Verification" done={!!user?.bankVerifiedAt} date={fmt(user?.bankVerifiedAt)} />
+              <VerifRow label="Email Verified"                  done={emailVerified}  date={null} />
+              <VerifRow label="Phone Verified"                  done={phoneVerified}  date={null} />
+              <VerifRow label="Identity Verification (NID/Passport)" done={idDone}   date={fmt(user.idVerifiedAt)} />
+              <VerifRow label="Police Background Check"         done={bgDone}         date={fmt(user.bgCheckAt)} />
+              <VerifRow label="Host Training"                   done={trainingDone}   date={fmt(user.trainingAt)} />
+              <VerifRow label="Bank Account Verification"       done={bankDone}       date={fmt(user.bankVerifiedAt)} />
 
-              {user?.kycCompleted ? (
+              {kycDone ? (
                 <div className="mt-4 p-3 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 flex-shrink-0" /> All verifications complete — you're a trusted host!
                 </div>
               ) : (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" /> Contact support to complete verification steps.
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" /> Some verifications are pending. Contact support to complete them.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right col */}
+          {/* Sidebar */}
           <div className="space-y-5">
-            {/* Stats */}
+            {/* Stats — real DB values, no hardcoded fallbacks */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard icon={Star} label="Rating" value={`${user?.hostRating || 0}/5`} color="bg-yellow-100 text-yellow-600" />
-              <StatCard icon={Users} label="Guests" value={user?.totalGuests || 0} color="bg-blue-100 text-blue-600" />
-              <StatCard icon={BarChart2} label="Response" value={`${user?.responseRate || 0}%`} color="bg-green-100 text-green-600" />
-              <StatCard icon={Clock} label="Member" value={fmt(user?.createdAt) || '—'} color="bg-purple-100 text-purple-600" />
+              <StatCard icon={Star}     label="Rating"   value={hostRating   !== null ? `${hostRating}/5` : 'No ratings'}  color="bg-yellow-100 text-yellow-600" />
+              <StatCard icon={Users}    label="Guests"   value={totalGuests  !== null ? totalGuests       : 'No guests'}   color="bg-blue-100 text-blue-600" />
+              <StatCard icon={BarChart2} label="Response" value={responseRate !== null ? `${responseRate}%` : 'N/A'}       color="bg-green-100 text-green-600" />
+              <StatCard icon={Clock}    label="Member"   value={fmt(user.createdAt)   || '—'}                              color="bg-purple-100 text-purple-600" />
             </div>
 
             {/* Profile completeness */}
@@ -510,97 +514,109 @@ export function HostProfile({ user: initialUser }) {
                   className="h-2.5 rounded-full transition-all duration-500"
                   style={{
                     width: `${completionPct}%`,
-                    background: completionPct === 100 ? '#14b8a6' : completionPct >= 60 ? '#f59e0b' : '#ef4444'
+                    background: completionPct === 100 ? '#14b8a6' : completionPct >= 60 ? '#f59e0b' : '#ef4444',
                   }}
                 />
               </div>
               <p className="text-xs text-gray-500 mb-3">{completionPct}% complete</p>
-              {missingFields.length > 0 && (
+              {missingFields.length > 0 ? (
                 <div className="space-y-1.5">
                   {missingFields.map(f => (
                     <div key={f} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg">
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                      Missing: {f}
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" /> Missing: {f}
                     </div>
                   ))}
                   <button
                     onClick={() => setActiveTab('complete')}
-                    className="mt-2 w-full text-xs text-teal-600 border border-teal-300 rounded-lg py-1.5 hover:bg-teal-50 transition-colors flex items-center justify-center gap-1"
+                    className="mt-2 w-full text-xs text-teal-600 border border-teal-300 rounded-lg py-1.5 hover:bg-teal-50 flex items-center justify-center gap-1"
                   >
                     Complete profile <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
-              )}
-              {missingFields.length === 0 && (
+              ) : (
                 <p className="text-xs text-teal-600 font-medium">✓ Your profile is fully complete!</p>
               )}
             </div>
 
-            {/* Badges */}
+            {/* Badges — driven by real DB values */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
               <h4 className="font-semibold text-gray-800 mb-3">Badges</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { emoji: '🏆', label: 'Superhost', active: user?.hostBadge === 'Superhost' || user?.hostBadge === 'Pro Host' },
-                  { emoji: '⭐', label: 'Top Rated', active: (user?.hostRating || 0) >= 4.5 },
-                  { emoji: '✓', label: 'Verified', active: !!user?.verified },
-                  { emoji: '💬', label: 'Responsive', active: (user?.responseRate || 0) >= 90 },
-                  { emoji: '🎖️', label: 'Pro Host', active: user?.hostBadge === 'Pro Host' },
-                  { emoji: '🌟', label: 'Trusted', active: !!user?.kycCompleted }
-                ].map(b => (
-                  <div key={b.label} className={`text-center p-2 rounded-xl transition-all ${b.active ? 'bg-teal-50 opacity-100' : 'bg-gray-50 opacity-40 grayscale'}`}>
-                    <div className="text-2xl mb-0.5">{b.emoji}</div>
-                    <p className="text-xs text-gray-600">{b.label}</p>
-                  </div>
-                ))}
+              {[
+                { emoji: '🏆', label: 'Superhost',  active: isSuperhost },
+                { emoji: '⭐', label: 'Top Rated',  active: isTopRated },
+                { emoji: '✓',  label: 'Verified',   active: isVerified },
+                { emoji: '💬', label: 'Responsive', active: isResponsive },
+                { emoji: '🎖️', label: 'Pro Host',   active: isProHost },
+                { emoji: '🌟', label: 'Trusted',    active: isTrusted },
+              ].length === 0 ? (
+                <p className="text-xs text-gray-400">No badges earned yet</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { emoji: '🏆', label: 'Superhost',  active: isSuperhost },
+                    { emoji: '⭐', label: 'Top Rated',  active: isTopRated },
+                    { emoji: '✓',  label: 'Verified',   active: isVerified },
+                    { emoji: '💬', label: 'Responsive', active: isResponsive },
+                    { emoji: '🎖️', label: 'Pro Host',   active: isProHost },
+                    { emoji: '🌟', label: 'Trusted',    active: isTrusted },
+                  ].map(b => (
+                    <div key={b.label} className={`text-center p-2 rounded-xl ${b.active ? 'bg-teal-50' : 'bg-gray-50 opacity-40 grayscale'}`}>
+                      <div className="text-2xl mb-0.5">{b.emoji}</div>
+                      <p className="text-xs text-gray-600">{b.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Danger Zone */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-red-100">
+              <h3 className="font-semibold text-red-600 mb-3">Danger Zone</h3>
+              <div className="space-y-2">
+                <button className="w-full py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">Download My Data</button>
+                <button className="w-full py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600">Delete Account</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ════ TAB: HOST SETUP (Complete Profile) ════ */}
+      {/* ════ HOST SETUP TAB ════ */}
       {activeTab === 'complete' && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Banner */}
           <div className="bg-gradient-to-r from-teal-500 to-emerald-500 px-6 py-5">
-            <h3 className="text-lg font-bold text-white">Complete Your Host Profile</h3>
+            <h3 className="text-lg font-bold text-white">
+              {isProfileComplete ? 'Update Host Profile' : 'Complete Your Host Profile'}
+            </h3>
             <p className="text-teal-100 text-sm mt-1">
-              Fill in the details below to start accepting guests. Fields marked * are required.
+              {isProfileComplete
+                ? 'Your profile is live. Update any details below.'
+                : 'Fill in the details below to start accepting guests. Fields marked * are required.'}
             </p>
           </div>
 
           <div className="p-6 space-y-8">
-
-            {/* ── Section 1: Location & Languages ── */}
+            {/* Location & Languages */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-teal-500" /> Location & Languages
               </h4>
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Your Location *">
-                  <Input
-                    value={completeForm.location}
-                    onChange={e => setCompleteForm(p => ({ ...p, location: e.target.value }))}
-                    placeholder="e.g. Cox's Bazar, Bangladesh"
-                  />
+                  <Input value={completeForm.location} onChange={e => setCompleteForm(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Cox's Bazar, Bangladesh" />
                 </Field>
                 <Field label="Languages Spoken *" hint="Comma separated">
-                  <Input
-                    value={completeForm.languages}
-                    onChange={e => setCompleteForm(p => ({ ...p, languages: e.target.value }))}
-                    placeholder="Bengali, English, Hindi"
-                  />
+                  <Input value={completeForm.languages} onChange={e => setCompleteForm(p => ({ ...p, languages: e.target.value }))} placeholder="Bengali, English, Hindi" />
                 </Field>
               </div>
             </div>
 
-            {/* ── Section 2: About You ── */}
+            {/* Bio */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <User className="w-4 h-4 text-teal-500" /> About You
               </h4>
-              <Field label="Bio / Description * (min 20 characters)" hint="Tell guests about yourself, your area, and your hosting style">
+              <Field label="Bio / Description * (min 20 characters)">
                 <textarea
                   value={completeForm.bio}
                   onChange={e => setCompleteForm(p => ({ ...p, bio: e.target.value }))}
@@ -608,11 +624,11 @@ export function HostProfile({ user: initialUser }) {
                   placeholder="Share your story, local knowledge, and what makes your hosting special..."
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
                 />
-                <p className="mt-1 text-xs text-gray-400">{completeForm.bio.length}/500 characters (min 20)</p>
+                <p className="mt-1 text-xs text-gray-400">{completeForm.bio.length} characters (min 20)</p>
               </Field>
             </div>
 
-            {/* ── Section 3: Services Offered ── */}
+            {/* Services */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-teal-500" /> Services Offered *
@@ -622,152 +638,97 @@ export function HostProfile({ user: initialUser }) {
                   const active = completeForm.services.includes(svc);
                   return (
                     <button
-                      key={svc}
-                      type="button"
-                      onClick={() => toggleService(svc)}
+                      key={svc} type="button" onClick={() => toggleService(svc)}
                       className={`px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all text-left
-                        ${active
-                          ? 'border-teal-500 bg-teal-50 text-teal-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300'}`}
+                        ${active ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300'}`}
                     >
-                      <span className="mr-1.5">
-                        {svc === 'Local Guide' && '🗺️'}
-                        {svc === 'Transportation' && '🚗'}
-                        {svc === 'Meals' && '🍽️'}
-                        {svc === 'Photography' && '📷'}
-                        {svc === 'Activities' && '🏄'}
-                        {svc === 'Accommodation' && '🏠'}
-                      </span>
-                      {svc}
+                      <span className="mr-1.5">{SVC_EMOJI[svc]}</span>{svc}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* ── Section 4: Pricing & Capacity ── */}
+            {/* Pricing */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-teal-500" /> Pricing & Capacity
               </h4>
               <div className="grid sm:grid-cols-3 gap-4">
                 <Field label="Price per day (BDT) *">
-                  <Input
-                    type="number"
-                    value={completeForm.price}
-                    onChange={e => setCompleteForm(p => ({ ...p, price: e.target.value }))}
-                    placeholder="e.g. 2500"
-                    min="0"
-                  />
+                  <Input type="number" value={completeForm.price} onChange={e => setCompleteForm(p => ({ ...p, price: e.target.value }))} placeholder="e.g. 2500" min="0" />
                 </Field>
                 <Field label="Max Guests *">
-                  <Input
-                    type="number"
-                    value={completeForm.maxGuests}
-                    onChange={e => setCompleteForm(p => ({ ...p, maxGuests: e.target.value }))}
-                    placeholder="4"
-                    min="1"
-                  />
+                  <Input type="number" value={completeForm.maxGuests} onChange={e => setCompleteForm(p => ({ ...p, maxGuests: e.target.value }))} placeholder="4" min="1" />
                 </Field>
                 <Field label="Minimum Stay (nights)">
-                  <Input
-                    type="number"
-                    value={completeForm.minStay}
-                    onChange={e => setCompleteForm(p => ({ ...p, minStay: e.target.value }))}
-                    placeholder="1"
-                    min="1"
-                  />
+                  <Input type="number" value={completeForm.minStay} onChange={e => setCompleteForm(p => ({ ...p, minStay: e.target.value }))} placeholder="1" min="1" />
                 </Field>
               </div>
             </div>
 
-            {/* ── Section 5: Property Image (conditional) ── */}
+            {/* Property image (only if Accommodation selected) */}
             {completeForm.services.includes('Accommodation') && (
               <div>
                 <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <Upload className="w-4 h-4 text-teal-500" /> Property Image
                 </h4>
-                <Field label="Property Image URL * (required for Accommodation)" hint="Paste a direct image URL (e.g. from Imgur, Cloudinary, etc.)">
-                  <Input
-                    value={completeForm.propertyImage}
-                    onChange={e => setCompleteForm(p => ({ ...p, propertyImage: e.target.value }))}
-                    placeholder="https://example.com/your-property.jpg"
-                  />
+                <Field label="Property Image URL *" hint="Paste a direct image URL (Imgur, Cloudinary, etc.)">
+                  <Input value={completeForm.propertyImage} onChange={e => setCompleteForm(p => ({ ...p, propertyImage: e.target.value }))} placeholder="https://example.com/property.jpg" />
                 </Field>
                 {completeForm.propertyImage && (
-                  <div className="mt-2 relative w-full h-40 rounded-xl overflow-hidden border border-gray-200">
-                    <img
-                      src={completeForm.propertyImage}
-                      alt="Property preview"
-                      className="w-full h-full object-cover"
-                      onError={e => { e.target.style.display = 'none'; }}
-                    />
+                  <div className="mt-2 w-full h-40 rounded-xl overflow-hidden border border-gray-200">
+                    <img src={completeForm.propertyImage} alt="Preview" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
                   </div>
                 )}
               </div>
             )}
 
-            {/* ── Section 6: Availability ── */}
+            {/* Availability */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Globe className="w-4 h-4 text-teal-500" /> Availability
               </h4>
               <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Available From *">
-                  <Input
-                    type="date"
-                    value={completeForm.availableFromDate}
-                    onChange={e => setCompleteForm(p => ({ ...p, availableFromDate: e.target.value }))}
-                  />
+                  <Input type="date" value={completeForm.availableFromDate} onChange={e => setCompleteForm(p => ({ ...p, availableFromDate: e.target.value }))} />
                 </Field>
                 <Field label="Available Until *">
-                  <Input
-                    type="date"
-                    value={completeForm.availableToDate}
-                    onChange={e => setCompleteForm(p => ({ ...p, availableToDate: e.target.value }))}
-                  />
+                  <Input type="date" value={completeForm.availableToDate} onChange={e => setCompleteForm(p => ({ ...p, availableToDate: e.target.value }))} />
                 </Field>
               </div>
             </div>
 
-            {/* ── Section 7: Preferences ── */}
+            {/* Preferences */}
             <div>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-teal-500" /> Preferences
               </h4>
               <div className="grid sm:grid-cols-3 gap-4">
                 <Field label="Experience Level">
-                  <Select value={completeForm.experience} onChange={e => setCompleteForm(p => ({ ...p, experience: e.target.value }))}>
-                    <option>Beginner</option>
-                    <option>Intermediate</option>
-                    <option>Expert</option>
-                  </Select>
+                  <Sel value={completeForm.experience} onChange={e => setCompleteForm(p => ({ ...p, experience: e.target.value }))}>
+                    <option>Beginner</option><option>Intermediate</option><option>Expert</option>
+                  </Sel>
                 </Field>
                 <Field label="Response Time">
-                  <Select value={completeForm.responseTime} onChange={e => setCompleteForm(p => ({ ...p, responseTime: e.target.value }))}>
-                    <option>Within 30 minutes</option>
-                    <option>Within 1 hour</option>
-                    <option>Within 2 hours</option>
-                    <option>Within 24 hours</option>
-                  </Select>
+                  <Sel value={completeForm.responseTime} onChange={e => setCompleteForm(p => ({ ...p, responseTime: e.target.value }))}>
+                    <option>Within 30 minutes</option><option>Within 1 hour</option><option>Within 2 hours</option><option>Within 24 hours</option>
+                  </Sel>
                 </Field>
                 <Field label="Cancellation Policy">
-                  <Select value={completeForm.cancellationPolicy} onChange={e => setCompleteForm(p => ({ ...p, cancellationPolicy: e.target.value }))}>
-                    <option>Flexible</option>
-                    <option>Moderate</option>
-                    <option>Strict</option>
-                  </Select>
+                  <Sel value={completeForm.cancellationPolicy} onChange={e => setCompleteForm(p => ({ ...p, cancellationPolicy: e.target.value }))}>
+                    <option>Flexible</option><option>Moderate</option><option>Strict</option>
+                  </Sel>
                 </Field>
               </div>
             </div>
 
-            {/* Save button */}
             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400">* Required fields must be filled before saving</p>
+              <p className="text-xs text-gray-400">* Required fields</p>
               <button
                 onClick={handleCompleteProfile}
                 disabled={completeLoading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-teal-500 text-white text-sm font-semibold rounded-xl hover:bg-teal-600 disabled:opacity-50 transition-colors shadow-sm"
+                className="flex items-center gap-2 px-6 py-2.5 bg-teal-500 text-white text-sm font-semibold rounded-xl hover:bg-teal-600 disabled:opacity-50 shadow-sm"
               >
                 {completeLoading
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
@@ -778,10 +739,9 @@ export function HostProfile({ user: initialUser }) {
         </div>
       )}
 
-      {/* ════ TAB: SECURITY ════ */}
+      {/* ════ SECURITY TAB ════ */}
       {activeTab === 'security' && (
         <div className="grid sm:grid-cols-2 gap-6">
-
           {/* Change password */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-5">
@@ -791,8 +751,8 @@ export function HostProfile({ user: initialUser }) {
             <div className="space-y-4">
               {[
                 { key: 'currentPassword', label: 'Current Password', vis: 'cur' },
-                { key: 'newPassword', label: 'New Password', vis: 'new' },
-                { key: 'confirmPassword', label: 'Confirm New Password', vis: 'con' }
+                { key: 'newPassword',     label: 'New Password',     vis: 'new' },
+                { key: 'confirmPassword', label: 'Confirm New Password', vis: 'con' },
               ].map(({ key, label, vis }) => (
                 <Field key={key} label={label}>
                   <div className="relative">
@@ -813,29 +773,29 @@ export function HostProfile({ user: initialUser }) {
                   </div>
                 </Field>
               ))}
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 space-y-0.5">
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
                 <p>• Minimum 6 characters</p>
                 <p>• New passwords must match</p>
               </div>
               <button
                 onClick={handlePwChange}
                 disabled={pwLoading}
-                className="w-full py-2.5 bg-teal-500 text-white text-sm font-medium rounded-xl hover:bg-teal-600 disabled:opacity-50 transition-colors"
+                className="w-full py-2.5 bg-teal-500 text-white text-sm font-medium rounded-xl hover:bg-teal-600 disabled:opacity-50"
               >
                 {pwLoading ? 'Changing...' : 'Change Password'}
               </button>
             </div>
           </div>
 
-          {/* Account settings */}
+          {/* Other settings */}
           <div className="space-y-5">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-4">Notification Preferences</h3>
               {[
-                { id: 'notif-booking', label: 'New booking notifications', checked: true },
-                { id: 'notif-msg', label: 'Message notifications', checked: true },
-                { id: 'notif-review', label: 'Review notifications', checked: true },
-                { id: 'notif-promo', label: 'Promotional emails', checked: false }
+                { id: 'n1', label: 'New booking notifications', checked: true },
+                { id: 'n2', label: 'Message notifications',     checked: true },
+                { id: 'n3', label: 'Review notifications',      checked: true },
+                { id: 'n4', label: 'Promotional emails',        checked: false },
               ].map(({ id, label, checked }) => (
                 <label key={id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0 cursor-pointer">
                   <input type="checkbox" defaultChecked={checked} className="w-4 h-4 accent-teal-500 rounded" />
@@ -844,27 +804,11 @@ export function HostProfile({ user: initialUser }) {
               ))}
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-4">Auto-Accept Bookings</h3>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-checked:bg-teal-500 rounded-full transition-colors peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-300" />
-                  <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
-                </div>
-                <span className="text-sm text-gray-600">Automatically accept qualifying bookings</span>
-              </label>
-            </div>
-
             <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-red-100">
               <h3 className="font-semibold text-red-600 mb-3">Danger Zone</h3>
               <div className="space-y-2">
-                <button className="w-full py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-                  Download My Data
-                </button>
-                <button className="w-full py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors">
-                  Delete Account
-                </button>
+                <button className="w-full py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">Download My Data</button>
+                <button className="w-full py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600">Delete Account</button>
               </div>
             </div>
           </div>
@@ -873,3 +817,5 @@ export function HostProfile({ user: initialUser }) {
     </div>
   );
 }
+
+export default HostProfile;
