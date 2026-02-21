@@ -3145,6 +3145,166 @@ app.put('/api/trips/fix/status', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/host/earnings
+app.get('/api/host/earnings', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can view earnings' });
+    }
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+    const earnings = await HostEarning.find({ hostId: hostProfile._id })
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    const totalEarnings = earnings.reduce((s, e) => s + e.hostEarnings, 0);
+
+    res.json({
+      success: true,
+      earnings: {
+        totalEarnings,
+        totalBookings: earnings.length,
+        recentTransactions: earnings.map(e => ({
+          _id: e._id,
+          amount: e.hostEarnings,
+          totalAmount: e.amount,
+          platformFee: e.platformFee,
+          guestName: e.bookingDetails?.guestName,
+          location: e.bookingDetails?.location,
+          bookingDetails: e.bookingDetails,
+          status: e.status,
+          transactionId: e.transactionId,
+          date: e.createdAt
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get earnings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/host/earnings/summary
+app.get('/api/host/earnings/summary', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can view earnings' });
+    }
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [allTime, thisMonth, lastMonth] = await Promise.all([
+      HostEarning.find({ hostId: hostProfile._id }),
+      HostEarning.find({ hostId: hostProfile._id, createdAt: { $gte: startOfMonth } }),
+      HostEarning.find({ hostId: hostProfile._id, createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } })
+    ]);
+
+    const sum = arr => arr.reduce((s, e) => s + e.hostEarnings, 0);
+
+    res.json({
+      success: true,
+      summary: {
+        allTime: { totalEarnings: Math.round(sum(allTime)), totalBookings: allTime.length },
+        thisMonth: { earnings: Math.round(sum(thisMonth)), bookings: thisMonth.length },
+        lastMonth: { earnings: Math.round(sum(lastMonth)), bookings: lastMonth.length }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get earnings summary error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/host/earnings
+app.get('/api/host/earnings', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can view earnings' });
+    }
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const earnings = await HostEarning.find({ hostId: hostProfile._id })
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    const totalEarnings = earnings.reduce((s, e) => s + (e.hostEarnings || 0), 0);
+
+    res.json({
+      success: true,
+      earnings: {
+        totalEarnings,
+        totalBookings: earnings.length,
+        recentTransactions: earnings.map(e => ({
+          _id:          e._id,
+          bookingId:    e.bookingId,              // ← Booking._id ref (for matching in frontend)
+          hostEarnings: e.hostEarnings,           // DB: 1702 — host's cut after fee
+          guestPaid:    e.amount,                 // DB: 2002 — what guest paid (DB field: amount)
+          platformFee:  e.platformFee,            // DB: 300  — platform's cut
+          guestName:    e.bookingDetails?.guestName,
+          location:     e.bookingDetails?.location,
+          bookingDetails: e.bookingDetails,
+          status:       e.status,
+          transactionId: e.transactionId,
+          date:         e.createdAt,
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get earnings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/host/earnings/summary
+app.get('/api/host/earnings/summary', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') {
+      return res.status(403).json({ success: false, message: 'Only hosts can view earnings' });
+    }
+    const hostProfile = await Host.findOne({ userId: req.user._id });
+    if (!hostProfile) {
+      return res.status(404).json({ success: false, message: 'Host profile not found' });
+    }
+
+    const now = new Date();
+    const startOfMonth    = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth   = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [allTime, thisMonth, lastMonth] = await Promise.all([
+      HostEarning.find({ hostId: hostProfile._id }),
+      HostEarning.find({ hostId: hostProfile._id, createdAt: { $gte: startOfMonth } }),
+      HostEarning.find({ hostId: hostProfile._id, createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
+    ]);
+
+    const sum = arr => arr.reduce((s, e) => s + (e.hostEarnings || 0), 0);
+
+    res.json({
+      success: true,
+      summary: {
+        allTime:   { totalEarnings: Math.round(sum(allTime)),   totalBookings: allTime.length },
+        thisMonth: { earnings: Math.round(sum(thisMonth)),      bookings: thisMonth.length },
+        lastMonth: { earnings: Math.round(sum(lastMonth)),      bookings: lastMonth.length },
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get earnings summary error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get a single trip by ID (Protected)
 app.get('/api/trips/:id', authenticate, async (req, res) => {
   try {
