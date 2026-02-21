@@ -1,185 +1,242 @@
+// AllTrips.jsx - FIXED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, ArrowLeft, Search, Cloud, Loader2, AlertCircle, Plus, CheckCircle } from 'lucide-react';
-import { TripDetails } from './TripDetails';
+import { Calendar, MapPin, ArrowLeft, Search, Loader2, AlertCircle, Home, Ticket, Star, Users, Clock, Eye } from 'lucide-react';
 
-// Weather API service
-const weatherService = {
-  getWeatherForDestination: async (destination, date) => {
-    try {
-      // Using Open-Meteo API (free, no key required)
-      const response = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=en&format=json`
-      );
-      const geoData = await response.json();
-      
-      if (!geoData.results || geoData.results.length === 0) {
-        return 'Clear'; // Default weather
-      }
+const API_URL = 'http://localhost:5000/api';
 
-      const { latitude, longitude, name } = geoData.results[0];
-      
-      // Get weather forecast
-      const weatherResponse = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`
-      );
-      const weatherData = await weatherResponse.json();
-      
-      // Map weather codes to descriptions
-      const weatherCodes = {
-        0: 'Clear',
-        1: 'Mostly Clear',
-        2: 'Partly Cloudy',
-        3: 'Overcast',
-        45: 'Foggy',
-        48: 'Foggy',
-        51: 'Light Drizzle',
-        53: 'Drizzle',
-        55: 'Heavy Drizzle',
-        61: 'Light Rain',
-        63: 'Rain',
-        65: 'Heavy Rain',
-        71: 'Light Snow',
-        73: 'Snow',
-        75: 'Heavy Snow',
-        80: 'Light Showers',
-        81: 'Showers',
-        82: 'Heavy Showers',
-        85: 'Light Snow Showers',
-        86: 'Snow Showers',
-        95: 'Thunderstorm',
-        96: 'Thunderstorm with Hail',
-        99: 'Thunderstorm with Hail'
-      };
+// ─── Trip Details Modal ───────────────────────────────────────────────────────
+function TripDetailsModal({ trip, onClose }) {
+  if (!trip) return null;
 
-      const code = weatherData.daily.weather_code[0];
-      const maxTemp = weatherData.daily.temperature_2m_max[0];
-      const minTemp = weatherData.daily.temperature_2m_min[0];
-      
-      return `${weatherCodes[code] || 'Clear'} (${minTemp}°-${maxTemp}°C)`;
-    } catch (error) {
-      console.error('Weather API error:', error);
-      return 'Check forecast';
-    }
-  }
-};
+  const nights = trip.nights || 0;
+  const fmtDate = (d) => {
+    if (!d) return 'N/A';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold">{trip.destination}</h2>
+            <p className="text-blue-100 text-sm mt-1">Booking ID: {trip.bookingId}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/20 rounded-lg transition-all"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Image */}
+        <div className="relative w-full h-80 overflow-hidden">
+          <img
+            src={trip.image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80'}
+            alt={trip.destination}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80';
+            }}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="p-8 space-y-8">
+          {/* Trip Dates */}
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Trip Dates</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="text-sm text-gray-600 mb-1">Check-in</div>
+                <div className="text-lg font-semibold text-gray-800">{fmtDate(trip.date)}</div>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="text-sm text-gray-600 mb-1">Check-out</div>
+                <div className="text-lg font-semibold text-gray-800">{fmtDate(trip.endDate)}</div>
+              </div>
+            </div>
+            <div className="mt-3 text-sm text-gray-600">
+              <Calendar className="w-4 h-4 inline mr-2" />
+              {nights} night{nights !== 1 ? 's' : ''} • {trip.guests || 1} guest{(trip.guests || 1) > 1 ? 's' : ''}
+            </div>
+          </div>
+
+          {/* Transport Info */}
+          {trip.ticketBooked && trip.ticketInfo && (
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                <Ticket className="w-6 h-6 text-purple-600" />
+                Transportation
+              </h3>
+              <div className="bg-purple-50 rounded-xl p-6 border border-purple-100 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Type</span>
+                  <span className="font-semibold text-gray-800 capitalize">{trip.ticketInfo.type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Provider</span>
+                  <span className="font-semibold text-gray-800">{trip.ticketInfo.provider}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Route</span>
+                  <span className="font-semibold text-gray-800">{trip.ticketInfo.from} → {trip.ticketInfo.to}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Date</span>
+                  <span className="font-semibold text-gray-800">{fmtDate(trip.ticketInfo.journeyDate)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t border-purple-200">
+                  <span className="text-gray-600 font-medium">Booking ID</span>
+                  <span className="font-bold text-purple-600">{trip.ticketInfo.bookingId}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Host Info */}
+          {trip.hostBooked && trip.hostInfo && (
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                <Home className="w-6 h-6 text-green-600" />
+                Host Experience
+              </h3>
+              <div className="bg-green-50 rounded-xl p-6 border border-green-100 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    {trip.hostName ? trip.hostName.charAt(0).toUpperCase() : 'H'}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-800">{trip.hostName || trip.hostInfo.name}</h4>
+                    <p className="text-sm text-gray-600">{trip.hostInfo.location}</p>
+                    {trip.hostInfo.rating > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        <span className="text-sm font-semibold">{trip.hostInfo.rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-green-200">
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">Check-in</div>
+                    <div className="font-semibold text-gray-800">{trip.hostInfo.checkIn || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">Check-out</div>
+                    <div className="font-semibold text-gray-800">{trip.hostInfo.checkOut || 'N/A'}</div>
+                  </div>
+                </div>
+
+                {trip.hostInfo.services && trip.hostInfo.services.length > 0 && (
+                  <div className="pt-3 border-t border-green-200">
+                    <div className="text-xs text-gray-600 mb-2">Services</div>
+                    <div className="flex flex-wrap gap-2">
+                      {trip.hostInfo.services.map((service, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-white text-green-700 rounded-lg text-xs font-medium border border-green-200">
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Payment Summary */}
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Payment Summary</h3>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-semibold">৳{(trip.totalAmount || 0).toLocaleString()}</span>
+              </div>
+              {trip.platformFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Platform Fee (15%)</span>
+                  <span>+ ৳{(trip.platformFee || 0).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-3 border-t border-blue-200 font-bold text-lg">
+                <span>Total</span>
+                <span className="text-blue-600">৳{(trip.grandTotal || trip.totalAmount || 0).toLocaleString()}</span>
+              </div>
+              <div className="pt-3 border-t border-blue-200">
+                <div className="text-sm">
+                  <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${
+                    trip.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                    trip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    trip.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {trip.status?.toUpperCase() || 'PENDING'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all"
+          >
+            Close Details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export function AllTrips({ onBack }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [trips, setTrips] = useState([]);
-  const [consolidatedTrips, setConsolidatedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [weatherCache, setWeatherCache] = useState({});
 
-  // ✅ Consolidate trips: combine ticket + host into single trip
-  const consolidateTrips = useCallback((rawTrips) => {
-    const tripMap = new Map();
-
-    rawTrips.forEach(trip => {
-      // Create a unique key based on destination + date range
-      const key = `${trip.destination}_${trip.date}_${trip.endDate}`;
-      
-      if (!tripMap.has(key)) {
-        tripMap.set(key, {
-          _id: trip._id,
-          destination: trip.destination,
-          location: trip.location,
-          date: trip.date,
-          endDate: trip.endDate,
-          image: trip.image,
-          totalAmount: trip.totalAmount || 0,
-          guests: trip.guests,
-          nights: trip.nights,
-          services: trip.services || [],
-          bookingId: trip.bookingId,
-          status: trip.status,
-          weather: trip.weather,
-          // Booking tracking
-          hostBooked: trip.host && trip.host !== 'pending' ? true : false,
-          hostName: trip.host && trip.host !== 'pending' ? trip.host : null,
-          hostInfo: trip.hostInfo || null,
-          ticketBooked: trip.transportProvider ? true : false,
-          ticketInfo: {
-            type: trip.transportType,
-            provider: trip.transportProvider,
-            from: trip.transportFrom,
-            to: trip.transportTo,
-            bookingId: trip.ticketBookingId
-          },
-          // Completion tracking
-          completionDate: trip.completionDate || null
-        });
-      } else {
-        // Merge booking info if this is a duplicate
-        const existing = tripMap.get(key);
-        if (trip.host && trip.host !== 'pending') {
-          existing.hostBooked = true;
-          existing.hostName = trip.host;
-        }
-        if (trip.transportProvider) {
-          existing.ticketBooked = true;
-          existing.ticketInfo = {
-            type: trip.transportType,
-            provider: trip.transportProvider,
-            from: trip.transportFrom,
-            to: trip.transportTo
-          };
-        }
-      }
-    });
-
-    return Array.from(tripMap.values());
-  }, []);
-
-  // ✅ FIX: Use useCallback to prevent unnecessary re-renders
   const fetchTrips = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         throw new Error('No authentication token found. Please login.');
       }
-      
-      const response = await fetch('http://localhost:5000/api/trips', {
+
+      const response = await fetch(`${API_URL}/trips`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.status === 401) {
         localStorage.removeItem('token');
         throw new Error('Session expired. Please login again.');
       }
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch trips: ${response.statusText}`);
       }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const rawTrips = data.trips || [];
-        const consolidated = consolidateTrips(rawTrips);
-        
-        // Fetch weather for all trips
-        const weatherPromises = consolidated.map(trip =>
-          weatherService.getWeatherForDestination(trip.destination, trip.date)
-            .then(weather => {
-              trip.weather = weather;
-              return trip;
-            })
-        );
 
-        const tripsWithWeather = await Promise.all(weatherPromises);
-        setTrips(tripsWithWeather);
-        setConsolidatedTrips(tripsWithWeather);
-        console.log('✅ Trips fetched and consolidated:', tripsWithWeather.length, 'trips');
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Trips fetched:', data.trips);
+        setTrips(data.trips || []);
       } else {
         throw new Error(data.message || 'Failed to fetch trips');
       }
@@ -189,87 +246,32 @@ export function AllTrips({ onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [consolidateTrips]);
+  }, []);
 
-  // ✅ FIX: Fetch trips only once on mount
   useEffect(() => {
     fetchTrips();
   }, [fetchTrips]);
 
-  const handleRefresh = () => {
-    fetchTrips();
-  };
-
-  const seedSampleTrips = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/trips/seed', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setTrips(data.trips || []);
-        setError(null);
-      } else {
-        throw new Error(data.message || 'Failed to seed trips');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Mark trip as completed
-  const markTripAsCompleted = async (tripId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/trips/${tripId}/complete`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          completionDate: new Date().toISOString()
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Update local state
-        setTrips(prevTrips => prevTrips.map(trip =>
-          trip._id === tripId ? { ...trip, status: 'completed', completionDate: new Date() } : trip
-        ));
-        setSelectedTrip(null);
-      }
-    } catch (err) {
-      console.error('Error completing trip:', err);
-    }
+  const fmtDate = (d) => {
+    if (!d) return 'N/A';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const filteredTrips = trips.filter(trip => {
     const matchesStatus = filterStatus === 'all' || trip.status === filterStatus;
-    const matchesSearch = trip.destination?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          trip.hostName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          trip.location?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (trip.destination || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (trip.hostName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (trip.location || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
-  if (selectedTrip) {
-    return <TripDetails trip={selectedTrip} onBack={() => setSelectedTrip(null)} onMarkComplete={() => markTripAsCompleted(selectedTrip._id)} />;
-  }
-
   return (
     <div className="space-y-6">
+      {/* Trip Details Modal */}
+      {selectedTrip && (
+        <TripDetailsModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} />
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <button
@@ -279,8 +281,8 @@ export function AllTrips({ onBack }) {
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Home</span>
         </button>
-        <h2 className="text-3xl mb-2">All Trips</h2>
-        <p className="text-blue-100">Your complete travel history</p>
+        <h2 className="text-3xl mb-2 font-bold">My Trips</h2>
+        <p className="text-blue-100">All your adventures in one place</p>
       </div>
 
       {/* Search and Filter */}
@@ -296,12 +298,12 @@ export function AllTrips({ onBack }) {
               className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div className="flex gap-2">
-            {['all', 'upcoming', 'completed'].map(status => (
+          <div className="flex gap-2 flex-wrap">
+            {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(status => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-5 py-3 rounded-xl transition-all ${
+                className={`px-4 py-2 rounded-lg transition-all text-sm ${
                   filterStatus === status
                     ? 'bg-blue-500 text-white shadow-md'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -321,224 +323,126 @@ export function AllTrips({ onBack }) {
       {/* Loading State */}
       {loading && (
         <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
-          <div className="flex flex-col items-center justify-center">
-            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-gray-600">Loading your trips...</p>
-          </div>
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your trips...</p>
         </div>
       )}
 
       {/* Error State */}
       {error && !loading && (
         <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
-          <div className="flex flex-col items-center mb-4">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-            <p className="text-red-500 font-semibold">Error loading trips</p>
-            <p className="text-sm text-gray-600 mt-2 mb-6">{error}</p>
-            <div className="flex gap-4">
-              <button
-                onClick={handleRefresh}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Try Again
-              </button>
-              {error.includes('Session expired') && (
-                <button
-                  onClick={() => window.location.href = '/login'}
-                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Go to Login
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Empty State - No trips found */}
-      {!loading && !error && trips.length === 0 && (
-        <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MapPin className="w-10 h-10 text-blue-400" />
-          </div>
-          <h3 className="text-2xl mb-2">No trips yet</h3>
-          <p className="text-gray-600 mb-6">You haven't created any trips yet. Start planning your next adventure!</p>
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <p className="text-red-500 font-semibold mb-4">{error}</p>
           <button
-            onClick={seedSampleTrips}
-            className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md"
+            onClick={fetchTrips}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
-            Add Sample Trips
+            Try Again
           </button>
         </div>
       )}
 
       {/* Trips Grid */}
-      {!loading && !error && trips.length > 0 && (
+      {!loading && !error && (
         <>
-          {/* Trip Stats */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 p-4 rounded-xl">
-                <p className="text-sm text-gray-600">Total Trips</p>
-                <p className="text-2xl font-bold text-blue-600">{trips.length}</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-xl">
-                <p className="text-sm text-gray-600">Upcoming</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {trips.filter(t => t.status === 'upcoming').length}
-                </p>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-xl">
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  {trips.filter(t => t.status === 'completed').length}
-                </p>
-              </div>
+          {filteredTrips.length === 0 ? (
+            <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
+              <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold mb-2 text-gray-800">No trips found</h3>
+              <p className="text-gray-600">
+                {searchTerm || filterStatus !== 'all' 
+                  ? 'Try adjusting your filters' 
+                  : 'Start planning your next adventure!'}
+              </p>
             </div>
-          </div>
-
-          {/* Results Count */}
-          {filteredTrips.length !== trips.length && (
-            <p className="text-gray-600">
-              Showing {filteredTrips.length} of {trips.length} trips
-            </p>
-          )}
-
-          {/* Trips Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTrips.map((trip) => (
-              <div key={trip._id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
-                <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={trip.image}
-                    alt={trip.destination}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      e.target.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80';
-                    }}
-                  />
-                  <div className="absolute top-4 right-4">
-                    <span className={`px-3 py-1.5 rounded-full text-xs backdrop-blur-md shadow-lg flex items-center gap-1 ${
-                      trip.status === 'upcoming'
-                        ? 'bg-green-500/90 text-white'
-                        : trip.status === 'completed'
-                        ? 'bg-blue-500/90 text-white'
-                        : 'bg-red-500/90 text-white'
-                    }`}>
-                      {trip.status === 'completed' && <CheckCircle className="w-3 h-3" />}
-                      {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
-                    </span>
-                  </div>
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                    <h3 className="text-white text-xl mb-1">{trip.destination}</h3>
-                    <p className="text-white/90 text-sm">Booking: {trip.bookingId}</p>
-                  </div>
-                </div>
-                <div className="p-6">
-                  {/* Booking Status Cards */}
-                  <div className="space-y-2 mb-4">
-                    <div className={`rounded-lg p-3 flex items-center gap-2 ${
-                      trip.hostBooked 
-                        ? 'bg-green-50 border-2 border-green-200' 
-                        : 'bg-yellow-50 border-2 border-yellow-200'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${trip.hostBooked ? 'bg-green-600' : 'bg-yellow-600'}`} />
-                      <span className={`text-sm font-medium ${trip.hostBooked ? 'text-green-800' : 'text-yellow-800'}`}>
-                        {trip.hostBooked ? `Host: ${trip.hostName}` : 'Host: Not Booked'}
-                      </span>
-                    </div>
-                    <div className={`rounded-lg p-3 flex items-center gap-2 ${
-                      trip.ticketBooked 
-                        ? 'bg-green-50 border-2 border-green-200' 
-                        : 'bg-yellow-50 border-2 border-yellow-200'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${trip.ticketBooked ? 'bg-green-600' : 'bg-yellow-600'}`} />
-                      <span className={`text-sm font-medium ${trip.ticketBooked ? 'text-green-800' : 'text-yellow-800'}`}>
-                        {trip.ticketBooked ? `Ticket: ${trip.ticketInfo.provider}` : 'Ticket: Not Booked'}
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredTrips.map((trip) => (
+                <div key={trip._id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden border border-gray-100">
+                  {/* Image */}
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={trip.image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80'}
+                      alt={trip.destination}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80';
+                      }}
+                    />
+                    <div className="absolute top-4 right-4">
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md shadow-lg text-white ${
+                        trip.status === 'confirmed'
+                          ? 'bg-green-500/90'
+                          : trip.status === 'completed'
+                          ? 'bg-blue-500/90'
+                          : trip.status === 'pending'
+                          ? 'bg-yellow-500/90'
+                          : 'bg-red-500/90'
+                      }`}>
+                        {trip.status?.charAt(0).toUpperCase() + trip.status?.slice(1)}
                       </span>
                     </div>
                   </div>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      <span>{trip.date} - {trip.endDate}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="w-4 h-4" />
-                      <span>{trip.ticketInfo.from || 'N/A'} → {trip.ticketInfo.to || trip.destination}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Cloud className="w-4 h-4" />
-                      <span>{trip.weather}</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <span className="font-medium">৳{trip.totalAmount?.toLocaleString()}</span>
-                      <span className="text-gray-500"> • {trip.guests} guest{trip.guests !== 1 ? 's' : ''} • {trip.nights} night{trip.nights !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
+                  {/* Content */}
+                  <div className="p-5">
+                    <h3 className="text-xl font-bold mb-1 text-gray-800">{trip.destination}</h3>
+                    <p className="text-sm text-gray-500 mb-3">ID: {trip.bookingId}</p>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {trip.services?.slice(0, 3).map((service, idx) => (
-                      <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-lg">
-                        {service}
-                      </span>
-                    ))}
-                    {trip.services?.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg">
-                        +{trip.services.length - 3} more
-                      </span>
-                    )}
-                  </div>
+                    {/* Status Indicators */}
+                    <div className="space-y-2 mb-4">
+                      <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                        trip.hostBooked ? 'bg-green-50' : 'bg-yellow-50'
+                      }`}>
+                        <Home className={`w-4 h-4 ${trip.hostBooked ? 'text-green-600' : 'text-yellow-600'}`} />
+                        <span className={`text-sm font-medium ${trip.hostBooked ? 'text-green-700' : 'text-yellow-700'}`}>
+                          {trip.hostBooked ? `Host: ${trip.hostName || 'Booked'}` : 'Host not booked'}
+                        </span>
+                      </div>
+                      <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                        trip.ticketBooked ? 'bg-green-50' : 'bg-yellow-50'
+                      }`}>
+                        <Ticket className={`w-4 h-4 ${trip.ticketBooked ? 'text-green-600' : 'text-yellow-600'}`} />
+                        <span className={`text-sm font-medium ${trip.ticketBooked ? 'text-green-700' : 'text-yellow-700'}`}>
+                          {trip.ticketBooked ? `Ticket: ${trip.ticketInfo?.provider || 'Booked'}` : 'Ticket not booked'}
+                        </span>
+                      </div>
+                    </div>
 
-                  <div className="flex gap-2 flex-wrap">
+                    {/* Trip Details */}
+                    <div className="space-y-2 text-sm text-gray-600 mb-4 pb-4 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>{fmtDate(trip.date)} - {fmtDate(trip.endDate)}</span>
+                      </div>
+                      {trip.ticketInfo && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          <span className="truncate">{trip.ticketInfo.from} → {trip.ticketInfo.to}</span>
+                        </div>
+                      )}
+                      {trip.hostInfo && (
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>{trip.hostInfo.nights} nights • {trip.guests || 1} guest{(trip.guests || 1) > 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                      <div className="font-bold text-blue-600">
+                        ৳{(trip.grandTotal || trip.totalAmount || 0).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
                     <button
-                      className="flex-1 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all text-sm"
                       onClick={() => setSelectedTrip(trip)}
+                      className="w-full py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all flex items-center justify-center gap-2 font-semibold"
                     >
+                      <Eye className="w-4 h-4" />
                       View Details
                     </button>
-                    {!trip.hostBooked && trip.status === 'upcoming' && (
-                      <button
-                        className="py-2 px-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all text-sm flex items-center gap-1"
-                        onClick={() => window.location.href = `/traveler/book-travel?dest=${trip.destination}`}
-                      >
-                        <Plus className="w-4 h-4" />
-                        Host
-                      </button>
-                    )}
-                    {!trip.ticketBooked && trip.status === 'upcoming' && (
-                      <button
-                        className="py-2 px-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition-all text-sm flex items-center gap-1"
-                        onClick={() => window.location.href = `/traveler/book-tickets?dest=${trip.destination}`}
-                      >
-                        <Plus className="w-4 h-4" />
-                        Ticket
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* No search results */}
-          {filteredTrips.length === 0 && trips.length > 0 && (
-            <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-10 h-10 text-gray-400" />
-              </div>
-              <h3 className="text-2xl mb-2">No trips found</h3>
-              <p className="text-gray-600">Try adjusting your filters or search terms</p>
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
-                }}
-                className="mt-4 px-6 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Clear Filters
-              </button>
+              ))}
             </div>
           )}
         </>

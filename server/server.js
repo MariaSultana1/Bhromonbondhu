@@ -10,8 +10,8 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '20mb' })); // Increased limit for base64 images
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
@@ -440,14 +440,26 @@ transportTicketSchema.pre('save', function(next) {
 const TransportTicket = mongoose.model('TransportTicket', transportTicketSchema);
 
 
-// Trip Schema
+// ==================== UNIFIED TRIP SCHEMA ====================
 const tripSchema = new mongoose.Schema({
+  // Basic Trip Info
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   destination: {
     type: String,
     required: [true, 'Destination is required'],
     trim: true
   },
-  date: {
+  location: {
+    type: String,
+    trim: true
+  },
+  
+  // Trip Dates
+  startDate: {
     type: String,
     required: [true, 'Start date is required']
   },
@@ -455,99 +467,134 @@ const tripSchema = new mongoose.Schema({
     type: String,
     required: [true, 'End date is required']
   },
+  
+  // Transport Ticket Info
+  transport: {
+    booked: {
+      type: Boolean,
+      default: false
+    },
+    ticketId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TransportTicket'
+    },
+    bookingId: String,
+    pnr: String,
+    type: {
+      type: String,
+      enum: ['bus', 'train', 'flight', null],
+      default: null
+    },
+    provider: String,
+    from: String,
+    to: String,
+    journeyDate: String,
+    departureTime: String,
+    arrivalTime: String,
+    duration: String,
+    vehicleNumber: String,
+    trainNumber: String,
+    flightNumber: String,
+    passengers: [{
+      firstName: String,
+      lastName: String,
+      age: Number,
+      gender: String,
+      nid: String,
+      passport: String,
+      seat: String,
+      ticketNumber: String,
+      class: String
+    }],
+    contactEmail: String,
+    contactPhone: String,
+    price: Number,
+    pricePerTicket: Number
+  },
+  
+  // Host Booking Info
   host: {
+    booked: {
+      type: Boolean,
+      default: false
+    },
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking'
+    },
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Host'
+    },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'HostService'
+    },
+    name: String,
+    avatar: String,
+    location: String,
+    price: Number,
+    image: String,
+    rating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 4.5
+    },
+    services: [String],
+    checkIn: String,
+    checkOut: String,
+    guests: Number,
+    nights: Number
+  },
+  
+  // Payment & Status
+  totalAmount: {
+    type: Number,
+    default: 0
+  },
+  platformFee: {
+    type: Number,
+    default: 0
+  },
+  grandTotal: {
+    type: Number,
+    default: 0
+  },
+  paymentMethod: {
     type: String,
+    enum: ['card', 'bkash', 'cash', null],
+    default: null
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'refunded'],
     default: 'pending'
   },
-  hostAvatar: {
+  bookingStatus: {
     type: String,
-    default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'
+    enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+    default: 'pending'
   },
+  
+  // Trip Display
   image: {
     type: String,
-    // ✅ FIX: Make it required but with a default fallback
     default: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80'
   },
   weather: {
     type: String,
     default: '25°C, Pleasant'
   },
-  status: {
+  description: {
     type: String,
-    enum: ['upcoming', 'completed', 'cancelled', ],
-    default: 'upcoming'
+    default: 'Enjoy your trip'
   },
-  services: [{
-    type: String,
-    default: []
-  }],
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
+  
+  // Metadata
   bookingId: {
     type: String,
     unique: true
-  },
-  transportTicketId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'TransportTicket'
-  },
-  transportType: {
-    type: String,
-    enum: ['bus', 'train', 'flight', null],
-    default: null
-  },
-  transportProvider: {
-    type: String,
-    default: null
-  },
-  transportFrom: {
-    type: String,
-    default: null
-  },
-  transportTo: {
-    type: String,
-    default: null
-  },
-  transportDate: {
-    type: String,
-    default: null
-  },
-  checkIn: {
-    type: String,
-    default: '2:00 PM'
-  },
-  checkOut: {
-    type: String,
-    default: '11:00 AM'
-  },
-  guests: {
-    type: Number,
-    default: 2
-  },
-  nights: {
-    type: Number,
-    default: 3
-  },
-  totalAmount: {
-    type: Number,
-    default: 12500
-  },
-  location: {
-    type: String
-  },
-  hostRating: {
-    type: Number,
-    // ✅ FIX: Change min from 1 to 0
-    min: 0,
-    max: 5,
-    default: 4.5
-  },
-  description: {
-    type: String,
-    default: 'Enjoy your stay'
   },
   createdAt: {
     type: Date,
@@ -562,7 +609,7 @@ tripSchema.pre('save', function(next) {
   if (!this.bookingId) {
     const year = new Date().getFullYear();
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    this.bookingId = `BK${year}${randomNum}`;
+    this.bookingId = `TRIP${year}${randomNum}`;
   }
   
   // Set location to destination if not provided
@@ -570,11 +617,17 @@ tripSchema.pre('save', function(next) {
     this.location = this.destination;
   }
   
+  // Calculate nights if check-in and check-out are provided
+  if (this.host.checkIn && this.host.checkOut) {
+    const checkIn = new Date(this.host.checkIn);
+    const checkOut = new Date(this.host.checkOut);
+    this.host.nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+  }
+  
   next();
 });
 
 const Trip = mongoose.model('Trip', tripSchema);
-
 
 
 
@@ -978,7 +1031,8 @@ const hostServiceSchema = new mongoose.Schema({
     checkIn: { type: Date, required: true },
     checkOut: { type: Date, required: true },
     bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' }
   }],
   
   // Availability settings
@@ -1256,6 +1310,11 @@ const bookingSchema = new mongoose.Schema({
   },
   notes: {
     type: String
+  },
+  transportTicketId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TransportTicket',
+    default: null
   }
 }, {
   timestamps: true
@@ -2376,13 +2435,97 @@ app.get('/api/traveler/stats', authenticate, async (req, res) => {
   }
 });
 
+// ✅ FIX 1: Replace the existing GET /api/traveler/booking-requests endpoint with this:
+
+app.get('/api/traveler/booking-requests', authenticate, async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = { userId: req.user._id, bookingType: 'host' };
+    if (status) query.status = status;
+
+    console.log('📋 Fetching booking requests for user:', req.user._id);
+    console.log('Query:', query);
+
+    const bookings = await Booking.find(query)
+      .populate('hostId', 'name location image rating reviews verified userId')
+      .populate('transportTicketId', 'bookingId from to transportType provider journeyDate')
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${bookings.length} bookings`);
+
+    const formatted = bookings.map(b => {
+      const hostData = b.hostId ? {
+        id: b.hostId._id,
+        name: b.hostId.name,
+        location: b.hostId.location,
+        avatar: b.hostId.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${b.hostId.name.replace(/\s/g, '')}`,
+        image: b.hostId.image,
+        rating: b.hostId.rating || 0,
+        reviews: b.hostId.reviews || 0,
+        verified: b.hostId.verified || false,
+        userId: b.hostId.userId
+      } : null;
+
+      const transportData = b.transportTicketId ? {
+        id: b.transportTicketId._id,
+        bookingId: b.transportTicketId.bookingId,
+        from: b.transportTicketId.from,
+        to: b.transportTicketId.to,
+        type: b.transportTicketId.transportType,
+        provider: b.transportTicketId.provider,
+        journeyDate: b.transportTicketId.journeyDate
+      } : null;
+
+      const nights = b.checkIn && b.checkOut 
+        ? Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      return {
+        _id: b._id,
+        bookingId: b.bookingId,
+        host: hostData,
+        hostId: hostData, // ✅ DUPLICATE for compatibility
+        hostName: hostData?.name || 'Host',
+        location: hostData?.location || 'Location',
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        guests: b.guests,
+        selectedServices: b.selectedServices || [],
+        totalAmount: b.totalAmount,
+        platformFee: b.platformFee,
+        grandTotal: b.grandTotal,
+        paymentMethod: b.paymentMethod,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        notes: b.notes,
+        createdAt: b.createdAt,
+        nights: nights,
+        transportTicket: transportData
+      };
+    });
+
+    console.log('✅ Formatted bookings:', formatted.length);
+
+    res.json({ 
+      success: true, 
+      count: formatted.length, 
+      bookings: formatted 
+    });
+  } catch (error) {
+    console.error('❌ Get booking requests error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching booking requests',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Book Transport Tickets (Store booking in database)
 app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
   try {
     console.log('📥 Transport booking request received');
-    console.log('User:', req.user.email);
-    console.log('Body:', JSON.stringify(req.body, null, 2).substring(0, 500));
-
+    
     const {
       bookingId,
       pnr,
@@ -2529,97 +2672,117 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
     // Prepare payment details for storage (secure)
     const securePaymentDetails = {};
     if (paymentMethod === 'card') {
-      // Only store last 4 digits of card for security
       const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
       securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
       securePaymentDetails.cardholderName = paymentDetails.cardholderName;
     } else if (paymentMethod === 'bkash') {
       securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
     }
-
-    // Generate transaction ID
     securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-    console.log('💾 Creating TransportTicket document...');
-    console.log('TransportType:', transportType);
-    console.log('BookingID:', bookingId);
-    console.log('Passengers count:', passengers.length);
-
-    // Create ticket booking in database
-    const ticketBooking = new TransportTicket({
-      userId: req.user._id,
-      bookingId,
-      pnr,
-      transportType,
-      provider,
-      from,
-      to,
-      journeyDate,
-      departureTime,
-      arrivalTime,
-      duration,
-      vehicleNumber,
-      trainNumber,
-      flightNumber,
-      passengers,
-      contactEmail,
-      contactPhone,
-      totalAmount,
-      pricePerTicket,
-      paymentMethod,
-      paymentDetails: securePaymentDetails,
-      status: 'confirmed'
-    });
-
-    console.log('📝 Document created, now saving to database...');
+    // Get tripId from query params if coming from AllTrips
+    const { tripId } = req.query;
     
-    // Safety check: Ensure ticketId is generated (in case pre-save hook doesn't run)
-    if (!ticketBooking.ticketId) {
-      ticketBooking.ticketId = `TKT${Date.now()}${Math.floor(Math.random() * 100000)}`;
-      console.log('⚠️  Generated ticketId:', ticketBooking.ticketId);
+    let trip;
+    
+    if (tripId) {
+      // Update existing trip
+      trip = await Trip.findOne({
+        _id: tripId,
+        userId: req.user._id
+      });
     }
     
-    await ticketBooking.save();
+    if (trip) {
+      // Update existing trip with transport info
+      console.log('✅ Updating existing trip with transport info');
+      trip.transport = {
+        booked: true,
+        bookingId,
+        pnr,
+        type: transportType,
+        provider,
+        from,
+        to,
+        journeyDate,
+        departureTime,
+        arrivalTime,
+        duration,
+        vehicleNumber,
+        trainNumber,
+        flightNumber,
+        passengers,
+        contactEmail,
+        contactPhone,
+        price: totalAmount,
+        pricePerTicket
+      };
+      trip.destination = to;
+      trip.startDate = journeyDate;
+      trip.endDate = journeyDate;
+      trip.totalAmount = (trip.totalAmount || 0) + totalAmount;
+      trip.grandTotal = (trip.grandTotal || 0) + totalAmount;
+      trip.paymentMethod = paymentMethod;
+      trip.paymentStatus = 'paid';
+      trip.bookingStatus = 'confirmed';
+    } else {
+      // Create new trip
+      console.log('✅ Creating new trip with transport info');
+      trip = new Trip({
+        userId: req.user._id,
+        destination: to,
+        location: to,
+        startDate: journeyDate,
+        endDate: journeyDate,
+        transport: {
+          booked: true,
+          bookingId,
+          pnr,
+          type: transportType,
+          provider,
+          from,
+          to,
+          journeyDate,
+          departureTime,
+          arrivalTime,
+          duration,
+          vehicleNumber,
+          trainNumber,
+          flightNumber,
+          passengers,
+          contactEmail,
+          contactPhone,
+          price: totalAmount,
+          pricePerTicket
+        },
+        totalAmount,
+        grandTotal: totalAmount,
+        paymentMethod,
+        paymentStatus: 'paid',
+        bookingStatus: 'confirmed'
+      });
+    }
 
-    console.log(`✅ Transport ticket booked successfully: ${bookingId} for user: ${req.user.email}`);
+    await trip.save();
+    
+    console.log(`✅ Transport booked successfully. Trip ID: ${trip._id}`);
 
     res.status(201).json({
       success: true,
       message: 'Ticket booking saved successfully',
-      booking: {
-        bookingId: ticketBooking.bookingId,
-        pnr: ticketBooking.pnr,
-        status: ticketBooking.status,
-        transactionId: securePaymentDetails.transactionId
+      trip: {
+        id: trip._id,
+        bookingId: trip.bookingId,
+        destination: trip.destination,
+        transport: trip.transport,
+        bookingStatus: trip.bookingStatus
       }
     });
   } catch (error) {
-    console.error('❌ Transport ticket booking error:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      console.error(`Duplicate key error on field: ${field}`);
-      return res.status(400).json({
-        success: false,
-        message: `This ${field} already exists. Please use a unique value.`
-      });
-    }
-    
-    // Better error message
-    let errorMessage = 'Error saving ticket booking';
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
-      errorMessage = 'Validation Error: ' + messages.join(', ');
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-    
-    console.error('Error message:', errorMessage);
-    
+    console.error('❌ Transport ticket booking error:', error);
     res.status(500).json({
       success: false,
-      message: errorMessage,
+      message: error.message,
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -2872,62 +3035,70 @@ app.post('/api/trips/from-ticket/:ticketBookingId', authenticate, async (req, re
   }
 });
 
-// Get all trips for a user (Protected)
+// Get all trips for a user
 app.get('/api/trips', authenticate, async (req, res) => {
   try {
     const trips = await Trip.find({ userId: req.user._id })
-      .sort({ date: -1, createdAt: -1 });
+      .sort({ createdAt: -1, startDate: -1 });
 
-    // Auto-complete trips where date has passed
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    const updatedTrips = await Promise.all(trips.map(async (trip) => {
-      // Only auto-complete if status is 'upcoming' and not already completed
-      if (trip.status === 'upcoming' && trip.date) {
-        try {
-          // Parse trip date
-          const tripDate = new Date(trip.date);
-          const tripDateOnly = new Date(tripDate.getFullYear(), tripDate.getMonth(), tripDate.getDate());
-          
-          // If trip date is in the past, mark as completed
-          if (tripDateOnly < today) {
-            console.log(`🔄 Auto-completing trip ${trip._id} - date was ${trip.date}`);
-            
-            trip.status = 'completed';
-            trip.completedAt = now;
-            
-            // Save the updated trip
-            await trip.save();
-            
-            // Also update associated transport ticket
-            if (trip.transportTicketId) {
-              await TransportTicket.findByIdAndUpdate(
-                trip.transportTicketId,
-                { 
-                  status: 'completed',
-                  completedAt: now
-                }
-              );
-            }
-          }
-        } catch (dateError) {
-          console.error(`Error checking trip date for ${trip._id}:`, dateError);
-        }
-      }
-      return trip;
+    console.log(`📍 GET /api/trips - Found ${trips.length} trips for user ${req.user._id}`);
+
+    // Format trips for frontend
+    const formattedTrips = trips.map(trip => ({
+      _id: trip._id,
+      bookingId: trip.bookingId,
+      destination: trip.destination,
+      location: trip.location,
+      date: trip.startDate,
+      endDate: trip.endDate,
+      image: trip.image,
+      weather: trip.weather,
+      status: trip.bookingStatus || trip.status,
+      totalAmount: trip.grandTotal || trip.totalAmount,
+      // ✅ IMPORTANT: Include host name for display
+      hostBooked: trip.host?.booked || false,
+      hostName: trip.host?.name || trip.hostName || 'Host',
+      hostId: trip.host?.id || trip.hostId,
+      hostBookingId: trip.host?.bookingId,
+      hostInfo: trip.host?.booked ? {
+        name: trip.host.name,
+        avatar: trip.host.avatar,
+        location: trip.host.location,
+        price: trip.host.price,
+        image: trip.host.image,
+        services: trip.host.services,
+        checkIn: trip.host.checkIn,
+        checkOut: trip.host.checkOut,
+        guests: trip.host.guests,
+        nights: trip.host.nights,
+        rating: trip.host.rating
+      } : null,
+      // Transport info
+      ticketBooked: trip.transport?.booked || false,
+      ticketInfo: trip.transport?.booked ? {
+        type: trip.transport.type,
+        provider: trip.transport.provider,
+        from: trip.transport.from,
+        to: trip.transport.to,
+        bookingId: trip.transport.bookingId,
+        journeyDate: trip.transport.journeyDate
+      } : null,
+      guests: trip.host?.guests || trip.guests || 1,
+      nights: trip.host?.nights || 0,
+      services: trip.host?.services || [],
+      createdAt: trip.createdAt,
+      journeyEnded: trip.endDate ? new Date(trip.endDate) < new Date() : false
     }));
 
-    console.log(`📍 GET /api/trips - Found ${updatedTrips.length} trips for user ${req.user._id}`);
-    console.log('Trip statuses:', updatedTrips.map(t => ({ destination: t.destination, status: t.status, date: t.date })));
+    console.log(`✅ Returning ${formattedTrips.length} formatted trips`);
 
     res.json({
       success: true,
-      count: updatedTrips.length,
-      trips: updatedTrips
+      count: formattedTrips.length,
+      trips: formattedTrips
     });
   } catch (error) {
-    console.error(' Get trips error:', error);
+    console.error('❌ Get trips error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching trips',
@@ -3420,10 +3591,7 @@ app.get('/api/hosts', async (req, res) => {
   }
 });
 
-// ==================== UPDATED POST /api/bookings ENDPOINT ====================
-// Replace the existing POST /api/bookings endpoint (around line 2445) with this:
-
-// Create host booking
+// ==================== FIXED POST /api/bookings ENDPOINT (Unified Schema) ====================
 app.post('/api/bookings', authenticate, async (req, res) => {
   try {
     const {
@@ -3435,11 +3603,15 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       guests,
       selectedServices,
       notes,
-      paymentMethod,
-      paymentDetails
+      transportTicketId,
+      fromTrips,
+      tripId
     } = req.body;
 
-    console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut });
+    console.log('📝 Booking request:', { 
+      bookingType, hostId, serviceId, checkIn, checkOut, 
+      transportTicketId, fromTrips, tripId 
+    });
 
     // Validate basic input
     if (!bookingType || bookingType !== 'host') {
@@ -3447,6 +3619,39 @@ app.post('/api/bookings', authenticate, async (req, res) => {
         success: false,
         message: 'Invalid booking type'
       });
+    }
+
+    // ✅ IMPORTANT: For unified schema, we don't need to validate against TransportTicket collection
+    // Instead, we check if there's an existing trip with transport info
+    if (fromTrips) {
+      // Find the trip that should have transport info
+      let existingTrip = null;
+      
+      if (transportTicketId) {
+        // Try to find trip by the transport.ticketId (which might be a string ID)
+        existingTrip = await Trip.findOne({
+          userId: req.user._id,
+          $or: [
+            { 'transport.ticketId': transportTicketId },
+            { 'transport.bookingId': transportTicketId },
+            { _id: transportTicketId }
+          ]
+        });
+      } else if (tripId) {
+        existingTrip = await Trip.findOne({
+          _id: tripId,
+          userId: req.user._id
+        });
+      }
+      
+      if (!existingTrip) {
+        return res.status(400).json({
+          success: false,
+          message: 'Could not find the trip with transport ticket. Please make sure you have booked transportation first.'
+        });
+      }
+      
+      console.log('✅ Found existing trip:', existingTrip._id);
     }
 
     // Get service first
@@ -3465,7 +3670,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     const actualHostId = service.hostId._id;
     console.log('✅ Service found, Host ID:', actualHostId);
 
-    // ✅ NEW: Check if service is available for requested dates
+    // ✅ Check service availability for requested dates
     const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
     
     if (!availabilityCheck.available) {
@@ -3489,7 +3694,7 @@ app.post('/api/bookings', authenticate, async (req, res) => {
       });
     }
 
-    console.log('🏠 Host:', host.name, 'Available:', host.available);
+    console.log('🏠 Host:', host.name);
 
     // Validate dates
     if (!checkIn || !checkOut) {
@@ -3526,157 +3731,209 @@ app.post('/api/bookings', authenticate, async (req, res) => {
 
     console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
 
-    // Validate payment details
-    if (paymentMethod === 'card') {
-      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Card number and holder name are required'
-        });
-      }
-
-      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
-      if (!cardValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: cardValidation.message
-        });
-      }
-    } else if (paymentMethod === 'bkash') {
-      if (!paymentDetails?.bkashNumber) {
-        return res.status(400).json({
-          success: false,
-          message: 'bKash number is required'
-        });
-      }
-
-      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
-      if (!bkashValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: `bKash ${bkashValidation.message}`
-        });
-      }
+    // ✅ CRITICAL: Find existing trip (unified approach)
+    let existingTrip = null;
+    
+    if (transportTicketId) {
+      // Try multiple ways to find the trip
+      existingTrip = await Trip.findOne({
+        userId: req.user._id,
+        $or: [
+          { _id: transportTicketId },
+          { 'transport.ticketId': transportTicketId },
+          { 'transport.bookingId': transportTicketId }
+        ]
+      });
+      console.log('🔍 Looking up trip by transportTicketId:', existingTrip ? 'FOUND' : 'NOT FOUND');
+    }
+    
+    if (!existingTrip && tripId) {
+      existingTrip = await Trip.findOne({
+        _id: tripId,
+        userId: req.user._id
+      });
+      console.log('🔍 Looking up trip by tripId:', existingTrip ? 'FOUND' : 'NOT FOUND');
     }
 
-    // Prepare secure payment details
-    const securePaymentDetails = {};
-    if (paymentMethod === 'card') {
-      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
-      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
-      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
-    } else if (paymentMethod === 'bkash') {
-      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
-    }
-    const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    securePaymentDetails.transactionId = transactionId;
-
-    // Create booking
-    const booking = new Booking({
-  userId: req.user._id,
-  bookingType: 'host',
-  hostId: actualHostId,
-  checkIn,
-  checkOut,
-  guests,
-  selectedServices: selectedServices || [],
-  totalAmount,
-  platformFee,
-  grandTotal,
-  notes,
-  status: 'pending',         // ✅ Traveler sends request, host must accept
-  paymentStatus: 'pending',  // ✅ Payment held until host accepts
-  paymentMethod,
-  paymentDetails: securePaymentDetails
-});
-
-    await booking.save();
-    console.log('✅ Booking saved:', booking._id);
-
-    // ✅ NEW: Add booking to service's bookedDates array
+    // Check for existing pending booking
     if (!service.bookedDates) {
       service.bookedDates = [];
     }
     
+    const existingPending = service.bookedDates.find(b =>
+      b.userId && b.userId.toString() === req.user._id.toString() &&
+      b.status === 'pending' &&
+      new Date(b.checkIn).toDateString() === checkInDate.toDateString() &&
+      new Date(b.checkOut).toDateString() === checkOutDate.toDateString()
+    );
+    
+    if (existingPending) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a pending request for these dates'
+      });
+    }
+
+    // Create booking with pending status
+    const booking = new Booking({
+      userId: req.user._id,
+      bookingType: 'host',
+      hostId: actualHostId,
+      checkIn,
+      checkOut,
+      guests,
+      selectedServices: selectedServices || [],
+      totalAmount,
+      platformFee,
+      grandTotal,
+      notes,
+      status: 'pending',
+      paymentStatus: 'pending',
+      transportTicketId: existingTrip?._id || null // Store the trip ID as reference
+    });
+
+    await booking.save();
+    console.log('✅ Booking request saved:', booking._id);
+
+    // Add to service bookedDates
     service.bookedDates.push({
       checkIn: checkInDate,
       checkOut: checkOutDate,
       bookingId: booking._id,
       userId: req.user._id,
-      status: 'confirmed'
-    });
-
-    // ✅ NEW: Check if service is now fully booked
-    if (isServiceFullyBooked(service)) {
-      service.available = false;
-      console.log('⚠️ Service is now fully booked and marked as unavailable');
-    }
-
-    // Update service stats
-    service.totalBookings = (service.totalBookings || 0) + 1;
-    await service.save();
-    console.log('✅ Service updated with booking dates');
-
-    // Create earning record for host
-    const earning = new HostEarning({
-      hostId: actualHostId,
-      userId: host.userId,
-      bookingId: booking._id,
-      amount: totalAmount,
-      platformFee,
-      hostEarnings: hostEarningsAmount,
-      bookingDetails: {
-        guestName: req.user.fullName,
-        guestEmail: req.user.email,
-        checkIn,
-        checkOut,
-        guests,
-        location: host.location,
-        days
-      },
-      status: 'completed',
-      paymentMethod,
-      transactionId
-    });
-
-    await earning.save();
-    console.log('💰 Earning recorded:', earning._id, '৳' + hostEarningsAmount);
-
-    // Update host stats
-    host.totalBookings = (host.totalBookings || 0) + 1;
-    await host.save();
-
-    // Create trip record
-    const trip = new Trip({
-      destination: host.location,
-      date: checkIn,
-      endDate: checkOut,
-      host: host.name,
-      hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
-      image: service.propertyImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
-      services: selectedServices || [],
-      guests,
-      totalAmount: grandTotal,
-      hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
-      description: `Experience ${host.location} with ${host.name}`,
-      userId: req.user._id,
       status: 'pending'
     });
 
-    await trip.save();
-    console.log('✅ Trip saved:', trip._id);
+    await service.save();
+    console.log('✅ Service updated with booking request');
+
+    // ✅ UPDATE OR CREATE TRIP
+    let trip;
+    
+    if (existingTrip) {
+      console.log(`✅ Updating EXISTING trip ${existingTrip._id} with host info`);
+      
+      // Preserve existing transport info
+      const transportInfo = existingTrip.transport || { booked: false };
+      
+      // Update with host info
+      existingTrip.host = {
+        booked: true,
+        bookingId: booking._id,
+        id: host._id,
+        serviceId: service._id,
+        name: host.name,
+        avatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
+        location: host.location,
+        price: service.price,
+        image: service.propertyImage,
+        rating: host.rating || 4.5,
+        services: selectedServices || [],
+        checkIn,
+        checkOut,
+        guests,
+        nights: days
+      };
+      
+      // Update amounts
+      existingTrip.totalAmount = (existingTrip.totalAmount || 0) + totalAmount;
+      existingTrip.platformFee = platformFee;
+      existingTrip.grandTotal = (existingTrip.grandTotal || 0) + grandTotal;
+      existingTrip.bookingStatus = 'pending';
+      
+      // Ensure transport info is preserved
+      existingTrip.transport = transportInfo;
+      
+      trip = existingTrip;
+      await trip.save();
+      console.log('✅ EXISTING trip UPDATED successfully');
+    } else {
+      console.log('⚠️ No existing trip found - creating NEW trip');
+      
+      // Create new trip with host info only
+      trip = new Trip({
+        userId: req.user._id,
+        destination: host.location,
+        location: host.location,
+        startDate: checkIn,
+        endDate: checkOut,
+        host: {
+          booked: true,
+          bookingId: booking._id,
+          id: host._id,
+          serviceId: service._id,
+          name: host.name,
+          avatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
+          location: host.location,
+          price: service.price,
+          image: service.propertyImage,
+          rating: host.rating || 4.5,
+          services: selectedServices || [],
+          checkIn,
+          checkOut,
+          guests,
+          nights: days
+        },
+        totalAmount,
+        platformFee,
+        grandTotal,
+        bookingStatus: 'pending',
+        transport: { booked: false }
+      });
+
+      await trip.save();
+      console.log('✅ NEW trip created:', trip._id);
+    }
+
+    // Create conversation between traveler and host
+    const hostUserId = host.userId;
+    if (hostUserId) {
+      let conversation = await Conversation.findOne({
+        participants: { $all: [req.user._id, hostUserId] }
+      });
+      
+      if (!conversation) {
+        // Create new conversation (without lastMessage - it will be set when messages are sent)
+        conversation = new Conversation({
+          participants: [req.user._id, hostUserId],
+          bookingId: booking._id,
+          tripId: existingTrip ? existingTrip._id : null
+        });
+        await conversation.save();
+        console.log('✅ Conversation created');
+
+        // Create initial message about the booking
+        const initialMessage = new Message({
+          conversationId: conversation._id,
+          senderId: req.user._id,
+          receiverId: hostUserId,
+          content: `Booking request for ${host.name} from ${checkIn} to ${checkOut}`,
+          type: 'text'
+        });
+        await initialMessage.save();
+
+        // Update conversation with lastMessage
+        conversation.lastMessage = initialMessage._id;
+        await conversation.save();
+      }
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Booking confirmed successfully!',
+      message: 'Booking request sent successfully! The host will review your request.',
       booking: {
         bookingId: booking.bookingId,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
-        transactionId,
         totalAmount: grandTotal,
         hostEarnings: hostEarningsAmount,
         platformFee
+      },
+      trip: {
+        id: trip._id,
+        status: trip.bookingStatus,
+        updated: !!existingTrip,
+        newTrip: !existingTrip
       }
     });
   } catch (error) {
@@ -3688,6 +3945,8 @@ app.post('/api/bookings', authenticate, async (req, res) => {
     });
   }
 });
+
+
 
 // Get host by ID
 app.get('/api/hosts/:id', async (req, res) => {
@@ -4384,198 +4643,240 @@ const hostEarningSchema = new mongoose.Schema({
 hostEarningSchema.index({ hostId: 1, createdAt: -1 });
 const HostEarning = mongoose.model('HostEarning', hostEarningSchema);
 
-// ============ REPLACE THE ENTIRE POST /api/bookings ENDPOINT ============
-
-// Create host booking
-// ==================== COMPLETE FIXED POST /api/bookings ENDPOINT ====================
-
-app.post('/api/bookings', authenticate, async (req, res) => {
+// Book Host - Update existing Trip
+app.post('/api/host-bookings', authenticate, async (req, res) => {
   try {
     const {
-      bookingType,
       hostId,
       serviceId,
       checkIn,
       checkOut,
       guests,
       selectedServices,
-      notes
+      notes,
+      transportTicketId,
+      tripId
     } = req.body;
 
-    console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut });
+    console.log('📝 Host booking request:', { hostId, serviceId, checkIn, checkOut, transportTicketId, tripId });
 
-    // Validate basic input
-    if (!bookingType || bookingType !== 'host') {
+    // Validate
+    if (!hostId || !serviceId || !checkIn || !checkOut) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid booking type'
+        message: 'Missing required fields'
       });
     }
 
-    // Get service first
-    let service = null;
-    if (serviceId) {
-      service = await HostService.findById(serviceId).populate('hostId');
-    }
+    // Get host and service
+    const host = await Host.findById(hostId);
+    const service = await HostService.findById(serviceId);
 
-    if (!service) {
+    if (!host || !service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found. Cannot complete booking.'
+        message: 'Host or service not found'
       });
     }
 
-    const actualHostId = service.hostId._id;
-    console.log('✅ Service found, Host ID:', actualHostId);
-
-    // Check if service is available for requested dates
-    const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
-    
-    if (!availabilityCheck.available) {
-      return res.status(400).json({
-        success: false,
-        message: availabilityCheck.reason,
-        conflictingBookings: availabilityCheck.conflictingBookings.map(b => ({
-          checkIn: b.checkIn,
-          checkOut: b.checkOut
-        }))
-      });
-    }
-
-    // Get actual host document
-    const host = await Host.findById(actualHostId);
-    
-    if (!host) {
-      return res.status(404).json({
-        success: false,
-        message: 'Host profile not found'
-      });
-    }
-
-    console.log('🏠 Host:', host.name, 'Available:', host.available);
-
-    if (!host.available) {
-      return res.status(400).json({
-        success: false,
-        message: 'Host is not currently available for bookings'
-      });
-    }
-
-    // Validate dates
-    if (!checkIn || !checkOut) {
-      return res.status(400).json({
-        success: false,
-        message: 'Check-in and check-out dates are required'
-      });
-    }
-
+    // Calculate nights and total
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
-    const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (days <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Check-out date must be after check-in date'
-      });
-    }
-
-    // Validate guests
-    if (guests > service.maxGuests) {
-      return res.status(400).json({
-        success: false,
-        message: `Maximum ${service.maxGuests} guests allowed. You selected ${guests} guests.`
-      });
-    }
-
-    // Calculate amounts
-    const totalAmount = service.price * days;
+    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    const totalAmount = service.price * nights;
     const platformFee = Math.round(totalAmount * 0.15);
-    const hostEarningsAmount = totalAmount - platformFee;
     const grandTotal = totalAmount + platformFee;
 
-    console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
-
-    // ✅ FIX 1: Create booking with pending status (NO payment details required)
-    const booking = new Booking({
-      userId: req.user._id,
-      bookingType: 'host',
-      hostId: actualHostId,
-      checkIn,
-      checkOut,
-      guests,
-      selectedServices: selectedServices || [],
-      totalAmount,
-      platformFee,
-      grandTotal,
-      notes,
-      status: 'pending',         // Traveler sends request, host must accept
-      paymentStatus: 'pending'    // Payment held until host accepts
-      // ❌ NO paymentMethod or paymentDetails here
-    });
-
-    await booking.save();
-    console.log('✅ Booking request saved:', booking._id);
-
-    // Add booking to service's bookedDates array with 'pending' status
-    if (!service.bookedDates) {
-      service.bookedDates = [];
+    // ✅ FIND OR CREATE TRIP
+    let trip;
+    
+    // First priority: Find by transportTicketId (if booking from an existing transport)
+    if (transportTicketId) {
+      trip = await Trip.findOne({
+        userId: req.user._id,
+        'transport.ticketId': transportTicketId
+      });
+      console.log('Looking up by transportTicketId:', trip ? 'Found' : 'Not found');
     }
     
-    service.bookedDates.push({
-      checkIn: checkInDate,
-      checkOut: checkOutDate,
-      bookingId: booking._id,
-      userId: req.user._id,
-      status: 'pending'
-    });
-
-    // Check if service is now fully booked
-    if (isServiceFullyBooked(service)) {
-      service.available = false;
-      console.log('⚠️ Service is now fully booked and marked as unavailable');
+    // Second priority: Find by tripId
+    if (!trip && tripId) {
+      trip = await Trip.findOne({
+        _id: tripId,
+        userId: req.user._id
+      });
+      console.log('Looking up by tripId:', trip ? 'Found' : 'Not found');
+    }
+    
+    // Third priority: Find by destination and dates (for standalone host booking)
+    if (!trip) {
+      trip = await Trip.findOne({
+        userId: req.user._id,
+        destination: host.location,
+        startDate: checkIn,
+        endDate: checkOut
+      });
+      console.log('Looking up by destination/dates:', trip ? 'Found' : 'Not found');
     }
 
-    await service.save();
-    console.log('✅ Service updated with booking request');
-
-    // ✅ FIX 2: Create trip with 'pending' status (requires schema update)
-    const trip = new Trip({
-      destination: host.location,
-      date: checkIn,
-      endDate: checkOut,
-      host: host.name,
-      hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
-      image: service.propertyImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
-      services: selectedServices || [],
-      guests,
-      totalAmount: grandTotal,
-      hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
-      description: `Experience ${host.location} with ${host.name}`,
-      userId: req.user._id,
-      status: 'pending' // ✅ Now works after schema update
-    });
+    if (trip) {
+      // ✅ UPDATE EXISTING TRIP with host info
+      console.log('✅ Updating existing trip with host info');
+      trip.host = {
+        booked: true,
+        bookingId: trip._id, // Will be set after save
+        id: host._id,
+        serviceId: service._id,
+        name: host.name,
+        avatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name}`,
+        location: host.location,
+        price: service.price,
+        image: service.propertyImage,
+        rating: host.rating || 4.5,
+        services: selectedServices || [],
+        checkIn,
+        checkOut,
+        guests,
+        nights
+      };
+      trip.totalAmount = (trip.totalAmount || 0) + totalAmount;
+      trip.platformFee = platformFee;
+      trip.grandTotal = (trip.grandTotal || 0) + grandTotal;
+      trip.bookingStatus = 'pending'; // Host needs to accept
+      
+      // Preserve transport info if it exists
+      if (!trip.transport) {
+        trip.transport = { booked: false };
+      }
+    } else {
+      // ✅ CREATE NEW TRIP (host only, no transport)
+      console.log('✅ Creating new trip with host info');
+      trip = new Trip({
+        userId: req.user._id,
+        destination: host.location,
+        location: host.location,
+        startDate: checkIn,
+        endDate: checkOut,
+        host: {
+          booked: true,
+          id: host._id,
+          serviceId: service._id,
+          name: host.name,
+          avatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name}`,
+          location: host.location,
+          price: service.price,
+          image: service.propertyImage,
+          rating: host.rating || 4.5,
+          services: selectedServices || [],
+          checkIn,
+          checkOut,
+          guests,
+          nights
+        },
+        totalAmount,
+        platformFee,
+        grandTotal,
+        bookingStatus: 'pending',
+        transport: { booked: false }
+      });
+    }
 
     await trip.save();
-    console.log('✅ Trip saved:', trip._id);
+    
+    // Update host bookingId after save
+    if (trip.host && !trip.host.bookingId) {
+      trip.host.bookingId = trip._id;
+      await trip.save();
+    }
+
+    console.log(`✅ Host booked successfully. Trip ID: ${trip._id}`);
 
     res.status(201).json({
       success: true,
-      message: 'Booking request sent successfully! The host will review your request.',
-      booking: {
-        bookingId: booking.bookingId,
-        status: booking.status,
-        paymentStatus: booking.paymentStatus,
-        totalAmount: grandTotal,
-        hostEarnings: hostEarningsAmount,
-        platformFee
+      message: 'Host booking request sent successfully!',
+      trip: {
+        id: trip._id,
+        bookingId: trip.bookingId,
+        destination: trip.destination,
+        host: trip.host,
+        transport: trip.transport,
+        bookingStatus: trip.bookingStatus,
+        grandTotal: trip.grandTotal
       }
     });
   } catch (error) {
-    console.error('❌ Booking error:', error);
+    console.error('❌ Host booking error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating booking: ' + error.message,
+      message: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get transport tickets for a user (with optional filtering)
+app.get('/api/transport-tickets', authenticate, async (req, res) => {
+  try {
+    const { destination } = req.query;
+    
+    let query = { userId: req.user._id };
+    if (destination) {
+      query.to = { $regex: new RegExp(destination, 'i') };
+    }
+    
+    const tickets = await TransportTicket.find(query)
+      .sort({ bookingDate: -1 });
+    
+    res.json({
+      success: true,
+      count: tickets.length,
+      tickets: tickets
+    });
+  } catch (error) {
+    console.error('❌ Get transport tickets error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching transport tickets',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Link a host booking to an existing trip
+app.post('/api/trips/:tripId/link-host', authenticate, async (req, res) => {
+  try {
+    const { hostBookingId, hostId, hostName, hostAvatar } = req.body;
+    
+    const trip = await Trip.findOne({
+      _id: req.params.tripId,
+      userId: req.user._id
+    });
+    
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: 'Trip not found'
+      });
+    }
+    
+    // Update trip with host info
+    trip.host = hostName;
+    trip.hostAvatar = hostAvatar;
+    trip.hostId = hostId;
+    trip.hostBookingId = hostBookingId;
+    
+    await trip.save();
+    
+    res.json({
+      success: true,
+      message: 'Host linked to trip successfully',
+      trip
+    });
+  } catch (error) {
+    console.error('❌ Link host error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error linking host to trip',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -6174,13 +6475,12 @@ app.post('/api/ai/destinations/seed', authenticate, async (req, res) => {
   }
 });
 
-
 // Helper function to check if dates overlap
 function datesOverlap(start1, end1, start2, end2) {
   return start1 < end2 && end1 > start2;
 }
 
-// Helper function to check service availability
+// Helper function to check service availability - ONLY considers CONFIRMED bookings
 const checkServiceAvailability = (service, checkIn, checkOut) => {
   const requestedCheckIn = new Date(checkIn);
   const requestedCheckOut = new Date(checkOut);
@@ -6197,7 +6497,7 @@ const checkServiceAvailability = (service, checkIn, checkOut) => {
     };
   }
   
-  // Check if bookedDates exists and is an array
+  // If no bookedDates at all, definitely available
   if (!service.bookedDates || !Array.isArray(service.bookedDates) || service.bookedDates.length === 0) {
     return { 
       available: true, 
@@ -6206,12 +6506,16 @@ const checkServiceAvailability = (service, checkIn, checkOut) => {
     };
   }
   
-  // Filter out cancelled bookings
-  const activeBookings = service.bookedDates.filter(booking => 
-    booking && booking.status !== 'cancelled'
+  // ✅ CRITICAL: ONLY check CONFIRMED bookings
+  // PENDING bookings do NOT block availability
+  const confirmedBookings = service.bookedDates.filter(booking => 
+    booking && booking.status === 'confirmed'
   );
   
-  if (activeBookings.length === 0) {
+  console.log(`🔍 Checking availability for ${checkIn} to ${checkOut}`);
+  console.log(`📊 Found ${confirmedBookings.length} confirmed bookings`);
+  
+  if (confirmedBookings.length === 0) {
     return { 
       available: true, 
       reason: 'Available', 
@@ -6219,11 +6523,17 @@ const checkServiceAvailability = (service, checkIn, checkOut) => {
     };
   }
   
-  // Check for date conflicts with active bookings
-  const conflicts = activeBookings.filter(booking => {
+  // Check for date conflicts with CONFIRMED bookings only
+  const conflicts = confirmedBookings.filter(booking => {
     const bookedCheckIn = new Date(booking.checkIn);
     const bookedCheckOut = new Date(booking.checkOut);
-    return datesOverlap(requestedCheckIn, requestedCheckOut, bookedCheckIn, bookedCheckOut);
+    const overlaps = datesOverlap(requestedCheckIn, requestedCheckOut, bookedCheckIn, bookedCheckOut);
+    
+    if (overlaps) {
+      console.log(`⚠️ Conflict with confirmed booking: ${bookedCheckIn} to ${bookedCheckOut}`);
+    }
+    
+    return overlaps;
   });
   
   if (conflicts.length > 0) {
@@ -6237,36 +6547,51 @@ const checkServiceAvailability = (service, checkIn, checkOut) => {
   return { available: true, reason: 'Available', conflictingBookings: [] };
 };
 
+
 // Helper function to check if service is fully booked
 const isServiceFullyBooked = (service) => {
   if (!service.bookedDates || !Array.isArray(service.bookedDates) || service.bookedDates.length === 0) {
     return false;
   }
   
-  // Filter active (non-cancelled) bookings
-  const activeBookings = service.bookedDates.filter(booking => 
-    booking && booking.status !== 'cancelled'
+  // Only CONFIRMED bookings count toward "fully booked"
+  const confirmedBookings = service.bookedDates.filter(booking => 
+    booking && booking.status === 'confirmed'
   );
   
-  if (activeBookings.length === 0) {
+  if (confirmedBookings.length === 0) {
     return false;
   }
   
   const availFrom = new Date(service.availableFromDate);
   const availTo = new Date(service.availableToDate);
   
-  // Check if there's a booking that covers the entire availability period
-  const fullyBooking = activeBookings.some(booking => {
-    const bookedCheckIn = new Date(booking.checkIn);
-    const bookedCheckOut = new Date(booking.checkOut);
-    
-    // Check if this booking covers the entire available period
-    return bookedCheckIn <= availFrom && bookedCheckOut >= availTo;
-  });
+  // Sort confirmed bookings by date
+  const sortedBookings = confirmedBookings.sort((a, b) => 
+    new Date(a.checkIn) - new Date(b.checkIn)
+  );
   
-  return fullyBooking;
+  // Check if the entire date range is covered by confirmed bookings
+  let currentDate = new Date(availFrom);
+  
+  for (const booking of sortedBookings) {
+    const bookingStart = new Date(booking.checkIn);
+    const bookingEnd = new Date(booking.checkOut);
+    
+    // If there's a gap before this booking, service is not fully booked
+    if (bookingStart > currentDate) {
+      return false;
+    }
+    
+    // Move current date to the end of this booking
+    if (bookingEnd > currentDate) {
+      currentDate = new Date(bookingEnd);
+    }
+  }
+  
+  // Check if we've covered until the end
+  return currentDate >= availTo;
 };
-
 
 // Add these endpoints to your server.js file
 
@@ -6525,157 +6850,338 @@ app.get('/api/hosts/:id/reviews', async (req, res) => {
 
 // ==================== BOOKING ROUTES ====================
 
-// Create booking (Protected)
+// ==================== FIXED POST /api/bookings ENDPOINT ====================
 app.post('/api/bookings', authenticate, async (req, res) => {
   try {
     const {
       bookingType,
       hostId,
-      transportationId,
+      serviceId,
       checkIn,
       checkOut,
-      travelDate,
       guests,
-      passengers,
-      seatClass,
       selectedServices,
-      notes
+      notes,
+      transportTicketId,
+      fromTrips,
+      tripId
     } = req.body;
 
-    // Validation
-    if (!bookingType || (bookingType === 'host' && !hostId) || (bookingType === 'transportation' && !transportationId)) {
+    console.log('📝 Booking request:', { bookingType, hostId, serviceId, checkIn, checkOut, transportTicketId, fromTrips, tripId });
+
+    // Validate basic input
+    if (!bookingType || bookingType !== 'host') {
       return res.status(400).json({
         success: false,
-        message: 'Invalid booking data'
+        message: 'Invalid booking type'
       });
     }
 
-    let totalAmount = 0;
-    let platformFee = 0;
-    let grandTotal = 0;
-
-    if (bookingType === 'host') {
-      // Host booking
-      const host = await Host.findById(hostId);
-      if (!host || !host.available) {
-        return res.status(400).json({
-          success: false,
-          message: 'Host not available'
-        });
-      }
-
-      if (!checkIn || !checkOut) {
-        return res.status(400).json({
-          success: false,
-          message: 'Check-in and check-out dates required'
-        });
-      }
-
-      const checkInDate = new Date(checkIn);
-      const checkOutDate = new Date(checkOut);
-      const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    // ✅ Validate transport ticket if provided (required when coming from AllTrips)
+    if (transportTicketId) {
+      const ticket = await TransportTicket.findOne({
+        _id: transportTicketId,
+        userId: req.user._id
+      });
       
-      if (days <= 0) {
+      if (!ticket) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid dates'
+          message: 'Invalid transport ticket. Please book a transport ticket first.'
         });
       }
-
-      if (guests > host.maxGuests) {
-        return res.status(400).json({
-          success: false,
-          message: `Maximum ${host.maxGuests} guests allowed`
-        });
-      }
-
-      totalAmount = host.price * days;
-      platformFee = totalAmount * 0.15;
-      grandTotal = totalAmount + platformFee;
-
-    } else {
-      // Transportation booking
-      const transportation = await Transportation.findById(transportationId);
-      if (!transportation || transportation.availableSeats < passengers) {
-        return res.status(400).json({
-          success: false,
-          message: 'Not enough seats available'
-        });
-      }
-
-      if (!travelDate) {
-        return res.status(400).json({
-          success: false,
-          message: 'Travel date required'
-        });
-      }
-
-      const basePrice = transportation.price;
-      const classMultiplier = seatClass === 'Business' ? 2 : seatClass === 'First' ? 3 : 1;
-      totalAmount = basePrice * passengers * classMultiplier;
-      platformFee = totalAmount * 0.15;
-      grandTotal = totalAmount + platformFee;
-
-      // Update available seats
-      transportation.availableSeats -= passengers;
-      await transportation.save();
+      console.log('✅ Transport ticket validated:', ticket.bookingId);
+    } else if (fromTrips) {
+      // If coming from AllTrips, transport ticket is required
+      return res.status(400).json({
+        success: false,
+        message: 'A transport ticket is required to book a host. Please book a transport ticket first.'
+      });
     }
 
-    // Create booking
+    // Get service first
+    let service = null;
+    if (serviceId) {
+      service = await HostService.findById(serviceId).populate('hostId');
+    }
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found. Cannot complete booking.'
+      });
+    }
+
+    const actualHostId = service.hostId._id;
+    console.log('✅ Service found, Host ID:', actualHostId);
+
+    // ✅ Check service availability for requested dates
+    const availabilityCheck = checkServiceAvailability(service, checkIn, checkOut);
+    
+    if (!availabilityCheck.available) {
+      return res.status(400).json({
+        success: false,
+        message: availabilityCheck.reason,
+        conflictingBookings: availabilityCheck.conflictingBookings.map(b => ({
+          checkIn: b.checkIn,
+          checkOut: b.checkOut
+        }))
+      });
+    }
+
+    // Get actual host document
+    const host = await Host.findById(actualHostId);
+    
+    if (!host) {
+      return res.status(404).json({
+        success: false,
+        message: 'Host profile not found'
+      });
+    }
+
+    console.log('🏠 Host:', host.name);
+
+    // Validate dates
+    if (!checkIn || !checkOut) {
+      return res.status(400).json({
+        success: false,
+        message: 'Check-in and check-out dates are required'
+      });
+    }
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const days = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (days <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Check-out date must be after check-in date'
+      });
+    }
+
+    // Validate guests
+    if (guests > service.maxGuests) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${service.maxGuests} guests allowed. You selected ${guests} guests.`
+      });
+    }
+
+    // Calculate amounts
+    const totalAmount = service.price * days;
+    const platformFee = Math.round(totalAmount * 0.15);
+    const hostEarningsAmount = totalAmount - platformFee;
+    const grandTotal = totalAmount + platformFee;
+
+    console.log('💰 Amounts:', { totalAmount, platformFee, hostEarningsAmount, grandTotal });
+
+    // ✅ CRITICAL: Check for existing pending booking BEFORE saving
+    if (!service.bookedDates) {
+      service.bookedDates = [];
+    }
+    
+    // Check if this user already has a pending booking for these dates
+    const existingPending = service.bookedDates.find(b =>
+      b.userId && b.userId.toString() === req.user._id.toString() &&
+      b.status === 'pending' &&
+      new Date(b.checkIn).toDateString() === checkInDate.toDateString() &&
+      new Date(b.checkOut).toDateString() === checkOutDate.toDateString()
+    );
+    
+    if (existingPending) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have a pending request for these dates'
+      });
+    }
+
+    // ✅ CRITICAL: Find existing trip BEFORE creating booking
+    // This is the most important fix - we need to find the existing trip FIRST
+    let existingTrip = null;
+    
+    // First and most important: Find by transportTicketId (this is the link between ticket and trip)
+    if (transportTicketId) {
+      existingTrip = await Trip.findOne({
+        userId: req.user._id,
+        transportTicketId: transportTicketId
+      });
+      console.log(`🔍 Primary: Looking up trip by transportTicketId ${transportTicketId}:`, existingTrip ? `Found (host: ${existingTrip.host}, _id: ${existingTrip._id})` : 'Not found');
+    }
+    
+    // Fallback: Try by tripId if transportTicketId didn't work
+    if (!existingTrip && tripId) {
+      try {
+        const { ObjectId } = mongoose.Types;
+        const tripIdObj = new ObjectId(tripId);
+        existingTrip = await Trip.findOne({
+          _id: tripIdObj,
+          userId: req.user._id
+        });
+        console.log(`🔍 Fallback: Looking up trip by tripId ${tripId}:`, existingTrip ? `Found (host: ${existingTrip.host}, transportTicketId: ${existingTrip.transportTicketId})` : 'Not found');
+      } catch (e) {
+        console.log('🔍 Fallback: Invalid tripId format');
+      }
+    }
+    
+    // If trip already has a host (host is not null and not 'pending'), update it instead of creating new
+    if (existingTrip && existingTrip.host && existingTrip.host !== 'pending') {
+      console.log(`⚠️ Trip already has host "${existingTrip.host}" - updating instead of creating new`);
+    }
+
+    // Create booking with pending status (NO payment details required)
     const booking = new Booking({
       userId: req.user._id,
-      bookingType,
-      hostId: bookingType === 'host' ? hostId : null,
-      transportationId: bookingType === 'transportation' ? transportationId : null,
-      checkIn: bookingType === 'host' ? checkIn : null,
-      checkOut: bookingType === 'host' ? checkOut : null,
-      travelDate: bookingType === 'transportation' ? travelDate : null,
-      guests: bookingType === 'host' ? guests : null,
-      passengers: bookingType === 'transportation' ? passengers : null,
-      seatClass: bookingType === 'transportation' ? seatClass : null,
+      bookingType: 'host',
+      hostId: actualHostId,
+      checkIn,
+      checkOut,
+      guests,
       selectedServices: selectedServices || [],
       totalAmount,
       platformFee,
       grandTotal,
       notes,
       status: 'pending',
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
+      transportTicketId: transportTicketId || null // Store transport ticket ID
     });
 
     await booking.save();
+    console.log('✅ Booking request saved:', booking._id);
+
+    // Add booking to service's bookedDates array with 'pending' status
+    service.bookedDates.push({
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      bookingId: booking._id,
+      userId: req.user._id,
+      status: 'pending'
+    });
+
+    await service.save();
+    console.log('✅ Service updated with booking request');
+
+    // ✅ Create conversation between traveler and host
+    const hostUserId = host.userId;
+    if (hostUserId) {
+      // Check if conversation already exists
+      let conversation = await Conversation.findOne({
+        participants: { $all: [req.user._id, hostUserId] }
+      });
+      
+      if (!conversation) {
+        // Create new conversation (without lastMessage - it will be set when messages are sent)
+        conversation = new Conversation({
+          participants: [req.user._id, hostUserId],
+          bookingId: booking._id,
+          tripId: existingTrip ? existingTrip._id : null
+        });
+        await conversation.save();
+        console.log('✅ Conversation created between traveler and host');
+
+        // Create initial message about the booking
+        const initialMessage = new Message({
+          conversationId: conversation._id,
+          senderId: req.user._id,
+          receiverId: hostUserId,
+          content: `Booking request for ${host.name} from ${checkIn} to ${checkOut}`,
+          type: 'text'
+        });
+        await initialMessage.save();
+
+        // Update conversation with lastMessage
+        conversation.lastMessage = initialMessage._id;
+        await conversation.save();
+      } else {
+        console.log('✅ Conversation already exists between traveler and host');
+      }
+    }
+
+    // ✅ CRITICAL: Update existing trip or create new one
+    let trip;
+    
+    if (existingTrip) {
+      console.log(`✅ Found existing trip ${existingTrip._id} to update with host info`);
+      
+      // Update the existing trip with host info
+      existingTrip.host = host.name;
+      existingTrip.hostName = host.name;
+      existingTrip.hostAvatar = host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`;
+      existingTrip.hostId = host._id;
+      existingTrip.hostServiceId = serviceId;
+      existingTrip.hostBookingId = booking._id;
+      existingTrip.hostLocation = host.location;
+      existingTrip.hostPrice = service.price;
+      existingTrip.hostImage = service.propertyImage;
+      existingTrip.selectedHostServices = selectedServices || [];
+      existingTrip.services = selectedServices || [];
+      existingTrip.guests = guests;
+      existingTrip.checkIn = checkIn;
+      existingTrip.checkOut = checkOut;
+      existingTrip.totalAmount = grandTotal;
+      existingTrip.status = 'pending';
+      
+      trip = existingTrip;
+      await trip.save();
+      console.log('✅ Existing trip updated with host info');
+    } else {
+      console.log('⚠️ No existing trip found - creating new trip');
+      
+      // Create new trip with all host fields
+      trip = new Trip({
+        destination: host.location,
+        date: checkIn,
+        endDate: checkOut,
+        host: host.name,
+        hostName: host.name,
+        hostAvatar: host.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${host.name.replace(/\s/g, '')}`,
+        hostId: host._id,
+        hostServiceId: serviceId,
+        hostLocation: host.location,
+        hostPrice: service.price,
+        hostImage: service.propertyImage,
+        selectedHostServices: selectedServices || [],
+        image: service.propertyImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80',
+        services: selectedServices || [],
+        guests,
+        totalAmount: grandTotal,
+        hostRating: host.rating && host.rating > 0 ? host.rating : 4.5,
+        description: `Experience ${host.location} with ${host.name}`,
+        userId: req.user._id,
+        hostBookingId: booking._id,
+        transportTicketId: transportTicketId || null,
+        status: 'pending'
+      });
+
+      await trip.save();
+      console.log('✅ New trip saved:', trip._id);
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully',
-      booking
+      message: 'Booking request sent successfully! The host will review your request.',
+      booking: {
+        bookingId: booking.bookingId,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        totalAmount: grandTotal,
+        hostEarnings: hostEarningsAmount,
+        platformFee
+      },
+      trip: {
+        id: trip._id,
+        status: trip.status,
+        updated: existingTrip ? true : false,
+        newTrip: !existingTrip
+      }
     });
   } catch (error) {
-    console.error('❌ Create booking error:', error);
+    console.error('❌ Booking error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating booking',
+      message: 'Error creating booking: ' + error.message,
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get user's bookings
-app.get('/api/bookings', authenticate, async (req, res) => {
-  try {
-    const bookings = await Booking.find({ userId: req.user._id })
-      .populate('hostId', 'name location price propertyImage')
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: bookings.length,
-      bookings
-    });
-  } catch (error) {
-    console.error('❌ Get bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching bookings'
     });
   }
 });
@@ -6745,6 +7251,7 @@ app.post('/api/trips', authenticate, async (req, res) => {
     });
   }
 });
+
 
 // ==================== UPDATED PUT /api/bookings/:id/cancel ENDPOINT ====================
 // Replace the existing cancellation endpoint (around line 2675) with this:
@@ -7269,10 +7776,6 @@ app.delete('/api/host-services/:id', authenticate, async (req, res) => {
 
 
 
-// ==================== ENHANCED GET /api/host-services ENDPOINT ====================
-// This version ensures fully booked services NEVER appear in Book Travel page
-// Replace the existing GET /api/host-services endpoint (around line 3290) with this:
-
 // GET /api/host-services — Public listing with filters (ENHANCED VERSION)
 app.get('/api/host-services', async (req, res) => {
   try {
@@ -7281,7 +7784,7 @@ app.get('/api/host-services', async (req, res) => {
       availableFrom, availableTo, limit = 20, page = 1
     } = req.query;
 
-    // ✅ CRITICAL: Only fetch services that are active
+    // Only fetch services that are active
     let query = { active: true };
 
     if (location) query.location = { $regex: location, $options: 'i' };
@@ -7303,28 +7806,34 @@ app.get('/api/host-services', async (req, res) => {
       .populate('hostId', 'name location rating reviews verified hostBadge')
       .sort({ createdAt: -1 });
 
-    // ✅ CRITICAL: Filter out fully booked services BEFORE pagination
+    console.log(`📊 Total services in DB: ${allServices.length}`);
+
+    // Filter out services that are FULLY BOOKED (based on CONFIRMED bookings)
     const availableServices = allServices.filter(service => {
+      // Log the service for debugging
+      console.log(`🔍 Checking service: ${service.name}`);
+      console.log(`   - Available flag: ${service.available}`);
+      console.log(`   - Booked dates: ${service.bookedDates ? service.bookedDates.length : 0}`);
+      
+      if (service.bookedDates && service.bookedDates.length > 0) {
+        const confirmedCount = service.bookedDates.filter(b => b.status === 'confirmed').length;
+        const pendingCount = service.bookedDates.filter(b => b.status === 'pending').length;
+        console.log(`   - Confirmed: ${confirmedCount}, Pending: ${pendingCount}`);
+      }
+      
       // 1. If service is explicitly marked unavailable, exclude it
       if (service.available === false) {
-        console.log(`🚫 Service "${service.name}" excluded: marked unavailable`);
+        console.log(`   🚫 Excluded: marked unavailable`);
         return false;
       }
       
-      // 2. Check if service is fully booked
+      // 2. Check if service is fully booked (based on CONFIRMED bookings only)
       if (isServiceFullyBooked(service)) {
-        console.log(`🚫 Service "${service.name}" excluded: fully booked`);
+        console.log(`   🚫 Excluded: fully booked`);
         return false;
       }
       
-      // 3. If host is not available, exclude the service
-      if (service.hostId && !service.hostId.verified) {
-        // Optional: You can also filter by host verification status
-        // Uncomment the line below if you want to hide unverified hosts
-        // return false;
-      }
-      
-      console.log(`✅ Service "${service.name}" included: available for booking`);
+      console.log(`   ✅ Included: available for booking`);
       return true;
     });
 
@@ -7332,7 +7841,7 @@ app.get('/api/host-services', async (req, res) => {
     const paginatedServices = availableServices.slice(skip, skip + parseInt(limit));
     const total = availableServices.length;
 
-    console.log(`📊 Services Summary: ${allServices.length} total, ${availableServices.length} available, ${paginatedServices.length} returned`);
+    console.log(`📊 Final: ${availableServices.length} available, returning ${paginatedServices.length}`);
 
     res.json({
       success: true,
@@ -9617,6 +10126,7 @@ app.get('/api/host/booking-requests', authenticate, async (req, res) => {
 
     const bookings = await Booking.find(query)
       .populate('userId', 'fullName email phone profilePicture username')
+      .populate('transportTicketId', 'bookingId from to transportType provider journeyDate')
       .sort({ createdAt: -1 });
 
     const formatted = bookings.map(b => ({
@@ -9641,7 +10151,17 @@ app.get('/api/host/booking-requests', authenticate, async (req, res) => {
       paymentStatus: b.paymentStatus,
       notes: b.notes,
       createdAt: b.createdAt,
-      nights: Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / (1000 * 60 * 60 * 24))
+      nights: Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / (1000 * 60 * 60 * 24)),
+      // ✅ Include transport ticket info if linked
+      transportTicket: b.transportTicketId ? {
+        id: b.transportTicketId._id,
+        bookingId: b.transportTicketId.bookingId,
+        from: b.transportTicketId.from,
+        to: b.transportTicketId.to,
+        type: b.transportTicketId.transportType,
+        provider: b.transportTicketId.provider,
+        journeyDate: b.transportTicketId.journeyDate
+      } : null
     }));
 
     res.json({ success: true, count: formatted.length, bookings: formatted });
@@ -9673,17 +10193,64 @@ app.put('/api/host/booking-requests/:id/accept', authenticate, async (req, res) 
       return res.status(404).json({ success: false, message: 'Booking not found or already processed' });
     }
 
-    // ✅ FIX: status = confirmed, paymentStatus stays PENDING
-    // The traveler must complete payment via the Pay button in MyHosts.
-    // The /api/payments/process endpoint will mark it paid and create HostEarning.
+    // Find the service for this host
+    const service = await HostService.findOne({ hostId: hostProfile._id });
+    
+    if (!service) {
+      return res.status(404).json({ success: false, message: 'Service not found' });
+    }
+    
+    // ✅ CRITICAL: Before accepting, double-check that these dates are still available
+    // (no other CONFIRMED bookings for these dates)
+    const availabilityCheck = checkServiceAvailability(service, booking.checkIn, booking.checkOut);
+    
+    if (!availabilityCheck.available) {
+      // If not available, mark this booking as cancelled
+      booking.status = 'cancelled';
+      booking.notes = 'Cancelled because dates were already booked by another traveler';
+      await booking.save();
+      
+      // Update the pending booking in service to cancelled
+      if (service.bookedDates) {
+        const idx = service.bookedDates.findIndex(b => 
+          b.bookingId && b.bookingId.toString() === booking._id.toString()
+        );
+        if (idx !== -1) {
+          service.bookedDates[idx].status = 'cancelled';
+          await service.save();
+        }
+      }
+      
+      return res.status(409).json({
+        success: false,
+        message: 'Sorry, these dates are no longer available. Another booking was accepted first.'
+      });
+    }
+    
+    // ✅ Update the booking status in service bookedDates to CONFIRMED
+    const bookingIndex = service.bookedDates.findIndex(b => 
+      b.bookingId && b.bookingId.toString() === booking._id.toString()
+    );
+    
+    if (bookingIndex !== -1) {
+      // Change from 'pending' to 'confirmed' - this blocks availability
+      service.bookedDates[bookingIndex].status = 'confirmed';
+      
+      // Check if service is now fully booked
+      if (isServiceFullyBooked(service)) {
+        service.available = false;
+      }
+      
+      await service.save();
+      console.log(`✅ Booking ${booking.bookingId} now CONFIRMED - dates are blocked`);
+    }
+
+    // Update booking status
     booking.status = 'confirmed';
     booking.paymentStatus = 'pending';
     await booking.save();
 
-    // Do NOT update trip status yet — wait for payment
-    // Do NOT create HostEarning yet — wait for payment
-
-    console.log(`✅ Booking ${booking.bookingId} accepted by host — awaiting traveler payment`);
+    console.log(`✅ Booking ${booking.bookingId} accepted by host`);
 
     res.json({
       success: true,
@@ -9697,6 +10264,7 @@ app.put('/api/host/booking-requests/:id/accept', authenticate, async (req, res) 
 });
 
 
+
 // ==================== PAYMENT AFTER HOST ACCEPTANCE ====================
 
 // Get pending payments for user (bookings where host accepted but payment pending)
@@ -9707,16 +10275,38 @@ app.get('/api/payments/pending', authenticate, async (req, res) => {
       status: 'confirmed',
       paymentStatus: 'pending'
     })
-    .populate({
-      path: 'hostId',
-      select: 'name location rating image'
-    })
+    .populate('hostId', 'name location image rating reviews verified')
     .sort({ updatedAt: -1 });
+
+    console.log(`✅ Found ${pendingBookings.length} pending payments`);
+
+    const formatted = pendingBookings.map(b => ({
+      _id: b._id,
+      bookingId: b.bookingId,
+      hostId: b.hostId ? {
+        _id: b.hostId._id,
+        name: b.hostId.name,
+        location: b.hostId.location,
+        image: b.hostId.image,
+        rating: b.hostId.rating || 0
+      } : null,
+      hostName: b.hostId?.name || 'Host',
+      location: b.hostId?.location || 'Location',
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      guests: b.guests,
+      totalAmount: b.totalAmount,
+      platformFee: b.platformFee,
+      grandTotal: b.grandTotal,
+      status: b.status,
+      paymentStatus: b.paymentStatus,
+      createdAt: b.createdAt
+    }));
 
     res.json({
       success: true,
-      count: pendingBookings.length,
-      bookings: pendingBookings
+      count: formatted.length,
+      bookings: formatted
     });
   } catch (error) {
     console.error('❌ Get pending payments error:', error);
@@ -9805,8 +10395,25 @@ app.post('/api/payments/process/:bookingId', authenticate, async (req, res) => {
     booking.paymentMethod = paymentMethod;
     booking.paymentDetails = securePaymentDetails;
     booking.paymentStatus = 'paid';
-    booking.status = 'confirmed'; // Keep confirmed
+    booking.status = 'confirmed';
     await booking.save();
+
+    console.log(`✅ Payment processed for booking ${booking.bookingId}`);
+
+    // ✅ FIX: Update trip to reflect payment completion
+    // Find the trip and update its status
+    const trip = await Trip.findOne({
+      userId: req.user._id,
+      'host.bookingId': booking._id
+    });
+
+    if (trip) {
+      trip.paymentStatus = 'paid';
+      trip.bookingStatus = 'confirmed';
+      trip.status = 'confirmed'; // Some trips use 'status', some use 'bookingStatus'
+      await trip.save();
+      console.log(`✅ Trip ${trip._id} updated to confirmed`);
+    }
 
     // Create earning record for host
     const hostEarningsAmount = booking.totalAmount - booking.platformFee;
@@ -9833,28 +10440,7 @@ app.post('/api/payments/process/:bookingId', authenticate, async (req, res) => {
     });
     
     await earning.save();
-
-    // Update host stats
-    const host = await Host.findById(booking.hostId._id);
-    if (host) {
-      host.totalGuests = (host.totalGuests || 0) + booking.guests;
-      host.totalEarnings = (host.totalEarnings || 0) + hostEarningsAmount;
-      await host.save();
-    }
-
-    // Update associated trip to 'upcoming' if it exists
-    await Trip.updateOne(
-      { 
-        userId: req.user._id, 
-        destination: booking.hostId.location,
-        date: booking.checkIn,
-        status: 'pending'
-      },
-      { status: 'upcoming' }
-    );
-
-    console.log(`✅ Payment processed for booking ${booking.bookingId}`);
-    console.log(`💰 Host earnings: ৳${hostEarningsAmount}`);
+    console.log('💰 Host earning recorded:', earning._id);
 
     res.json({
       success: true,
@@ -9875,38 +10461,6 @@ app.post('/api/payments/process/:bookingId', authenticate, async (req, res) => {
       success: false,
       message: 'Error processing payment',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// Get payment status for a booking
-app.get('/api/payments/status/:bookingId', authenticate, async (req, res) => {
-  try {
-    const booking = await Booking.findOne({
-      _id: req.params.bookingId,
-      userId: req.user._id
-    }).select('status paymentStatus paymentMethod grandTotal createdAt');
-
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      paymentStatus: booking.paymentStatus,
-      bookingStatus: booking.status,
-      paymentMethod: booking.paymentMethod,
-      amount: booking.grandTotal,
-      bookedAt: booking.createdAt
-    });
-  } catch (error) {
-    console.error('❌ Get payment status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching payment status'
     });
   }
 });

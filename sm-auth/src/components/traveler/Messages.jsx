@@ -80,7 +80,7 @@ const formatMessageTime = (timestamp) => {
   }
 };
 
-export function Messages() {
+export function Messages({ selectedHostId, selectedBookingId }) {
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -466,6 +466,17 @@ export function Messages() {
     conv.hostName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     conv.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Handle pre-selected conversation from props
+  useEffect(() => {
+    if (selectedHostId && conversations.length > 0) {
+      const conversation = conversations.find(c => c.participantId === selectedHostId);
+      if (conversation) {
+        setSelectedConversation(conversation);
+        fetchMessages(conversation._id);
+      }
+    }
+  }, [selectedHostId, conversations]);
 
   // Initial load
   useEffect(() => {
