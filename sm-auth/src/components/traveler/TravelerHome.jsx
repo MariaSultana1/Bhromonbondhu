@@ -563,7 +563,7 @@ export function TravelerHome({ user }) {
                             <span className="flex items-center gap-1">
                               <MapPin className="w-4 h-4" />
                               {trip.ticketInfo.from} 
-                              <span className="mx-1 text-gray-400">→</span>
+                              {trip.ticketInfo.type === 'train' ? '🚆' : trip.ticketInfo.type === 'flight' ? '✈️' : '🚌'} 
                               {trip.ticketInfo.to}
                             </span>
                           ) : (
