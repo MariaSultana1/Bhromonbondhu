@@ -383,6 +383,19 @@ export function AllBookings({ onBack }) {
                     </div>
                   )}
 
+                  {/* ✅ Transport Ticket Info */}
+                  {booking.transportTicket && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs font-semibold text-blue-700 mb-1">🎫 Linked Transport Ticket</p>
+                      <div className="flex flex-wrap gap-3 text-xs text-blue-800">
+                        <span>Type: <strong>{booking.transportTicket.type}</strong></span>
+                        <span>Provider: <strong>{booking.transportTicket.provider}</strong></span>
+                        <span>Route: <strong>{booking.transportTicket.from} → {booking.transportTicket.to}</strong></span>
+                        <span>Date: <strong>{booking.transportTicket.journeyDate}</strong></span>
+                      </div>
+                    </div>
+                  )}
+
                   {booking.notes && (
                     <div className="mb-4 p-3 bg-yellow-50 rounded-lg text-sm text-gray-700">
                       <span className="font-medium">Notes: </span>{booking.notes}
