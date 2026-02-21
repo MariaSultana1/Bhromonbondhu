@@ -1,362 +1,304 @@
-import { ArrowLeft, Star, Loader, AlertCircle, RefreshCw } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { Star, MessageSquare, Loader, AlertCircle, RefreshCw, Search } from 'lucide-react';
 
-/**
- * MINIMAL TRULY DYNAMIC AllReviews Component
- * 
- * This component ONLY fetches from GET /api/reviews endpoint
- * Everything is dynamic from your database
- * 
- * Props:
- * - onBack: function to call when user clicks back
- * - token: JWT token (from props or localStorage)
- * - apiUrl: API base URL (default: http://localhost:5000)
- */
-export function AllReviews({ onBack, token = null, apiUrl = 'http://localhost:5000' }) {
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const getAuthToken = () => localStorage.getItem('token');
+
+const apiCall = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(options.headers || {}),
+    },
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Something went wrong');
+  return data;
+};
+
+function StarRating({ rating, size = 'sm' }) {
+  const sz = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`${sz} ${star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function AllReviews() {
   const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterRating, setFilterRating] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
 
-  // Get auth token
-  const authToken = token || localStorage.getItem('token');
+  useEffect(() => {
+    fetchReviews();
+  }, []);
 
-  /**
-   * FETCH REVIEWS FROM API
-   * This is the ONLY API call made by this component
-   */
-  const fetchReviews = useCallback(async () => {
-    if (!authToken) {
-      setError('No authentication token. Please login first.');
-      setLoading(false);
-      return;
-    }
-
+  const fetchReviews = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      console.log('🔄 Fetching reviews from:', `${apiUrl}/api/reviews`);
-
-      const response = await fetch(`${apiUrl}/api/reviews`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('📡 API Response Status:', response.status);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication failed. Token may have expired.');
-        }
-        if (response.status === 404) {
-          throw new Error('Reviews endpoint not found. Check API server.');
-        }
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      console.log('✅ Reviews received from API:', data.count || data.reviews?.length, 'reviews');
-      console.log('📋 Sample review:', data.reviews?.[0]);
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch reviews');
-      }
-
-      // ALL data comes from API response - NO processing, NO assumptions
+      // ✅ FIX: Use the correct protected endpoint for the authenticated host
+      const data = await apiCall('/hosts/reviews');
       setReviews(data.reviews || []);
-      setError(null);
-
+      setStats(data.stats || null);
     } catch (err) {
-      console.error('❌ Error fetching reviews:', err);
-      setError(err.message || 'Failed to load reviews');
-      setReviews([]);
+      setError(err.message || 'Failed to fetch reviews');
     } finally {
       setLoading(false);
     }
-  }, [authToken, apiUrl]);
-
-  /**
-   * LOAD REVIEWS ON COMPONENT MOUNT
-   */
-  useEffect(() => {
-    console.log('🚀 AllReviews component mounted');
-    console.log('🔑 Auth token present:', !!authToken);
-    console.log('🌐 API URL:', apiUrl);
-    
-    if (authToken) {
-      fetchReviews();
-    } else {
-      setError('No authentication token found. Please login first.');
-      setLoading(false);
-    }
-  }, [authToken, fetchReviews, apiUrl]);
-
-  // Filter reviews based on selected rating
-  const filteredReviews = filterRating === 'all' 
-    ? reviews 
-    : reviews.filter(r => r.rating === parseInt(filterRating));
-
-  // Calculate stats
-  const totalReviews = reviews.length;
-  const averageRating = totalReviews > 0 
-    ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / totalReviews).toFixed(1)
-    : 0;
-
-  const ratingCounts = {
-    5: reviews.filter(r => r.rating === 5).length,
-    4: reviews.filter(r => r.rating === 4).length,
-    3: reviews.filter(r => r.rating === 3).length,
-    2: reviews.filter(r => r.rating === 2).length,
-    1: reviews.filter(r => r.rating === 1).length,
   };
 
-  // Show loading state
-  if (loading) {
+  const filteredReviews = reviews
+    .filter((r) => {
+      const matchesSearch =
+        !searchQuery ||
+        r.reviewer?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.comment?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.listing?.title?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRating =
+        filterRating === 'all' || r.rating === parseInt(filterRating);
+      return matchesSearch && matchesRating;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'highest') return b.rating - a.rating;
+      if (sortBy === 'lowest') return a.rating - b.rating;
+      return 0;
+    });
+
+  if (loading)
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <Loader className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">Loading reviews from database...</p>
-          <p className="text-gray-400 text-sm mt-2">API: {apiUrl}/api/reviews</p>
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <Loader className="w-8 h-8 animate-spin text-blue-500" />
+        <span className="ml-3 text-gray-600">Loading reviews...</span>
       </div>
     );
-  }
 
-  return (
-    <div className="space-y-6 bg-gray-50 min-h-screen p-6">
-      
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-2xl p-8 text-white">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 mb-4 hover:bg-white/20 px-3 py-2 rounded-lg transition-all"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Home</span>
-        </button>
-        <div className="flex items-center justify-between">
+  if (error)
+    return (
+      <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-red-500 mt-0.5" />
           <div>
-            <h2 className="text-3xl font-bold mb-2">All Reviews</h2>
-            <p className="text-yellow-100">
-              {totalReviews} review{totalReviews !== 1 ? 's' : ''} from guests
-            </p>
-          </div>
-          <button
-            onClick={() => fetchReviews()}
-            disabled={loading}
-            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* ERROR MESSAGE */}
-      {error && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Error Loading Reviews</h3>
-            <p className="text-red-700 text-sm mt-1">{error}</p>
+            <p className="font-bold text-red-800">Error loading reviews</p>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
             <button
-              onClick={() => fetchReviews()}
-              className="text-red-600 hover:text-red-900 text-sm font-medium mt-2 underline"
+              onClick={fetchReviews}
+              className="mt-3 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm flex items-center gap-2"
             >
-              Try Again
+              <RefreshCw className="w-4 h-4" /> Retry
             </button>
           </div>
         </div>
-      )}
+      </div>
+    );
 
-      {/* STATS SECTION */}
-      {totalReviews > 0 && (
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
-              <span className="text-sm text-gray-600">Average Rating</span>
-            </div>
-            <div className="text-3xl font-bold">{averageRating}</div>
-            <p className="text-xs text-gray-500 mt-1">Based on {totalReviews} reviews</p>
-          </div>
+  const avgRating = stats?.averageRating || (reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0);
+  const ratingCounts = [5, 4, 3, 2, 1].map((r) => ({
+    rating: r,
+    count: reviews.filter((rev) => rev.rating === r).length,
+  }));
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="text-sm text-gray-600 mb-3">Rating Distribution</div>
-            <div className="space-y-2">
-              {[5, 4, 3, 2, 1].map((rating) => (
-                <div key={rating} className="flex items-center gap-2">
-                  <span className="text-xs font-medium w-6">{rating}★</span>
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-yellow-500 h-2 rounded-full"
-                      style={{
-                        width: `${totalReviews > 0 ? (ratingCounts[rating] / totalReviews) * 100 : 0}%`
-                      }}
-                    />
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-1">My Reviews</h2>
+          <p className="text-gray-600">
+            {reviews.length} review{reviews.length !== 1 ? 's' : ''} from guests
+          </p>
+        </div>
+        <button
+          onClick={fetchReviews}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+        >
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
+      </div>
+
+      {/* Stats */}
+      {reviews.length > 0 && (
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="flex items-center gap-6">
+              <div className="text-center">
+                <div className="text-5xl font-bold text-gray-800">{avgRating.toFixed(1)}</div>
+                <StarRating rating={Math.round(avgRating)} size="md" />
+                <p className="text-sm text-gray-500 mt-1">{reviews.length} reviews</p>
+              </div>
+              <div className="flex-1 space-y-2">
+                {ratingCounts.map(({ rating, count }) => (
+                  <div key={rating} className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 w-4">{rating}</span>
+                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-yellow-400 h-2 rounded-full"
+                        style={{ width: reviews.length ? `${(count / reviews.length) * 100}%` : '0%' }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-500 w-6 text-right">{count}</span>
                   </div>
-                  <span className="text-xs text-gray-600 w-8 text-right">{ratingCounts[rating]}</span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Total Reviews', value: reviews.length },
+                { label: 'Avg Rating', value: avgRating.toFixed(1) + ' / 5' },
+                { label: '5 Star Reviews', value: ratingCounts[0].count },
+                { label: 'Response Rate', value: stats?.responseRate ? `${stats.responseRate}%` : 'N/A' },
+              ].map((item) => (
+                <div key={item.label} className="bg-gray-50 rounded-xl p-4 text-center">
+                  <div className="text-xl font-bold text-gray-800">{item.value}</div>
+                  <div className="text-xs text-gray-500 mt-1">{item.label}</div>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="text-sm text-gray-600 mb-3">Review Stats</div>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">5-Star Reviews</span>
-                <span className="font-bold text-green-600">{ratingCounts[5]}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">4-Star Reviews</span>
-                <span className="font-bold text-blue-600">{ratingCounts[4]}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Below 4-Star</span>
-                <span className="font-bold text-orange-600">{ratingCounts[3] + ratingCounts[2] + ratingCounts[1]}</span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* FILTER BUTTONS */}
-      {reviews.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {['all', 5, 4, 3, 2, 1].map((rating) => {
-            const count = rating === 'all' 
-              ? reviews.length 
-              : reviews.filter(r => r.rating === rating).length;
-
-            return (
-              <button
-                key={rating}
-                onClick={() => setFilterRating(rating)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  filterRating === rating || (typeof filterRating === 'string' && filterRating === String(rating))
-                    ? 'bg-yellow-500 text-white'
-                    : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {rating === 'all' ? 'All Reviews' : `${rating}★`} ({count})
-              </button>
-            );
-          })}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search reviews..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-      )}
+        <select
+          value={filterRating}
+          onChange={(e) => setFilterRating(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Ratings</option>
+          <option value="5">5 Stars</option>
+          <option value="4">4 Stars</option>
+          <option value="3">3 Stars</option>
+          <option value="2">2 Stars</option>
+          <option value="1">1 Star</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="highest">Highest Rating</option>
+          <option value="lowest">Lowest Rating</option>
+        </select>
+      </div>
 
-      {/* NO REVIEWS */}
-      {filteredReviews.length === 0 && !error && (
-        <div className="bg-white rounded-2xl p-12 text-center border-2 border-gray-200">
-          <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-600 mb-2">No Reviews Found</h3>
-          <p className="text-gray-500">
-            {reviews.length === 0 
-              ? "You don't have any reviews yet" 
-              : `No ${filterRating}-star reviews found`}
+      {/* Reviews List */}
+      {filteredReviews.length === 0 ? (
+        <div className="bg-white rounded-xl p-16 shadow-sm border border-gray-100 text-center">
+          <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-700 mb-2">
+            {reviews.length === 0 ? 'No reviews yet' : 'No reviews match your filters'}
+          </h3>
+          <p className="text-sm text-gray-500">
+            {reviews.length === 0
+              ? 'Reviews from guests will appear here once they complete their stay.'
+              : 'Try adjusting your search or filter criteria.'}
           </p>
         </div>
-      )}
+      ) : (
+        <div className="space-y-4">
+          {filteredReviews.map((review) => (
+            <div key={review._id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="flex items-start gap-4">
+                {/* Avatar */}
+                <div className="flex-shrink-0">
+                  {review.reviewer?.avatar ? (
+                    <img
+                      src={review.reviewer.avatar}
+                      alt={review.reviewer.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg">
+                      {review.reviewer?.name?.[0]?.toUpperCase() || 'G'}
+                    </div>
+                  )}
+                </div>
 
-      {/* REVIEWS LIST */}
-      <div className="space-y-4">
-        {filteredReviews.map((review) => (
-          <div
-            key={review._id}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all p-6"
-          >
-            {/* REVIEW HEADER */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-4 flex-1">
-                {review.avatar && (
-                  <img
-                    src={review.avatar}
-                    alt={review.travelerName}
-                    className="w-14 h-14 rounded-full object-cover"
-                  />
-                )}
-                {!review.avatar && (
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-white text-xl font-bold">
-                    {review.travelerName?.charAt(0).toUpperCase() || '?'}
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        {review.reviewer?.name || 'Guest'}
+                      </p>
+                      {review.listing?.title && (
+                        <p className="text-sm text-blue-600 mt-0.5">{review.listing.title}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <StarRating rating={review.rating} />
+                      <span className="text-xs text-gray-500">
+                        {review.createdAt
+                          ? new Date(review.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : '—'}
+                      </span>
+                    </div>
                   </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold mb-1">
-                    {review.travelerName || 'Anonymous'}
-                  </h3>
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < (review.rating || 0)
-                              ? 'text-yellow-500 fill-yellow-500'
-                              : 'text-gray-300 fill-gray-300'
-                          }`}
-                        />
+
+                  {review.comment && (
+                    <p className="mt-3 text-gray-700 text-sm leading-relaxed">{review.comment}</p>
+                  )}
+
+                  {/* Sub-ratings */}
+                  {review.subRatings && Object.keys(review.subRatings).length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {Object.entries(review.subRatings).map(([key, val]) => (
+                        <div key={key} className="flex items-center gap-1 text-xs text-gray-600">
+                          <span className="capitalize">{key}:</span>
+                          <StarRating rating={val} size="sm" />
+                        </div>
                       ))}
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Date unknown'}
-                    </span>
-                  </div>
+                  )}
+
+                  {/* Host response */}
+                  {review.hostResponse && (
+                    <div className="mt-4 pl-4 border-l-4 border-blue-200 bg-blue-50 rounded-r-lg p-3">
+                      <p className="text-xs font-semibold text-blue-700 mb-1">Your Response</p>
+                      <p className="text-sm text-gray-700">{review.hostResponse}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* REVIEW CONTENT */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-4">
-              <p className="text-gray-700 text-sm leading-relaxed">
-                {review.comment || review.text || 'No comment provided'}
-              </p>
-            </div>
-
-            {/* REVIEW METADATA */}
-            {(review.bookingId || review.bookingDate) && (
-              <div className="text-xs text-gray-500 space-y-1">
-                {review.bookingId && (
-                  <div>Booking ID: {review.bookingId}</div>
-                )}
-                {review.bookingDate && (
-                  <div>Booking Date: {new Date(review.bookingDate).toLocaleDateString()}</div>
-                )}
-              </div>
-            )}
-
-            {/* RAW DATA (for debugging) */}
-            <details className="mt-4 pt-4 border-t border-gray-200">
-              <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                Raw Data (Debug)
-              </summary>
-              <pre className="mt-2 text-xs bg-gray-100 p-3 rounded overflow-auto max-h-48 text-gray-700">
-                {JSON.stringify(review, null, 2)}
-              </pre>
-            </details>
-          </div>
-        ))}
-      </div>
-
-      {/* DEBUG INFO */}
-      <div className="bg-gray-200 rounded-2xl p-6 text-sm text-gray-700">
-        <h4 className="font-bold mb-2">Debug Information</h4>
-        <div className="space-y-1 font-mono text-xs">
-          <div>API URL: {apiUrl}</div>
-          <div>Endpoint: GET /api/reviews</div>
-          <div>Auth Token: {authToken ? '✅ Present' : '❌ Missing'}</div>
-          <div>Total Reviews: {reviews.length}</div>
-          <div>Filtered Reviews: {filteredReviews.length}</div>
-          <div>Filter Rating: {filterRating}</div>
-          <div>Component Status: {loading ? 'Loading' : error ? 'Error' : 'Ready'}</div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
+export default AllReviews;

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Home, Search, Filter, Star, MapPin, Languages, Shield, Calendar, X, Check, CreditCard, Users, CheckCircle2, Lock, Loader, Send, AlertCircle, Phone, Mail, Clock, Users2 } from 'lucide-react';
+import { 
+  Home, Search, Filter, Star, MapPin, Languages, Shield, Calendar, X, Check, 
+  CreditCard, Users, CheckCircle2, Lock, Loader, Send, AlertCircle, Clock, 
+  Users2, ChevronDown, Eye, EyeOff
+} from 'lucide-react';
 
-// API configuration
+// ==================== API CONFIGURATION ====================
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Helper function to get auth token
@@ -32,7 +36,8 @@ const apiCall = async (endpoint, options = {}) => {
   return data;
 };
 
-// Helper function to get today's date in YYYY-MM-DD format
+// ==================== HELPER FUNCTIONS ====================
+
 const getTodayDate = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -41,7 +46,6 @@ const getTodayDate = () => {
   return `${year}-${month}-${day}`;
 };
 
-// Format date to YYYY-MM-DD format for input
 const formatDateToInput = (date) => {
   const d = new Date(date);
   const year = d.getFullYear();
@@ -50,7 +54,6 @@ const formatDateToInput = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-// Format date for display
 const formatDate = (dateString) => {
   if (!dateString) return 'Not specified';
   try {
@@ -64,7 +67,6 @@ const formatDate = (dateString) => {
   }
 };
 
-// Get initials from name
 const getInitials = (name) => {
   if (!name) return '?';
   const parts = name.trim().split(' ');
@@ -74,7 +76,6 @@ const getInitials = (name) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-// Generate color based on name
 const getColorFromName = (name) => {
   const colors = [
     'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
@@ -119,20 +120,20 @@ const getLocationImage = (location) => {
     'Chittagong': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
   };
   
-  if (defaultImages[location]) {
-    return defaultImages[location];
-  }
-  
-  return 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80';
+  return defaultImages[location] || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80';
 };
 
+// ==================== MAIN COMPONENT ====================
+
 export function BookTravel() {
-  // State for hosts
+  // ========== STATE MANAGEMENT ==========
+  
+  // Hosts and loading
   const [hosts, setHosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Search and filter states
+  // Search and filter
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState({
@@ -141,66 +142,35 @@ export function BookTravel() {
     languages: []
   });
 
-  // Booking modal states
-  const [showHostModal, setShowHostModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedHost, setSelectedHost] = useState(null);
-  const [dateValidationError, setDateValidationError] = useState('');
-  
-  // New modal states
+  // Modal states
   const [showHostProfile, setShowHostProfile] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showBookingRequestModal, setShowBookingRequestModal] = useState(false);
+  const [selectedHost, setSelectedHost] = useState(null);
+
+  // Message form
   const [messageContent, setMessageContent] = useState('');
   const [messageSubject, setMessageSubject] = useState('General Inquiry');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageError, setMessageError] = useState('');
-  
-  // Payment simulation
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCVV, setCardCVV] = useState('');
-  const [bkashNumber, setBkashNumber] = useState('');
 
-  // Host booking form
-  const [hostBookingForm, setHostBookingForm] = useState({
+  // Booking request form
+  const [bookingRequestForm, setBookingRequestForm] = useState({
     checkIn: '',
     checkOut: '',
     guests: 1,
-    selectedServices: []
+    selectedServices: [],
+    specialRequests: ''
   });
+  const [dateValidationError, setDateValidationError] = useState('');
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
 
-  // Helper function to check if a service should be displayed
-  const shouldDisplayService = (service) => {
-    // 1. Service must be available
-    if (!service.available) {
-      console.log(`Hiding service: ${service.name} (marked unavailable)`);
-      return false;
-    }
+  // ========== FETCH HOSTS ==========
 
-    // 2. Check if service has availability dates
-    if (!service.availableFromDate || !service.availableToDate) {
-      console.log(`Hiding service: ${service.name} (missing availability dates)`);
-      return false;
-    }
-
-    // 3. Optional: Check if availability period has passed
-    const today = new Date();
-    const availTo = new Date(service.availableToDate);
-    if (availTo < today) {
-      console.log(`Hiding service: ${service.name} (availability period ended)`);
-      return false;
-    }
-
-    return true;
-  };
-
-  // Fetch host services from database
   useEffect(() => {
     fetchHosts();
-  }, []);
+  }, [searchTerm, selectedFilters]);
 
   const fetchHosts = async () => {
     try {
@@ -209,9 +179,8 @@ export function BookTravel() {
       
       const data = await apiCall('/host-services');
       
-      // Backend already filters, but we add extra validation here
       const mappedHosts = data.services
-        .filter(service => shouldDisplayService(service))
+        .filter(service => service.available !== undefined ? service.available : true)
         .map(service => {
           const hostInfo = service.hostId || {};
           
@@ -237,7 +206,6 @@ export function BookTravel() {
             cancellationPolicy: service.cancellationPolicy || 'Flexible',
             maxGuests: service.maxGuests || 4,
             minStay: service.minStay || 1,
-            offersAccommodation: service.serviceType?.includes('Accommodation'),
             hostId: hostInfo._id || service.hostId,
             hostName: hostInfo.name || 'Host',
             hostEmail: hostInfo.email,
@@ -264,49 +232,21 @@ export function BookTravel() {
         filtered = filtered.filter(host => host.verified);
       }
       
-      console.log(`✅ Displaying ${filtered.length} available services`);
       setHosts(filtered);
     } catch (err) {
-      console.error('Error fetching host services:', err);
-      setError(err.message || 'Failed to fetch host services');
+      console.error('Error fetching hosts:', err);
+      setError(err.message || 'Failed to fetch hosts');
       setHosts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    const debounce = setTimeout(() => {
-      fetchHosts();
-    }, 500);
+  // ========== BOOKING REQUEST HANDLERS ==========
 
-    return () => clearTimeout(debounce);
-  }, [searchTerm, selectedFilters]);
-
-  // Check service availability
-  const checkServiceAvailability = async (serviceId) => {
-    try {
-      const response = await apiCall(`/host-services/${serviceId}/availability`);
-      return response;
-    } catch (error) {
-      console.error('Error checking availability:', error);
-      return { success: false, available: false, reason: 'Error checking availability' };
-    }
-  };
-
-  const handleHostBooking = async (host) => {
-    // Check availability in real-time before opening modal
-    const availabilityCheck = await checkServiceAvailability(host.serviceId);
-    
-    if (!availabilityCheck.success || !availabilityCheck.available) {
-      alert(`Sorry, this service is no longer available. ${availabilityCheck.reason || ''}`);
-      // Refresh the list to remove this service
-      fetchHosts();
-      return;
-    }
-    
+  const openBookingRequest = (host) => {
     setSelectedHost(host);
-    setShowHostModal(true);
+    setShowBookingRequestModal(true);
     setDateValidationError('');
     
     let defaultCheckIn = getTodayDate();
@@ -319,21 +259,22 @@ export function BookTravel() {
       }
     }
     
-    setHostBookingForm({
+    setBookingRequestForm({
       checkIn: defaultCheckIn,
       checkOut: '',
       guests: 1,
-      selectedServices: []
+      selectedServices: [],
+      specialRequests: ''
     });
   };
 
   const isDateRangeValid = () => {
-    if (!selectedHost || !hostBookingForm.checkIn || !hostBookingForm.checkOut) {
+    if (!selectedHost || !bookingRequestForm.checkIn || !bookingRequestForm.checkOut) {
       return false;
     }
 
-    const checkIn = new Date(hostBookingForm.checkIn);
-    const checkOut = new Date(hostBookingForm.checkOut);
+    const checkIn = new Date(bookingRequestForm.checkIn);
+    const checkOut = new Date(bookingRequestForm.checkOut);
     const availFrom = new Date(selectedHost.availableFromDate);
     const availTo = new Date(selectedHost.availableToDate);
     const today = new Date();
@@ -344,12 +285,12 @@ export function BookTravel() {
 
   const getDateValidationError = () => {
     if (!selectedHost) return '';
-    if (!hostBookingForm.checkIn || !hostBookingForm.checkOut) {
+    if (!bookingRequestForm.checkIn || !bookingRequestForm.checkOut) {
       return '';
     }
 
-    const checkIn = new Date(hostBookingForm.checkIn);
-    const checkOut = new Date(hostBookingForm.checkOut);
+    const checkIn = new Date(bookingRequestForm.checkIn);
+    const checkOut = new Date(bookingRequestForm.checkOut);
     const availFrom = new Date(selectedHost.availableFromDate);
     const availTo = new Date(selectedHost.availableToDate);
     const today = new Date();
@@ -371,6 +312,58 @@ export function BookTravel() {
     return '';
   };
 
+  const submitBookingRequest = async () => {
+    const error = getDateValidationError();
+    if (error) {
+      setDateValidationError(error);
+      return;
+    }
+
+    if (!isDateRangeValid()) {
+      setDateValidationError('Invalid booking dates');
+      return;
+    }
+
+    setSubmittingRequest(true);
+
+    try {
+      const requestData = {
+        bookingType: 'host',
+        serviceId: selectedHost.serviceId,
+        hostId: selectedHost.hostId,
+        checkIn: bookingRequestForm.checkIn,
+        checkOut: bookingRequestForm.checkOut,
+        guests: bookingRequestForm.guests,
+        selectedServices: bookingRequestForm.selectedServices,
+        notes: bookingRequestForm.specialRequests || `Booking request for ${selectedHost.name}`
+      };
+
+      const response = await apiCall('/bookings', {
+        method: 'POST',
+        body: JSON.stringify(requestData)
+      });
+
+      console.log('✅ Booking request sent:', response);
+      
+      setRequestSuccess(true);
+      setShowBookingRequestModal(false);
+
+      // Show success message for 3 seconds
+      setTimeout(() => {
+        setRequestSuccess(false);
+        fetchHosts(); // Refresh the list
+      }, 3000);
+
+    } catch (err) {
+      console.error('Error submitting booking request:', err);
+      setDateValidationError(err.message || 'Failed to send booking request');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  // ========== MESSAGE HANDLERS ==========
+
   const handleSendMessage = async () => {
     if (!messageContent.trim()) {
       setMessageError('Message cannot be empty');
@@ -381,12 +374,14 @@ export function BookTravel() {
     setMessageError('');
     
     try {
+      // In production, this would send to your backend
       console.log('Message sent:', {
         to: selectedHost.hostId,
         subject: messageSubject,
         content: messageContent
       });
       
+      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       alert(`Message sent to ${selectedHost.hostName}! They typically respond within ${selectedHost.responseTime}.`);
@@ -401,155 +396,23 @@ export function BookTravel() {
     }
   };
 
-  const calculateHostTotal = () => {
-    if (!selectedHost) return 0;
-    const checkIn = new Date(hostBookingForm.checkIn);
-    const checkOut = new Date(hostBookingForm.checkOut);
-    const days = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-    return days > 0 ? selectedHost.price * days : 0;
-  };
-
-  const proceedToPayment = () => {
-    const error = getDateValidationError();
-    if (error) {
-      setDateValidationError(error);
-      return;
-    }
-    
-    if (!isDateRangeValid()) {
-      setDateValidationError('Invalid booking dates');
-      return;
-    }
-
-    setShowHostModal(false);
-    setShowPaymentModal(true);
-  };
-
-  const processPayment = async () => {
-    setPaymentProcessing(true);
-    
-    try {
-      if (paymentMethod === 'card') {
-        const cleanedCard = cardNumber.replace(/\s+/g, '');
-        if (!/^\d{16}$/.test(cleanedCard)) {
-          alert('Card number must be exactly 16 digits');
-          setPaymentProcessing(false);
-          return;
-        }
-
-        if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry)) {
-          alert('Expiry date must be in MM/YY format');
-          setPaymentProcessing(false);
-          return;
-        }
-
-        const [month, year] = cardExpiry.split('/');
-        const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
-        if (expiry < new Date()) {
-          alert('Card has expired');
-          setPaymentProcessing(false);
-          return;
-        }
-
-        if (!/^\d{3}$/.test(cardCVV)) {
-          alert('CVV must be exactly 3 digits');
-          setPaymentProcessing(false);
-          return;
-        }
-      } else if (paymentMethod === 'bkash') {
-        if (!/^01[3-9]\d{8}$/.test(bkashNumber)) {
-          alert('bKash number must be 11 digits starting with 01');
-          setPaymentProcessing(false);
-          return;
-        }
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      if (!selectedHost) return;
-
-      const totalAmount = calculateHostTotal();
-      const platformFee = Math.round(totalAmount * 0.15);
-      const grandTotal = totalAmount + platformFee;
-
-      const paymentDetails = {};
-      if (paymentMethod === 'card') {
-        paymentDetails.cardNumber = cardNumber;
-        paymentDetails.cardholderName = 'Card Holder';
-      } else if (paymentMethod === 'bkash') {
-        paymentDetails.bkashNumber = bkashNumber;
-      }
-
-      const bookingData = {
-        bookingType: 'host',
-        serviceId: selectedHost.serviceId,
-        hostId: selectedHost.hostId,
-        checkIn: hostBookingForm.checkIn,
-        checkOut: hostBookingForm.checkOut,
-        guests: hostBookingForm.guests,
-        selectedServices: hostBookingForm.selectedServices,
-        notes: `Booking for ${selectedHost.name} in ${selectedHost.location}`,
-        paymentMethod: paymentMethod,
-        paymentDetails: paymentDetails
-      };
-
-      const response = await apiCall('/bookings', {
-        method: 'POST',
-        body: JSON.stringify(bookingData)
-      });
-      console.log("✅ Booking data being sent:", bookingData);
-
-      console.log('✅ Booking created:', response.booking);
-
-      const tripData = {
-        destination: selectedHost.location,
-        date: hostBookingForm.checkIn,
-        endDate: hostBookingForm.checkOut,
-        host: selectedHost.hostName,
-        hostAvatar: selectedHost.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedHost.hostName}`,
-        image: selectedHost.propertyImage || getLocationImage(selectedHost.location),
-        services: hostBookingForm.selectedServices,
-        guests: hostBookingForm.guests,
-        totalAmount: grandTotal,
-        hostRating: selectedHost.rating,
-        description: `Experience ${selectedHost.location} with ${selectedHost.hostName}`
-      };
-
-      await apiCall('/trips', {
-        method: 'POST',
-        body: JSON.stringify(tripData)
-      });
-
-      setPaymentProcessing(false);
-      setShowPaymentModal(false);
-      setShowConfirmation(true);
-      
-      setCardNumber('');
-      setCardExpiry('');
-      setCardCVV('');
-      setBkashNumber('');
-      
-      setTimeout(() => {
-        setShowConfirmation(false);
-        // Refresh the host list to remove newly booked service
-        fetchHosts();
-      }, 3000);
-
-    } catch (err) {
-      console.error('Booking error:', err);
-      alert(`Booking failed: ${err.message}`);
-      setPaymentProcessing(false);
-    }
-  };
-
   const toggleService = (service) => {
-    setHostBookingForm(prev => ({
+    setBookingRequestForm(prev => ({
       ...prev,
       selectedServices: prev.selectedServices.includes(service)
         ? prev.selectedServices.filter(s => s !== service)
         : [...prev.selectedServices, service]
     }));
   };
+
+  const calculateNights = () => {
+    if (!bookingRequestForm.checkIn || !bookingRequestForm.checkOut) return 0;
+    const checkIn = new Date(bookingRequestForm.checkIn);
+    const checkOut = new Date(bookingRequestForm.checkOut);
+    return Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // ========== RENDER ==========
 
   const filteredHosts = hosts.filter(host => {
     const matchesSearch = !searchTerm || 
@@ -564,13 +427,15 @@ export function BookTravel() {
 
   return (
     <div className="space-y-8">
+      {/* Header Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-300 rounded-2xl p-8 text-white">
-        <h2 className="text-2xl mb-2 font-bold">Discover Local Hosts</h2>
+        <h2 className="text-3xl font-bold mb-2">Discover Local Hosts</h2>
         <p className="text-blue-100">Book authentic experiences with verified local hosts across Bangladesh</p>
       </div>
 
-      <div className="flex gap-3">
-        <div className="flex-1 relative">
+      {/* Search and Filters */}
+      <div className="flex gap-3 flex-wrap md:flex-nowrap">
+        <div className="flex-1 min-w-xs relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
@@ -582,7 +447,7 @@ export function BookTravel() {
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`px-6 py-4 rounded-xl flex items-center gap-2 border-2 transition-all ${
+          className={`px-6 py-4 rounded-xl flex items-center gap-2 border-2 transition-all whitespace-nowrap ${
             showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 hover:bg-gray-50'
           }`}
         >
@@ -591,6 +456,7 @@ export function BookTravel() {
         </button>
       </div>
 
+      {/* Filters Panel */}
       {showFilters && (
         <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
           <div className="grid md:grid-cols-3 gap-6">
@@ -622,13 +488,15 @@ export function BookTravel() {
         </div>
       )}
 
+      {/* Error Message */}
       {error && (
         <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-800">
-          <p className="font-medium">Error loading host services</p>
+          <p className="font-medium">Error loading services</p>
           <p className="text-sm">{error}</p>
         </div>
       )}
 
+      {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <Loader className="w-8 h-8 animate-spin text-blue-500" />
@@ -636,33 +504,39 @@ export function BookTravel() {
         </div>
       )}
 
+      {/* No Results */}
       {!loading && !error && filteredHosts.length === 0 && (
         <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-8 text-center">
-          <p className="text-gray-600">No host services found matching your criteria.</p>
+          <p className="text-gray-600 mb-4">No host services found matching your criteria.</p>
           <button 
             onClick={() => {
               setSearchTerm('');
               setSelectedFilters({ verified: false, minRating: 0, languages: [] });
             }}
-            className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium"
           >
             Clear Filters
           </button>
         </div>
       )}
 
+      {/* Hosts List */}
       {!loading && !error && filteredHosts.length > 0 && (
         <div className="space-y-4">
           {filteredHosts.map((host) => (
-            <div key={host.id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+            <div 
+              key={host.id} 
+              className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+            >
               <div className="md:flex">
+                {/* Image */}
                 <div className="md:w-80 h-64 md:h-auto relative overflow-hidden bg-gray-100">
                   <img
                     src={host.propertyImage || getLocationImage(host.location)}
                     alt={host.location}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                     onError={(e) => {
-                      e.target.src = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80';
+                      e.target.src = getLocationImage(host.location);
                     }}
                   />
                   
@@ -674,7 +548,9 @@ export function BookTravel() {
                   )}
                 </div>
 
-                <div className="flex-1 p-6">
+                {/* Content */}
+                <div className="flex-1 p-6 flex flex-col">
+                  {/* Host Info */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-4">
@@ -700,6 +576,7 @@ export function BookTravel() {
                         </div>
                       </div>
 
+                      {/* Service Name and Description */}
                       <div className="mb-4">
                         <h4 className="font-semibold text-gray-800 mb-2">{host.name}</h4>
                         <p className="text-sm text-gray-600 leading-relaxed mb-3 line-clamp-2">
@@ -707,6 +584,7 @@ export function BookTravel() {
                         </p>
                       </div>
 
+                      {/* Availability */}
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Calendar className="w-4 h-4 text-blue-600" />
@@ -719,6 +597,7 @@ export function BookTravel() {
                         </div>
                       </div>
 
+                      {/* Stats */}
                       <div className="flex items-center gap-4 mb-4 flex-wrap">
                         <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg">
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
@@ -735,6 +614,7 @@ export function BookTravel() {
                         </div>
                       </div>
 
+                      {/* Details Grid */}
                       <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                         <div className="flex items-center gap-2 text-gray-700">
                           <Users className="w-4 h-4 text-gray-500" />
@@ -746,14 +626,19 @@ export function BookTravel() {
                         </div>
                       </div>
 
+                      {/* Languages */}
                       <div className="flex items-center gap-2 mb-4">
                         <Languages className="w-4 h-4 text-gray-500" />
                         <span className="text-sm text-gray-600">{host.languages.join(', ')}</span>
                       </div>
 
+                      {/* Services Tags */}
                       <div className="flex flex-wrap gap-2 mb-4">
                         {host.services.map((service, index) => (
-                          <span key={index} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-200">
+                          <span 
+                            key={index} 
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-200"
+                          >
                             {service}
                           </span>
                         ))}
@@ -761,17 +646,18 @@ export function BookTravel() {
                     </div>
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="flex items-center gap-3 pt-4 border-t border-gray-100 flex-wrap">
                     <button
                       disabled={!host.available}
-                      onClick={() => handleHostBooking(host)}
+                      onClick={() => openBookingRequest(host)}
                       className={`px-6 py-3 rounded-xl transition-all font-medium ${
                         host.available
                           ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg'
                           : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       }`}
                     >
-                      {host.available ? 'Book Experience' : 'Unavailable'}
+                      {host.available ? 'Request Booking' : 'Unavailable'}
                     </button>
                     <button 
                       className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-medium text-gray-700" 
@@ -801,20 +687,25 @@ export function BookTravel() {
         </div>
       )}
 
+      {/* Security Info Banner */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-2xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h4 className="mb-2 text-blue-900 font-semibold">Secure Booking with Escrow Protection</h4>
+            <h4 className="mb-2 text-blue-900 font-semibold">Request-Based Booking with Host Approval</h4>
             <p className="text-sm text-blue-800 leading-relaxed">
-              Your payment is held securely in escrow until you confirm the service. A 15% platform fee applies. Full refund available through our dispute resolution system if anything goes wrong.
+              📌 Send a booking request → Host reviews and accepts → Payment after acceptance. 
+              A 15% platform fee applies. Full refund available if the host declines.
             </p>
           </div>
         </div>
       </div>
 
+      {/* ==================== MODALS ==================== */}
+
+      {/* Host Profile Modal */}
       {showHostProfile && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -842,17 +733,19 @@ export function BookTravel() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Property Image */}
               <div className="rounded-xl overflow-hidden shadow-lg">
                 <img 
                   src={selectedHost.propertyImage || getLocationImage(selectedHost.location)} 
                   alt={selectedHost.location} 
                   className="w-full h-80 object-cover" 
                   onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80';
+                    e.target.src = getLocationImage(selectedHost.location);
                   }}
                 />
               </div>
 
+              {/* Stats Grid */}
               <div className="grid grid-cols-4 gap-4">
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
                   <div className="flex items-center justify-center gap-1 mb-2">
@@ -875,11 +768,13 @@ export function BookTravel() {
                 </div>
               </div>
 
+              {/* Description */}
               <div>
                 <h4 className="font-bold text-lg mb-3 text-gray-800">{selectedHost.name}</h4>
-                <p className="text-gray-700 leading-relaxed mb-4">{selectedHost.description}</p>
+                <p className="text-gray-700 leading-relaxed">{selectedHost.description}</p>
               </div>
 
+              {/* Availability */}
               <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="w-5 h-5 text-blue-600" />
@@ -894,6 +789,7 @@ export function BookTravel() {
                 </div>
               </div>
 
+              {/* Details */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <span className="text-sm font-semibold text-gray-700 block mb-2">Experience Level</span>
@@ -921,6 +817,7 @@ export function BookTravel() {
                 </div>
               </div>
 
+              {/* Languages */}
               <div>
                 <h4 className="font-bold text-gray-800 mb-3">Languages Spoken</h4>
                 <div className="flex flex-wrap gap-2">
@@ -935,6 +832,7 @@ export function BookTravel() {
                 </div>
               </div>
 
+              {/* Services */}
               <div>
                 <h4 className="font-bold text-gray-800 mb-3">Services Offered</h4>
                 <div className="grid md:grid-cols-2 gap-3">
@@ -950,6 +848,7 @@ export function BookTravel() {
                 </div>
               </div>
 
+              {/* Close and Book Buttons */}
               <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowHostProfile(false)}
@@ -960,11 +859,11 @@ export function BookTravel() {
                 <button
                   onClick={() => {
                     setShowHostProfile(false);
-                    handleHostBooking(selectedHost);
+                    openBookingRequest(selectedHost);
                   }}
                   className="py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 font-medium"
                 >
-                  Book Now
+                  Request Booking
                 </button>
               </div>
             </div>
@@ -972,6 +871,7 @@ export function BookTravel() {
         </div>
       )}
 
+      {/* Message Modal */}
       {showMessageModal && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
@@ -989,6 +889,7 @@ export function BookTravel() {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Host Info */}
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <AvatarWithInitials 
                   image={selectedHost.image} 
@@ -1008,6 +909,7 @@ export function BookTravel() {
                 </div>
               )}
 
+              {/* Subject */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">Subject</label>
                 <select 
@@ -1023,6 +925,7 @@ export function BookTravel() {
                 </select>
               </div>
 
+              {/* Message */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">Your Message</label>
                 <textarea
@@ -1034,10 +937,12 @@ export function BookTravel() {
                 />
               </div>
 
+              {/* Response Time Hint */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
                 💡 {selectedHost.hostName} responds within {selectedHost.responseTime}
               </div>
 
+              {/* Buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -1072,26 +977,34 @@ export function BookTravel() {
         </div>
       )}
 
-      {showHostModal && selectedHost && (
+      {/* Booking Request Modal */}
+      {showBookingRequestModal && selectedHost && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
               <div>
-                <h3 className="text-2xl font-bold mb-1">Complete Your Booking</h3>
-                <p className="text-blue-100 text-sm">Book {selectedHost.hostName}'s service in {selectedHost.location}</p>
+                <h3 className="text-2xl font-bold mb-1">Request Booking</h3>
+                <p className="text-blue-100 text-sm">Request a booking from {selectedHost.hostName} in {selectedHost.location}</p>
               </div>
-              <button onClick={() => setShowHostModal(false)} className="p-2 hover:bg-white/20 rounded-lg">
+              <button 
+                onClick={() => setShowBookingRequestModal(false)} 
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="overflow-y-auto max-h-[calc(90vh-88px)]">
               <div className="p-6 space-y-6">
+                {/* Host Summary */}
                 <div className="flex gap-5 p-5 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200">
                   <img 
                     src={selectedHost.propertyImage || getLocationImage(selectedHost.location)} 
                     alt={selectedHost.location} 
                     className="w-32 h-32 object-cover rounded-xl shadow-md" 
+                    onError={(e) => {
+                      e.target.src = getLocationImage(selectedHost.location);
+                    }}
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -1115,6 +1028,7 @@ export function BookTravel() {
                   </div>
                 </div>
 
+                {/* Error Message */}
                 {dateValidationError && (
                   <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
                     <div className="flex items-start gap-3">
@@ -1124,6 +1038,7 @@ export function BookTravel() {
                   </div>
                 )}
 
+                {/* Date Selection */}
                 <div>
                   <label className="block text-sm mb-3 text-gray-700 font-semibold">Select Your Dates</label>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -1133,12 +1048,12 @@ export function BookTravel() {
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="date"
-                          value={hostBookingForm.checkIn}
+                          value={bookingRequestForm.checkIn}
                           onChange={(e) => {
-                            setHostBookingForm({ ...hostBookingForm, checkIn: e.target.value });
+                            setBookingRequestForm({ ...bookingRequestForm, checkIn: e.target.value });
                             setDateValidationError('');
                           }}
-                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           min={formatDateToInput(new Date(selectedHost.availableFromDate))}
                           max={formatDateToInput(new Date(selectedHost.availableToDate))}
                         />
@@ -1153,13 +1068,13 @@ export function BookTravel() {
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="date"
-                          value={hostBookingForm.checkOut}
+                          value={bookingRequestForm.checkOut}
                           onChange={(e) => {
-                            setHostBookingForm({ ...hostBookingForm, checkOut: e.target.value });
+                            setBookingRequestForm({ ...bookingRequestForm, checkOut: e.target.value });
                             setDateValidationError('');
                           }}
-                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          min={hostBookingForm.checkIn || formatDateToInput(new Date(selectedHost.availableFromDate))}
+                          className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          min={bookingRequestForm.checkIn || formatDateToInput(new Date(selectedHost.availableFromDate))}
                           max={formatDateToInput(new Date(selectedHost.availableToDate))}
                         />
                       </div>
@@ -1167,20 +1082,21 @@ export function BookTravel() {
                   </div>
                 </div>
 
+                {/* Number of Guests */}
                 <div>
                   <label className="block text-sm mb-3 text-gray-700 font-semibold">Number of Guests</label>
                   <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
                     <Users className="w-5 h-5 text-gray-400" />
                     <button
-                      onClick={() => setHostBookingForm({ ...hostBookingForm, guests: Math.max(1, hostBookingForm.guests - 1) })}
-                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white font-bold"
+                      onClick={() => setBookingRequestForm({ ...bookingRequestForm, guests: Math.max(1, bookingRequestForm.guests - 1) })}
+                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white font-bold transition-colors"
                     >
                       −
                     </button>
-                    <span className="text-xl w-16 text-center font-bold">{hostBookingForm.guests}</span>
+                    <span className="text-xl w-16 text-center font-bold">{bookingRequestForm.guests}</span>
                     <button
-                      onClick={() => setHostBookingForm({ ...hostBookingForm, guests: Math.min(selectedHost.maxGuests || 10, hostBookingForm.guests + 1) })}
-                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white font-bold"
+                      onClick={() => setBookingRequestForm({ ...bookingRequestForm, guests: Math.min(selectedHost.maxGuests || 10, bookingRequestForm.guests + 1) })}
+                      className="w-10 h-10 border-2 border-gray-300 rounded-lg hover:bg-white font-bold transition-colors"
                     >
                       +
                     </button>
@@ -1188,51 +1104,90 @@ export function BookTravel() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm mb-3 text-gray-700 font-semibold">Select Services</label>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {selectedHost.services.map((service) => (
-                      <label key={service} className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer ${
-                        hostBookingForm.selectedServices.includes(service) 
-                          ? 'border-blue-500 bg-blue-50' 
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={hostBookingForm.selectedServices.includes(service)}
-                          onChange={() => toggleService(service)}
-                          className="w-5 h-5 text-blue-500 rounded"
-                        />
-                        <span className="flex-1 font-medium text-gray-700">{service}</span>
-                      </label>
-                    ))}
+                {/* Services Selection */}
+                {selectedHost.services.length > 0 && (
+                  <div>
+                    <label className="block text-sm mb-3 text-gray-700 font-semibold">Select Services (Optional)</label>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {selectedHost.services.map((service) => (
+                        <label 
+                          key={service} 
+                          className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                            bookingRequestForm.selectedServices.includes(service) 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={bookingRequestForm.selectedServices.includes(service)}
+                            onChange={() => toggleService(service)}
+                            className="w-5 h-5 text-blue-500 rounded border-gray-300 cursor-pointer"
+                          />
+                          <span className="flex-1 font-medium text-gray-700">{service}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                {/* Special Requests */}
+                <div>
+                  <label className="block text-sm mb-3 text-gray-700 font-semibold">Special Requests (Optional)</label>
+                  <textarea
+                    value={bookingRequestForm.specialRequests}
+                    onChange={(e) => setBookingRequestForm({ ...bookingRequestForm, specialRequests: e.target.value })}
+                    placeholder="Any special requests or notes for the host..."
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={4}
+                  />
                 </div>
 
+                {/* Price Summary */}
                 <div className="border-t-2 border-gray-200 pt-6">
-                  <h4 className="mb-4 font-bold text-gray-800">Price Breakdown</h4>
-                  <div className="space-y-3 mb-5">
+                  <h4 className="mb-4 font-bold text-gray-800">Booking Summary</h4>
+                  <div className="space-y-3 mb-5 bg-gray-50 p-4 rounded-lg">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">৳{selectedHost.price} × {Math.ceil((new Date(hostBookingForm.checkOut).getTime() - new Date(hostBookingForm.checkIn).getTime()) / (1000 * 60 * 60 * 24)) || 0} days</span>
-                      <span className="font-medium">৳{calculateHostTotal()}</span>
+                      <span className="text-gray-600">Nights: {calculateNights()}</span>
+                      <span className="font-medium">
+                        ৳{selectedHost.price} × {calculateNights()} = ৳{selectedHost.price * calculateNights()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Platform fee (15%)</span>
-                      <span className="font-medium">৳{Math.round(calculateHostTotal() * 0.15)}</span>
+                      <span className="font-medium">৳{Math.round(selectedHost.price * calculateNights() * 0.15)}</span>
                     </div>
                     <div className="flex justify-between pt-3 border-t-2 border-gray-200">
-                      <span className="text-lg font-bold text-gray-800">Total Amount</span>
-                      <span className="text-3xl text-blue-600 font-bold">৳{calculateHostTotal() + Math.round(calculateHostTotal() * 0.15)}</span>
+                      <span className="text-lg font-bold text-gray-800">Estimated Total</span>
+                      <span className="text-3xl text-blue-600 font-bold">
+                        ৳{selectedHost.price * calculateNights() + Math.round(selectedHost.price * calculateNights() * 0.15)}
+                      </span>
                     </div>
                   </div>
 
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-5">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 How it works:</strong> Send a request to the host. They'll review and accept or decline. 
+                      Payment is processed only after the host accepts your request.
+                    </p>
+                  </div>
+
                   <button
-                    onClick={proceedToPayment}
-                    disabled={!isDateRangeValid()}
-                    className="w-full py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-bold"
+                    onClick={submitBookingRequest}
+                    disabled={!isDateRangeValid() || submittingRequest}
+                    className="w-full py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-bold transition-all"
                   >
-                    <CreditCard className="w-5 h-5" />
-                    <span>Proceed to Payment</span>
+                    {submittingRequest ? (
+                      <>
+                        <Loader className="w-5 h-5 animate-spin" />
+                        <span>Sending Request...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        <span>Send Booking Request</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1241,175 +1196,15 @@ export function BookTravel() {
         </div>
       )}
 
-      {showPaymentModal && selectedHost && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 text-white p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl mb-1 font-bold">Secure Payment</h3>
-                <p className="text-green-100 text-sm">Complete your booking payment</p>
-              </div>
-              <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white/20 rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto max-h-[calc(90vh-88px)]">
-              <div className="p-6 space-y-6">
-                <div className="bg-gradient-to-br from-green-50 to-blue-50 p-5 rounded-xl border-2 border-green-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-gray-700 font-semibold">Booking Total</span>
-                    <span className="text-2xl text-green-600 font-bold">৳{calculateHostTotal() + Math.round(calculateHostTotal() * 0.15)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Lock className="w-4 h-4" />
-                    <span>Payment secured with escrow protection</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm mb-3 text-gray-700 font-semibold">Select Payment Method</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setPaymentMethod('card')}
-                      className={`p-4 border-2 rounded-xl transition-all ${
-                        paymentMethod === 'card'
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <CreditCard className="w-6 h-6 mx-auto mb-2 text-blue-600" />
-                      <div className="text-sm font-medium">Credit / Debit Card</div>
-                    </button>
-                    <button
-                      onClick={() => setPaymentMethod('bkash')}
-                      className={`p-4 border-2 rounded-xl transition-all ${
-                        paymentMethod === 'bkash'
-                          ? 'border-pink-500 bg-pink-50'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">💳</div>
-                      <div className="text-sm font-medium">bKash</div>
-                    </button>
-                  </div>
-                </div>
-
-                {paymentMethod === 'card' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm mb-2 text-gray-700 font-semibold">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          if (value.length <= 16) {
-                            setCardNumber(value.replace(/(\d{4})/g, '$1 ').trim());
-                          }
-                        }}
-                        placeholder="1234 5678 9012 3456"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        maxLength={19}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm mb-2 text-gray-700 font-semibold">Expiry Date</label>
-                        <input
-                          type="text"
-                          value={cardExpiry}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            if (value.length <= 4) {
-                              setCardExpiry(value.length >= 2 ? `${value.slice(0, 2)}/${value.slice(2)}` : value);
-                            }
-                          }}
-                          placeholder="MM/YY"
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          maxLength={5}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm mb-2 text-gray-700 font-semibold">CVV</label>
-                        <input
-                          type="text"
-                          value={cardCVV}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            if (value.length <= 3) setCardCVV(value);
-                          }}
-                          placeholder="123"
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          maxLength={3}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === 'bkash' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm mb-2 text-gray-700 font-semibold">bKash Number</label>
-                      <input
-                        type="text"
-                        value={bkashNumber}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          if (value.length <= 11) setBkashNumber(value);
-                        }}
-                        placeholder="01XXXXXXXXX"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
-                        maxLength={11}
-                      />
-                    </div>
-                    <div className="p-4 bg-pink-50 border border-pink-200 rounded-lg text-sm text-pink-800">
-                      You will receive a payment request on your bKash app. Please approve to complete the booking.
-                    </div>
-                  </div>
-                )}
-
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-blue-800">
-                      <strong>100% Secure:</strong> Payment is encrypted and held in escrow. Funds released after you confirm the service.
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={processPayment}
-                  disabled={paymentProcessing || (paymentMethod === 'card' && (!cardNumber || !cardExpiry || !cardCVV)) || (paymentMethod === 'bkash' && !bkashNumber)}
-                  className="w-full py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:bg-gray-300 flex items-center justify-center gap-3 font-bold"
-                >
-                  {paymentProcessing ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Processing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-5 h-5" />
-                      <span>Pay ৳{calculateHostTotal() + Math.round(calculateHostTotal() * 0.15)}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showConfirmation && (
+      {/* Success Toast */}
+      {requestSuccess && (
         <div className="fixed bottom-8 right-8 bg-white border-2 border-green-200 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-50 max-w-md">
           <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
             <Check className="w-6 h-6 text-white" />
           </div>
           <div>
-            <div className="font-bold text-gray-900">Booking Confirmed!</div>
-            <div className="text-sm text-gray-600">Your service booking has been saved successfully.</div>
+            <div className="font-bold text-gray-900">Request Sent! 🎉</div>
+            <div className="text-sm text-gray-600">The host will review your request shortly.</div>
           </div>
         </div>
       )}
