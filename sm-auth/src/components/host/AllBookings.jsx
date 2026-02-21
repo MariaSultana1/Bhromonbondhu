@@ -1,680 +1,420 @@
-import { ArrowLeft, Calendar, User, DollarSign, MapPin, Phone, Mail, MessageSquare, FileText, Edit, X, Loader, AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import {
+  Calendar, User, Loader, AlertCircle, RefreshCw,
+  ArrowLeft, Search, ChevronDown, ChevronUp, CheckCircle, XCircle
+} from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+const apiCall = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    ...options,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Request failed');
+  return data;
+};
+
+const formatDate = (d) => {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const calcNights = (ci, co) => {
+  if (!ci || !co) return 0;
+  return Math.max(0, Math.ceil((new Date(co) - new Date(ci)) / 86400000));
+};
+
+const STATUS_STYLES = {
+  pending:   'bg-yellow-100 text-yellow-700',
+  confirmed: 'bg-green-100 text-green-700',
+  completed: 'bg-blue-100 text-blue-700',
+  cancelled: 'bg-red-100 text-red-700',
+};
 
 export function AllBookings({ onBack }) {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [showReviewRequest, setShowReviewRequest] = useState(false);
-  const [showModify, setShowModify] = useState(false);
-  const [reviewMessage, setReviewMessage] = useState('');
-  const [modifyData, setModifyData] = useState({});
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [bookings, setBookings]           = useState([]);
+  const [transactions, setTransactions]   = useState([]);
+  const [totalEarningsAll, setTotalEarningsAll] = useState(0);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState(null);
+  const [search, setSearch]               = useState('');
+  const [statusFilter, setStatusFilter]   = useState('all');
+  const [expandedId, setExpandedId]       = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
-  const token = localStorage.getItem('token');
-
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  const fetchBookings = async () => {
+  const fetchAll = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
+      const [bookingsRes, earningsRes] = await Promise.allSettled([
+        apiCall('/host/booking-requests'),
+        
+        apiCall('/hosts/earnings'),
+      ]);
 
-      // ✅ FIX: Use the host-specific endpoint for booking requests
-      const response = await fetch(`${API_URL}/host/booking-requests`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const rawBookings = bookingsRes.status === 'fulfilled'
+        ? (bookingsRes.value?.bookings || [])
+        : [];
+      setBookings(rawBookings);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to fetch bookings');
+      if (earningsRes.status === 'fulfilled') {
+        const txns = earningsRes.value?.earnings?.recentTransactions || [];
+        setTransactions(txns);
+
+        
+        let allTotal = 0;
+        txns.forEach((t) => {
+
+          const hostCut = Number(t.amount ?? 0);
+          allTotal += hostCut;
+        });
+        setTotalEarningsAll(allTotal);
       }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setBookings(data.bookings || []);
-      }
-    } catch (err) {
-      console.error('Error fetching bookings:', err);
-      setError(err.message || 'Failed to load bookings');
+    } catch (e) {
+      setError(e.message || 'Failed to load bookings');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewReceipt = async (booking) => {
-    try {
-      setActionLoading(true);
-      const response = await fetch(
-        `${API_URL}/bookings/${booking._id}/receipt`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+  useEffect(() => { fetchAll(); }, []);
 
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedBooking({ ...booking, receipt: data.receipt });
-        setShowReceipt(true);
-      }
-    } catch (err) {
-      setActionError('Failed to load receipt');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleSendReviewRequest = async () => {
-    try {
-      setActionLoading(true);
-      setActionError(null);
-
-      const response = await fetch(`${API_URL}/messages/send`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          // ✅ FIX: use traveler.id (guest's user ID), not selectedBooking.userId
-          receiverId: selectedBooking.traveler?.id || selectedBooking.userId,
-          content: `Hi ${selectedBooking.traveler?.name || 'there'}, we'd love to hear about your experience! ${reviewMessage}`,
-          type: 'text',
-          metadata: {
-            requestType: 'review_request',
-            bookingId: selectedBooking._id
-          }
-        })
-      });
-
-      if (response.ok) {
-        alert('Review request sent successfully!');
-        setShowReviewRequest(false);
-        setReviewMessage('');
-      }
-    } catch (err) {
-      setActionError('Failed to send review request');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleModifyBooking = async () => {
-    try {
-      setActionLoading(true);
-      setActionError(null);
-
-      const response = await fetch(`${API_URL}/messages/send`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          receiverId: selectedBooking.traveler?.id || selectedBooking.userId,
-          content: `Booking Modification Request:\n- New Check-in: ${modifyData.checkIn || selectedBooking.checkIn}\n- New Check-out: ${modifyData.checkOut || selectedBooking.checkOut}\n- Guests: ${modifyData.guests || selectedBooking.guests}\n- Reason: ${modifyData.modificationReason || 'Not specified'}`,
-          type: 'text',
-          metadata: {
-            requestType: 'booking_modification',
-            bookingId: selectedBooking._id
-          }
-        })
-      });
-
-      if (response.ok) {
-        alert('Modification request sent to the guest!');
-        setShowModify(false);
-        setModifyData({});
-      }
-    } catch (err) {
-      setActionError('Failed to send modification request');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleAcceptBooking = async (bookingId) => {
-    if (!window.confirm('Accept this booking request?')) return;
-    try {
-      setActionLoading(true);
-      const response = await fetch(`${API_URL}/host/booking-requests/${bookingId}/accept`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-      });
-      if (response.ok) {
-        alert('Booking accepted! The guest will be notified to complete payment.');
-        fetchBookings();
-      }
-    } catch (err) {
-      setActionError('Failed to accept booking');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeclineBooking = async (bookingId) => {
-    const reason = window.prompt('Reason for declining (optional):') || 'Host unavailable';
-    if (reason === null) return; // user cancelled
-    try {
-      setActionLoading(true);
-      const response = await fetch(`${API_URL}/host/booking-requests/${bookingId}/decline`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
-      });
-      if (response.ok) {
-        alert('Booking declined.');
-        fetchBookings();
-        setSelectedBooking(null);
-      }
-    } catch (err) {
-      setActionError('Failed to decline booking');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDownloadReceipt = () => {
-    if (!selectedBooking?.receipt) return;
-    const receiptHTML = `<!DOCTYPE html><html><head><title>Receipt</title></head><body>
-      <h1>Receipt #${selectedBooking.receipt.bookingId}</h1>
-      <p>Guest: ${selectedBooking.receipt.hostName}</p>
-      <p>Check-in: ${selectedBooking.receipt.checkIn}</p>
-      <p>Check-out: ${selectedBooking.receipt.checkOut}</p>
-      <p>Total: ৳${selectedBooking.receipt.totalAmount}</p>
-      <p>Status: ${selectedBooking.receipt.status}</p>
-    </body></html>`;
-    const blob = new Blob([receiptHTML], { type: 'text/html' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipt-${selectedBooking.receipt.bookingId}.html`;
-    a.click();
-  };
-
-  const filteredBookings = filterStatus === 'all'
-    ? bookings
-    : bookings.filter(b => b.status === filterStatus);
-
-  const statusCounts = {
-    all: bookings.length,
-    pending: bookings.filter(b => b.status === 'pending').length,
-    confirmed: bookings.filter(b => b.status === 'confirmed').length,
-    cancelled: bookings.filter(b => b.status === 'cancelled').length,
-    completed: bookings.filter(b => b.status === 'completed').length,
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
-        <span className="ml-3 text-gray-600">Loading bookings...</span>
-      </div>
+  const getEarnings = (booking) => {
+    const matched = transactions.find(t =>
+      String(t.bookingId) === String(booking._id) ||
+      String(t._id)       === String(booking.earningId)
     );
-  }
+
+    if (matched) {
+      const hostEarnings = Number(matched.amount      ?? 0); 
+      const guestPaid    = Number(matched.totalAmount ?? 0);  
+      const platformFee  = Number(matched.platformFee ?? 0);
+
+      // Fallback: reconstruct guestPaid if totalAmount is missing
+      const finalGuestPaid = guestPaid > 0 ? guestPaid : hostEarnings + platformFee;
+
+      return { guestPaid: finalGuestPaid, platformFee, hostEarnings };
+    }
+
+    // No matched earning record — use booking fields directly
+    const guestPaid    = Number(booking.hostEarnings  || 0);
+    const platformFee  = Number(booking.platformFee || 0);
+    const hostEarnings = guestPaid-platformFee;
+    return { guestPaid, platformFee, hostEarnings };
+  };
+
+  const handleAccept = async (bookingId, e) => {
+    e.stopPropagation();
+    setActionLoading(bookingId);
+    try {
+      await apiCall(`/host/booking-requests/${bookingId}/accept`, { method: 'PUT' });
+      await fetchAll();
+    } catch (err) {
+      alert(err.message || 'Failed to accept booking');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDecline = async (bookingId, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to decline this booking?')) return;
+    setActionLoading(bookingId);
+    try {
+      await apiCall(`/host/booking-requests/${bookingId}/decline`, {
+        method: 'PUT',
+        body: JSON.stringify({ reason: 'Host declined' }),
+      });
+      await fetchAll();
+    } catch (err) {
+      alert(err.message || 'Failed to decline booking');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const pendingCount   = bookings.filter(b => b.status === 'pending').length;
+  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length;
+  const completedCount = bookings.filter(b => b.status === 'completed').length;
+  const cancelledCount = bookings.filter(b => b.status === 'cancelled').length;
+
+  const filtered = bookings.filter(b => {
+    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const q = search.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (b.traveler?.name || '').toLowerCase().includes(q) ||
+      (b.bookingId || '').toLowerCase().includes(q) ||
+      (b.location || '').toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
+  });
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader className="w-8 h-8 animate-spin text-green-500" />
+      <span className="ml-3 text-gray-600">Loading bookings...</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
+      <AlertCircle className="w-6 h-6 text-red-500 mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="font-bold text-red-800">Failed to load bookings</p>
+        <p className="text-sm text-red-700 mt-1">{error}</p>
+        <button onClick={fetchAll} className="mt-3 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm flex items-center gap-2">
+          <RefreshCw className="w-4 h-4" /> Retry
+        </button>
+      </div>
+    </div>
+  );
+
+  const summaryCards = [
+    { label: 'All',       value: bookings.length, color: 'gray',   filter: 'all' },
+    { label: 'Pending',   value: pendingCount,     color: 'yellow', filter: 'pending' },
+    { label: 'Confirmed', value: confirmedCount,   color: 'green',  filter: 'confirmed' },
+    { label: 'Completed', value: completedCount,   color: 'blue',   filter: 'completed' },
+    { label: 'Cancelled', value: cancelledCount,   color: 'red',    filter: 'cancelled' },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
-        <button onClick={onBack} className="flex items-center gap-2 mb-4 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Home</span>
-        </button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl mb-2">Guest Bookings</h2>
-            <p className="text-blue-100">Manage your guest bookings ({bookings.length})</p>
-          </div>
-          <button onClick={fetchBookings} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm">
-            <RefreshCw className="w-4 h-4" /> Refresh
+      <div className="flex items-center gap-3">
+        {onBack && (
+          <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg transition">
+            <ArrowLeft className="w-5 h-5" />
           </button>
+        )}
+        <div>
+          <h2 className="text-2xl font-bold">All Bookings</h2>
+          <p className="text-sm text-gray-500">{bookings.length} total booking{bookings.length !== 1 ? 's' : ''}</p>
         </div>
+        <button onClick={fetchAll} className="ml-auto flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm">
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-red-900">Error: {error}</p>
-            <button onClick={fetchBookings} className="text-sm text-red-600 underline mt-1">Retry</button>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { key: 'all', label: 'All', color: 'bg-blue-500' },
-          { key: 'pending', label: 'Pending', color: 'bg-yellow-500' },
-          { key: 'confirmed', label: 'Confirmed', color: 'bg-green-500' },
-          { key: 'completed', label: 'Completed', color: 'bg-purple-500' },
-          { key: 'cancelled', label: 'Cancelled', color: 'bg-red-500' },
-        ].map(({ key, label, color }) => (
-          <button
-            key={key}
-            onClick={() => setFilterStatus(key)}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              filterStatus === key ? `${color} text-white` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+        {summaryCards.map(({ label, value, color, filter }) => (
+          <div
+            key={filter}
+            onClick={() => setStatusFilter(filter)}
+            className={`bg-white rounded-xl p-4 shadow-sm border text-center cursor-pointer hover:shadow-md transition-all ${
+              statusFilter === filter ? 'border-green-400 ring-2 ring-green-300' : 'border-gray-100'
             }`}
           >
-            {label} ({statusCounts[key] || 0})
-          </button>
+            <div className={`text-2xl font-bold text-${color}-600`}>{value}</div>
+            <div className="text-xs text-gray-500 mt-1">{label}</div>
+          </div>
         ))}
       </div>
 
-      {filteredBookings.length === 0 ? (
-        <div className="bg-gray-50 rounded-2xl p-12 text-center">
-          <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl text-gray-600 mb-2">No Bookings Found</h3>
-          <p className="text-gray-500">No {filterStatus !== 'all' ? filterStatus : ''} bookings yet</p>
+      {/* Search & Filter */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="flex-1 min-w-48 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by guest name, booking ID or location…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        >
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      {/* Booking List */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-xl p-16 text-center shadow-sm border border-gray-100">
+          <Calendar className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+          <p className="text-gray-400 text-sm">No bookings match your filters</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredBookings.map((booking) => {
-            // ✅ FIX: The host endpoint returns traveler info directly
-            const guestName = booking.traveler?.name || 'Guest';
-            const guestEmail = booking.traveler?.email || '';
-            const guestPhone = booking.traveler?.phone || '';
-            const guestAvatar = booking.traveler?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${booking._id}`;
-            // ✅ FIX: hostEarnings = totalAmount (base before platform fee)
-            const hostEarnings = booking.hostEarnings || booking.totalAmount || 0;
-            const platformFee = booking.platformFee || 0;
-            const grandTotal = booking.totalAmount || 0;
+        <div className="space-y-3">
+          {filtered.map(booking => {
+            const nights     = calcNights(booking.checkIn, booking.checkOut);
+            const isExpanded = expandedId === booking._id;
+            const isActing   = actionLoading === booking._id;
+            const { guestPaid, platformFee, hostEarnings } = getEarnings(booking);
 
             return (
-              <div key={booking._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={guestAvatar}
-                        alt={guestName}
-                        className="w-16 h-16 rounded-full border-2 border-blue-100 object-cover"
-                        onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${booking._id}`; }}
-                      />
-                      <div>
-                        <h3 className="text-xl mb-1 font-semibold">{guestName}</h3>
-                        <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                          {booking.checkIn && (
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>
-                                {new Date(booking.checkIn).toLocaleDateString()} → {new Date(booking.checkOut).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>{booking.guests} guest{booking.guests > 1 ? 's' : ''}</span>
-                          </div>
-                          {booking.nights && (
-                            <span className="text-gray-500">{booking.nights} night{booking.nights > 1 ? 's' : ''}</span>
-                          )}
-                        </div>
-                        {guestEmail && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                            <Mail className="w-3 h-3" />
-                            <span>{guestEmail}</span>
-                          </div>
-                        )}
-                        {guestPhone && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Phone className="w-3 h-3" />
-                            <span>{guestPhone}</span>
-                          </div>
-                        )}
-                      </div>
+              <div key={booking._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+                {/* Row */}
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition"
+                  onClick={() => setExpandedId(isExpanded ? null : booking._id)}
+                >
+                  {booking.traveler?.avatar ? (
+                    <img src={booking.traveler.avatar} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-gray-400" />
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                        booking.status === 'confirmed' ? 'bg-green-100 text-green-700'
-                        : booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700'
-                        : booking.status === 'completed' ? 'bg-purple-100 text-purple-700'
-                        : 'bg-red-100 text-red-700'
-                      }`}>
-                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800 truncate">
+                        {booking.traveler?.name || 'Guest'}
                       </span>
-                      {booking.paymentStatus && (
-                        <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                          booking.paymentStatus === 'paid' ? 'bg-green-50 text-green-600'
-                          : booking.paymentStatus === 'pending' ? 'bg-orange-50 text-orange-600'
-                          : 'bg-gray-50 text-gray-500'
-                        }`}>
-                          Payment: {booking.paymentStatus}
-                        </span>
-                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[booking.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {booking.status}
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}
+                      {' · '}{nights} night{nights !== 1 ? 's' : ''}
+                      {' · '}{booking.guests || 1} guest{(booking.guests || 1) !== 1 ? 's' : ''}
+                    </p>
+                    {booking.bookingId && <p className="text-xs text-gray-400">#{booking.bookingId}</p>}
                   </div>
 
-                  {/* ✅ FIX: Show correct earnings breakdown */}
-                  <div className="grid md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-xl">
-                    <div>
-                      <p className="text-xs text-gray-500">Guest Paid</p>
-                      <p className="text-lg font-semibold text-gray-800">৳{grandTotal.toLocaleString()}</p>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">৳{hostEarnings.toLocaleString()}</div>
+                      <div className="text-xs text-gray-400">your earnings</div>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Platform Fee (15%)</p>
-                      <p className="text-lg font-semibold text-red-500">-৳{platformFee.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Your Earnings</p>
-                      <p className="text-lg font-bold text-green-600">৳{hostEarnings.toLocaleString()}</p>
-                    </div>
-                  </div>
 
-                  {booking.selectedServices && booking.selectedServices.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-2">
-                        {booking.selectedServices.map((service, idx) => (
-                          <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-lg">{service}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ✅ Transport Ticket Info */}
-                  {booking.transportTicket && (
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs font-semibold text-blue-700 mb-1">🎫 Linked Transport Ticket</p>
-                      <div className="flex flex-wrap gap-3 text-xs text-blue-800">
-                        <span>Type: <strong>{booking.transportTicket.type}</strong></span>
-                        <span>Provider: <strong>{booking.transportTicket.provider}</strong></span>
-                        <span>Route: <strong>{booking.transportTicket.from} → {booking.transportTicket.to}</strong></span>
-                        <span>Date: <strong>{booking.transportTicket.journeyDate}</strong></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {booking.notes && (
-                    <div className="mb-4 p-3 bg-yellow-50 rounded-lg text-sm text-gray-700">
-                      <span className="font-medium">Notes: </span>{booking.notes}
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => { setSelectedBooking(booking); setModifyData({ checkIn: booking.checkIn, checkOut: booking.checkOut, guests: booking.guests }); }}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all"
-                    >
-                      <FileText className="w-4 h-4" /> View Details
-                    </button>
-
-                    {/* Accept/Decline for pending */}
                     {booking.status === 'pending' && (
-                      <>
+                      <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                         <button
-                          onClick={() => handleAcceptBooking(booking._id)}
-                          disabled={actionLoading}
-                          className="flex items-center gap-2 px-5 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all disabled:opacity-50"
+                          disabled={isActing}
+                          onClick={e => handleAccept(booking._id, e)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 disabled:opacity-50 transition"
                         >
-                          ✓ Accept
+                          {isActing ? <Loader className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                          Accept
                         </button>
                         <button
-                          onClick={() => handleDeclineBooking(booking._id)}
-                          disabled={actionLoading}
-                          className="flex items-center gap-2 px-5 py-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all"
+                          disabled={isActing}
+                          onClick={e => handleDecline(booking._id, e)}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-red-300 text-red-600 text-xs rounded-lg hover:bg-red-50 disabled:opacity-50 transition"
                         >
-                          ✗ Decline
+                          <XCircle className="w-3 h-3" />
+                          Decline
                         </button>
-                      </>
+                      </div>
                     )}
 
-                    {booking.status === 'confirmed' && (
-                      <button
-                        onClick={() => { setSelectedBooking(booking); setShowModify(true); }}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-all"
-                      >
-                        <Edit className="w-4 h-4" /> Modify
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => handleViewReceipt(booking)}
-                      disabled={actionLoading}
-                      className="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
-                    >
-                      <FileText className="w-4 h-4" /> Receipt
-                    </button>
-
-                    <button className="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-                      <MessageSquare className="w-4 h-4" /> Message Guest
-                    </button>
-
-                    {booking.status === 'confirmed' && (
-                      <button
-                        onClick={() => { setSelectedBooking(booking); setShowReviewRequest(true); }}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-all"
-                      >
-                        Request Review
-                      </button>
-                    )}
+                    {isExpanded
+                      ? <ChevronUp className="w-4 h-4 text-gray-400" />
+                      : <ChevronDown className="w-4 h-4 text-gray-400" />
+                    }
                   </div>
                 </div>
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50">
+
+                    {/* Earnings Breakdown */}
+                    <div className="bg-white rounded-xl p-4 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-3">Earnings Breakdown</p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Guest Paid (Total)</span>
+                          <span>৳{guestPaid.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-red-500">
+                          <span>Platform Fee (15%)</span>
+                          <span>−৳{platformFee.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between font-bold pt-2 border-t border-gray-200 text-base">
+                          <span>Your Earnings</span>
+                          <span className="text-green-600">৳{hostEarnings.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detail Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      {[
+                        ['Check-in',       formatDate(booking.checkIn)],
+                        ['Check-out',      formatDate(booking.checkOut)],
+                        ['Guests',         booking.guests || 1],
+                        ['Nights',         nights],
+                        ['Payment Method', booking.paymentMethod === 'card' ? 'Card' : (booking.paymentMethod || '—')],
+                        ['Payment Status', booking.paymentStatus || '—'],
+                      ].map(([label, val]) => (
+                        <div key={label} className="bg-white rounded-lg p-3 shadow-sm">
+                          <p className="text-xs text-gray-400 mb-1">{label}</p>
+                          <p className="font-medium capitalize">{val}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {(booking.traveler?.email || booking.traveler?.phone) && (
+                      <div className="bg-white rounded-xl p-4 shadow-sm text-sm space-y-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Guest Contact</p>
+                        {booking.traveler?.email && <p className="text-gray-700">✉ {booking.traveler.email}</p>}
+                        {booking.traveler?.phone && <p className="text-gray-700">📞 {booking.traveler.phone}</p>}
+                      </div>
+                    )}
+
+                    {booking.notes && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+                        <p className="text-xs font-semibold text-yellow-700 mb-1">Guest Notes</p>
+                        <p className="text-gray-700">{booking.notes}</p>
+                      </div>
+                    )}
+
+                    {booking.selectedServices?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-2">Services Requested</p>
+                        <div className="flex flex-wrap gap-2">
+                          {booking.selectedServices.map((s, i) => (
+                            <span key={i} className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-xs">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {booking.status === 'pending' && (
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          disabled={isActing}
+                          onClick={e => handleAccept(booking._id, e)}
+                          className="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 disabled:opacity-50 flex items-center justify-center gap-2 transition"
+                        >
+                          {isActing ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                          Accept Booking
+                        </button>
+                        <button
+                          disabled={isActing}
+                          onClick={e => handleDecline(booking._id, e)}
+                          className="flex-1 py-2.5 border-2 border-red-300 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-2 transition"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* View Details Modal */}
-      {selectedBooking && !showReceipt && !showReviewRequest && !showModify && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl mb-1">Booking Details</h3>
-                <p className="text-blue-100 text-sm">ID: {selectedBooking.bookingId}</p>
-              </div>
-              <button onClick={() => setSelectedBooking(null)} className="p-2 hover:bg-white/20 rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              {/* Guest Info */}
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                <img
-                  src={selectedBooking.traveler?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedBooking._id}`}
-                  alt="Guest"
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-                <div>
-                  <h4 className="text-xl font-semibold">{selectedBooking.traveler?.name || 'Guest'}</h4>
-                  <p className="text-sm text-gray-600">{selectedBooking.traveler?.email}</p>
-                  <p className="text-sm text-gray-600">{selectedBooking.traveler?.phone}</p>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 rounded-xl">
-                  <div className="text-sm text-gray-600 mb-1">Check-in</div>
-                  <div className="text-lg font-semibold">{selectedBooking.checkIn ? new Date(selectedBooking.checkIn).toLocaleDateString() : 'N/A'}</div>
-                </div>
-                <div className="p-4 bg-blue-50 rounded-xl">
-                  <div className="text-sm text-gray-600 mb-1">Check-out</div>
-                  <div className="text-lg font-semibold">{selectedBooking.checkOut ? new Date(selectedBooking.checkOut).toLocaleDateString() : 'N/A'}</div>
-                </div>
-              </div>
-
-              <div className="p-4 bg-green-50 rounded-xl">
-                <div className="text-sm text-gray-600 mb-1">Guests & Duration</div>
-                <div className="text-xl font-bold text-green-700">{selectedBooking.guests} guest{selectedBooking.guests > 1 ? 's' : ''} · {selectedBooking.nights || '?'} nights</div>
-              </div>
-
-              {/* ✅ FIX: Correct payment breakdown */}
-              <div className="p-4 bg-purple-50 rounded-xl">
-                <h4 className="mb-3 font-semibold">Earnings Breakdown</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Guest Paid (Total):</span>
-                    <span className="font-medium">৳{(selectedBooking.totalAmount || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-red-600">
-                    <span>Platform Fee (15%):</span>
-                    <span>-৳{(selectedBooking.platformFee || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t-2 border-purple-200 font-bold text-lg">
-                    <span>Your Earnings:</span>
-                    <span className="text-green-600">৳{(selectedBooking.hostEarnings || selectedBooking.totalAmount || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 pt-1">
-                    <span>Payment Status:</span>
-                    <span className={selectedBooking.paymentStatus === 'paid' ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
-                      {selectedBooking.paymentStatus || 'pending'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {selectedBooking.selectedServices?.length > 0 && (
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <div className="text-sm text-gray-600 mb-2">Services Booked</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedBooking.selectedServices.map((service, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-white text-gray-700 rounded-lg border">{service}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedBooking.notes && (
-                <div className="p-4 bg-yellow-50 rounded-xl">
-                  <div className="text-sm text-gray-600 mb-1">Notes</div>
-                  <div>{selectedBooking.notes}</div>
-                </div>
-              )}
-
-              <div className="text-xs text-gray-400">
-                Booked: {new Date(selectedBooking.createdAt).toLocaleDateString()}
-              </div>
-
-              {selectedBooking.status === 'pending' && (
-                <div className="flex gap-3">
-                  <button onClick={() => { handleAcceptBooking(selectedBooking._id); setSelectedBooking(null); }} className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-medium">
-                    ✓ Accept Booking
-                  </button>
-                  <button onClick={() => { handleDeclineBooking(selectedBooking._id); }} className="flex-1 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 font-medium">
-                    ✗ Decline
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Receipt Modal */}
-      {showReceipt && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-500 text-white p-6 flex items-center justify-between">
-              <h3 className="text-2xl">Receipt</h3>
-              <button onClick={() => { setShowReceipt(false); setSelectedBooking(null); }} className="p-2 hover:bg-white/20 rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-8">
-              {selectedBooking.receipt ? (
-                <>
-                  <div className="text-center mb-6">
-                    <h4 className="text-2xl font-bold">ভ্রমণবন্ধু</h4>
-                    <p className="text-sm text-gray-600">Travel Platform - Receipt</p>
-                  </div>
-                  <div className="border-2 border-gray-200 rounded-xl p-6 space-y-3 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-600">Receipt #</span><span className="font-semibold">{selectedBooking.receipt.bookingId}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Guest</span><span>{selectedBooking.traveler?.name}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Check-in</span><span>{selectedBooking.receipt.checkIn}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Check-out</span><span>{selectedBooking.receipt.checkOut}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Guests</span><span>{selectedBooking.receipt.guests}</span></div>
-                    <div className="flex justify-between border-t pt-3 font-bold"><span>Total</span><span>৳{selectedBooking.receipt.totalAmount?.toLocaleString()}</span></div>
-                    <div className="text-center text-xs text-gray-400">{selectedBooking.receipt.status}</div>
-                  </div>
-                  <button onClick={handleDownloadReceipt} className="mt-4 w-full py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 flex items-center justify-center gap-2">
-                    <Download className="w-4 h-4" /> Download Receipt
-                  </button>
-                </>
-              ) : (
-                <p className="text-center text-gray-500">Loading receipt...</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Review Request Modal */}
-      {showReviewRequest && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-500 text-white p-6 flex items-center justify-between">
-              <h3 className="text-2xl">Request Review</h3>
-              <button onClick={() => { setShowReviewRequest(false); setReviewMessage(''); }} className="p-2 hover:bg-white/20 rounded-lg"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              {actionError && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">{actionError}</div>}
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="text-sm text-gray-600 mb-1">Guest</div>
-                <div className="text-lg font-semibold">{selectedBooking.traveler?.name || 'Guest'}</div>
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700 font-medium">Personal Message (Optional)</label>
-                <textarea
-                  value={reviewMessage}
-                  onChange={(e) => setReviewMessage(e.target.value)}
-                  placeholder="Hi! Hope you enjoyed your stay..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                  rows={4}
-                />
-              </div>
-              <button onClick={handleSendReviewRequest} disabled={actionLoading} className="w-full py-4 bg-purple-500 text-white rounded-xl hover:bg-purple-600 disabled:opacity-50">
-                {actionLoading ? 'Sending...' : 'Send Review Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modify Booking Modal */}
-      {showModify && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-orange-600 to-orange-500 text-white p-6 flex items-center justify-between">
-              <h3 className="text-2xl">Modify Booking</h3>
-              <button onClick={() => { setShowModify(false); setModifyData({}); }} className="p-2 hover:bg-white/20 rounded-lg"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              {actionError && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">{actionError}</div>}
-              <div>
-                <label className="block text-sm mb-2 text-gray-700 font-medium">Check-in Date</label>
-                <input type="date" value={modifyData.checkIn ? new Date(modifyData.checkIn).toISOString().split('T')[0] : ''} onChange={(e) => setModifyData({ ...modifyData, checkIn: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700 font-medium">Check-out Date</label>
-                <input type="date" value={modifyData.checkOut ? new Date(modifyData.checkOut).toISOString().split('T')[0] : ''} onChange={(e) => setModifyData({ ...modifyData, checkOut: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700 font-medium">Number of Guests</label>
-                <input type="number" value={modifyData.guests || selectedBooking.guests} onChange={(e) => setModifyData({ ...modifyData, guests: parseInt(e.target.value) })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" />
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700 font-medium">Modification Reason</label>
-                <textarea value={modifyData.modificationReason || ''} onChange={(e) => setModifyData({ ...modifyData, modificationReason: e.target.value })} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none" rows={3} />
-              </div>
-              <button onClick={handleModifyBooking} disabled={actionLoading} className="w-full py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-600 disabled:opacity-50">
-                {actionLoading ? 'Sending...' : 'Send Modification Request'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
