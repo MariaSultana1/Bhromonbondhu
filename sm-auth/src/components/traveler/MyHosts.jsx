@@ -1,9 +1,10 @@
-// MyHosts.jsx - FIXED VERSION
+// MyHosts.jsx - WITH COMPLAINT/DISPUTE FEATURE
 import { useState, useEffect } from 'react';
 import {
   Calendar, MapPin, Star, MessageSquare, Phone, Plane, Train, Bus,
   Ticket, Users, Clock, Download, Mail, Loader, AlertCircle, X, CheckCircle,
-  Shield, Languages, Users2, CheckCircle2, Send, CreditCard, Smartphone, Lock, Eye
+  Shield, Languages, Users2, CheckCircle2, Send, CreditCard, Smartphone, Lock, Eye,
+  AlertTriangle, MessageCircle, ChevronDown, ChevronUp, Flag
 } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
@@ -57,7 +58,7 @@ const formatDate = (dateString) => {
   }
 };
 
-// ─── Payment Modal - FIXED ───────────────────────────────────────────────────
+// ─── Payment Modal ───────────────────────────────────────────────────────────
 function PaymentModal({ booking, onClose, onPaymentComplete }) {
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [formData, setFormData] = useState({
@@ -309,6 +310,326 @@ function PaymentModal({ booking, onClose, onPaymentComplete }) {
   );
 }
 
+// ─── Complaint Modal ──────────────────────────────────────────────────────────
+function ComplaintModal({ booking, onClose, onSubmitted }) {
+  const [formData, setFormData] = useState({
+    issue: '',
+    description: '',
+    priority: 'medium',
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const issueOptions = [
+    'Service not provided as promised',
+    'Payment issue',
+    'Property damage',
+    'Safety concern',
+    'Communication issue',
+    'Other',
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.issue) { setError('Please select an issue type.'); return; }
+    if (!formData.description.trim() || formData.description.trim().length < 20) {
+      setError('Please provide a description of at least 20 characters.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const hostId = booking.hostId?._id || booking.hostId?.id;
+
+      const response = await fetch(`${API_URL}/complaints`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: booking._id,
+          hostId,
+          issue: formData.issue,
+          description: formData.description.trim(),
+          priority: formData.priority,
+          amount: booking.grandTotal || 0,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to submit complaint');
+      setSuccess(true);
+      setTimeout(() => { onSubmitted && onSubmitted(); onClose(); }, 2200);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const hostName = booking.hostId?.name || booking.hostName || 'Host';
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-red-600 to-orange-500 text-white p-6 flex items-center justify-between rounded-t-2xl">
+          <div>
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <Flag className="w-5 h-5" /> File a Complaint
+            </h3>
+            <p className="text-red-100 text-sm mt-0.5">Booking with {hostName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {success ? (
+            <div className="text-center py-10">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-9 h-9 text-green-600" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-800 mb-2">Complaint Submitted!</h4>
+              <p className="text-gray-500 text-sm">Our admin team will review your complaint and respond soon. You can track the status in your bookings.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Booking Info */}
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 border border-gray-200">
+                <div className="flex justify-between mb-1">
+                  <span>Booking ID</span><span className="font-medium text-gray-800">{booking.bookingId}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span>Host</span><span className="font-medium text-gray-800">{hostName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Amount Paid</span><span className="font-medium text-gray-800">৳{booking.grandTotal?.toLocaleString() || '0'}</span>
+                </div>
+              </div>
+
+              {/* Issue Type */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Issue Type <span className="text-red-500">*</span></label>
+                <select
+                  value={formData.issue}
+                  onChange={(e) => { setFormData({ ...formData, issue: e.target.value }); setError(''); }}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-400 bg-white text-gray-700"
+                >
+                  <option value="">Select issue type...</option>
+                  {issueOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Priority</label>
+                <div className="flex gap-3">
+                  {[
+                    { value: 'low', label: 'Low', color: 'green' },
+                    { value: 'medium', label: 'Medium', color: 'yellow' },
+                    { value: 'high', label: 'High', color: 'red' },
+                  ].map(({ value, label, color }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, priority: value })}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                        formData.priority === value
+                          ? color === 'green' ? 'border-green-500 bg-green-50 text-green-700'
+                          : color === 'yellow' ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                          : 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description <span className="text-red-500">*</span>
+                  <span className="text-gray-400 font-normal ml-1">(min 20 characters)</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => { setFormData({ ...formData, description: e.target.value }); setError(''); }}
+                  rows={5}
+                  placeholder="Please describe the issue in detail. What happened? When did it occur? What outcome do you expect?"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-red-400 resize-none text-sm"
+                />
+                <p className="text-xs text-gray-400 mt-1 text-right">{formData.description.length} characters</p>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={onClose}
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:bg-gray-300 font-medium flex items-center justify-center gap-2 transition-colors">
+                  {submitting ? (
+                    <><Loader className="w-4 h-4 animate-spin" /> Submitting...</>
+                  ) : (
+                    <><Send className="w-4 h-4" /> Submit Complaint</>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Complaint Thread Viewer ──────────────────────────────────────────────────
+function ComplaintThread({ bookingId }) {
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    fetchComplaints();
+  }, [bookingId]);
+
+  const fetchComplaints = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/complaints/booking/${bookingId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setComplaints(data.complaints || []);
+    } catch (err) {
+      console.error('Failed to fetch complaints:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return null;
+  if (complaints.length === 0) return null;
+
+  const statusColors = {
+    open: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    'in-progress': 'bg-blue-100 text-blue-700 border-blue-200',
+    resolved: 'bg-green-100 text-green-700 border-green-200',
+    rejected: 'bg-red-100 text-red-700 border-red-200',
+    escalated: 'bg-purple-100 text-purple-700 border-purple-200',
+  };
+
+  return (
+    <div className="mt-4 space-y-3">
+      {complaints.map((complaint) => (
+        <div key={complaint._id} className="border border-orange-200 rounded-xl overflow-hidden bg-orange-50">
+          {/* Complaint Header */}
+          <button
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-orange-100 transition-colors"
+            onClick={() => setExpanded(prev => ({ ...prev, [complaint._id]: !prev[complaint._id] }))}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <Flag className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{complaint.issue}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Filed {new Date(complaint.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium border capitalize ${statusColors[complaint.status] || 'bg-gray-100 text-gray-600'}`}>
+                {complaint.status.replace('-', ' ')}
+              </span>
+              {expanded[complaint._id] ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+            </div>
+          </button>
+
+          {/* Expanded Content */}
+          {expanded[complaint._id] && (
+            <div className="px-4 pb-4 space-y-3 border-t border-orange-200 pt-3">
+              {/* Your complaint */}
+              <div className="bg-white rounded-xl p-3 border border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 mb-1">Your Complaint</p>
+                <p className="text-sm text-gray-700">{complaint.description}</p>
+              </div>
+
+              {/* Admin reply / resolution */}
+              {complaint.resolution && (
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Shield className="w-4 h-4 text-blue-600" />
+                    <p className="text-xs font-semibold text-blue-700">Admin Response</p>
+                  </div>
+                  <p className="text-sm text-blue-800">{complaint.resolution}</p>
+                  {complaint.resolvedAt && (
+                    <p className="text-xs text-blue-500 mt-1">
+                      Responded on {new Date(complaint.resolvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Pending response notice */}
+              {!complaint.resolution && complaint.status === 'open' && (
+                <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <Clock className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                  <p className="text-xs text-yellow-700">Awaiting admin review. We typically respond within 24–48 hours.</p>
+                </div>
+              )}
+
+              {/* Messages thread */}
+              {complaint.messages && complaint.messages.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500">Conversation</p>
+                  {complaint.messages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl text-sm ${
+                        msg.senderId === complaint.travelerId || msg.senderRole === 'traveler'
+                          ? 'bg-gray-100 text-gray-700 ml-0 mr-8'
+                          : 'bg-blue-600 text-white ml-8 mr-0'
+                      }`}
+                    >
+                      <p className={`text-xs font-semibold mb-1 ${msg.senderRole !== 'traveler' ? 'text-blue-200' : 'text-gray-500'}`}>
+                        {msg.senderRole === 'admin' ? '🛡️ Admin' : 'You'}
+                      </p>
+                      {msg.content}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Refund info */}
+              {complaint.refundAmount > 0 && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl border border-green-200">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <p className="text-sm text-green-700 font-medium">Refund of ৳{complaint.refundAmount?.toLocaleString()} has been approved.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function MyHosts() {
   const [activeTab, setActiveTab] = useState('hosts');
@@ -318,6 +639,7 @@ export function MyHosts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paymentModalBooking, setPaymentModalBooking] = useState(null);
+  const [complaintModalBooking, setComplaintModalBooking] = useState(null);
 
   useEffect(() => {
     fetchBookings();
@@ -344,13 +666,10 @@ export function MyHosts() {
       }
 
       const data = await response.json();
-      console.log('✅ Fetched bookings:', data.bookings);
 
       if (data.success) {
-        // ✅ FIX: Properly format bookings with host details
         const formattedBookings = (data.bookings || []).map(booking => ({
           ...booking,
-          // Ensure hostId is a proper object with all details
           hostId: booking.host ? {
             _id: booking.host.id,
             name: booking.host.name,
@@ -361,17 +680,14 @@ export function MyHosts() {
             reviews: booking.host.reviews || 0,
             verified: booking.host.verified || false
           } : null,
-          // Keep original nested properties for backwards compatibility
           hostName: booking.host?.name || 'Host',
           location: booking.host?.location || 'Location'
         }));
 
         setHostBookings(formattedBookings);
-        console.log('✅ Host bookings formatted:', formattedBookings.length);
       }
     } catch (err) {
       setError(err.message);
-      console.error('Fetch bookings error:', err);
     } finally {
       setLoading(false);
     }
@@ -393,7 +709,6 @@ export function MyHosts() {
           }
         }));
         setPendingPayments(formattedPayments);
-        console.log('✅ Pending payments:', formattedPayments.length);
       }
     } catch (err) {
       console.error('Error fetching pending payments:', err);
@@ -401,7 +716,6 @@ export function MyHosts() {
   };
 
   const handlePaymentComplete = async (paymentData) => {
-    console.log('✅ Payment completed:', paymentData);
     await fetchBookings();
     await fetchPendingPayments();
   };
@@ -451,6 +765,18 @@ export function MyHosts() {
         />
       )}
 
+      {/* Complaint Modal */}
+      {complaintModalBooking && (
+        <ComplaintModal
+          booking={complaintModalBooking}
+          onClose={() => setComplaintModalBooking(null)}
+          onSubmitted={() => {
+            setComplaintModalBooking(null);
+            fetchBookings();
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
@@ -465,7 +791,7 @@ export function MyHosts() {
         </div>
       </div>
 
-      {/* ── Pending Payments Alert ── */}
+      {/* Pending Payments Alert */}
       {pendingPayments.length > 0 && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
@@ -498,7 +824,7 @@ export function MyHosts() {
         </button>
       </div>
 
-      {/* ── Host Bookings ── */}
+      {/* Host Bookings */}
       {activeTab === 'hosts' && (
         <div className="space-y-4">
           {hostBookings.length === 0 ? (
@@ -516,13 +842,16 @@ export function MyHosts() {
               const isPending = booking.status === 'pending';
               const needsPayment = booking.status === 'confirmed' && booking.paymentStatus === 'pending';
               const isConfirmed = booking.status === 'confirmed';
+              const isPaid = booking.paymentStatus === 'paid';
 
-              // ✅ FIX: Get host details correctly
               const hostId = booking.hostId;
               const hostName = hostId?.name || booking.hostName || 'Host';
               const hostLocation = hostId?.location || booking.location || 'Location';
-              const hostImage = hostId?.image || null;
+              const hostImage = booking.traveler?.avatar || booking.traveler?.image || booking.user?.avatar || null;
               const hostRating = hostId?.rating || 0;
+
+              // Show complaint button for confirmed+paid bookings and cancelled ones
+              const canComplain = (isConfirmed && isPaid) || isCancelled || status === 'completed';
 
               return (
                 <div key={booking._id} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
@@ -610,12 +939,8 @@ export function MyHosts() {
                           <div className="flex items-center gap-3">
                             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                             <div className="flex-1">
-                              <p className="text-sm font-semibold text-amber-900">
-                                🎉 Host Accepted! Complete Payment
-                              </p>
-                              <p className="text-xs text-amber-700 mt-0.5">
-                                Payment needed to finalize your stay
-                              </p>
+                              <p className="text-sm font-semibold text-amber-900">🎉 Host Accepted! Complete Payment</p>
+                              <p className="text-xs text-amber-700 mt-0.5">Payment needed to finalize your stay</p>
                             </div>
                           </div>
                           <button
@@ -633,9 +958,7 @@ export function MyHosts() {
                             <Clock className="w-5 h-5 text-orange-500 flex-shrink-0" />
                             <div>
                               <p className="text-sm font-medium text-orange-800">Awaiting {hostName}'s approval</p>
-                              <p className="text-xs text-orange-600 mt-0.5">
-                                You'll be notified when they respond
-                              </p>
+                              <p className="text-xs text-orange-600 mt-0.5">You'll be notified when they respond</p>
                             </div>
                           </div>
                         </div>
@@ -647,9 +970,7 @@ export function MyHosts() {
                             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
                             <div>
                               <p className="text-sm font-medium text-green-800">✓ Your stay is confirmed</p>
-                              <p className="text-xs text-green-600 mt-0.5">
-                                Payment completed - See you soon!
-                              </p>
+                              <p className="text-xs text-green-600 mt-0.5">Payment completed - See you soon!</p>
                             </div>
                           </div>
                         </div>
@@ -684,7 +1005,21 @@ export function MyHosts() {
                             Write Review
                           </button>
                         )}
+
+                        {/* 🚨 COMPLAINT BUTTON */}
+                        {canComplain && (
+                          <button
+                            onClick={() => setComplaintModalBooking(booking)}
+                            className="px-5 py-2.5 border-2 border-red-400 text-red-600 rounded-xl hover:bg-red-50 transition-all flex items-center gap-2 ml-auto"
+                          >
+                            <Flag className="w-4 h-4" />
+                            File Complaint
+                          </button>
+                        )}
                       </div>
+
+                      {/* Complaint Thread (shows existing complaints for this booking) */}
+                      <ComplaintThread bookingId={booking._id} />
                     </div>
                   </div>
                 </div>

@@ -4,6 +4,22 @@ import axios from 'axios';
 
 // Use backend API - NOT external AI services
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const PEXELS_API_KEY = process.env.REACT_APP_PEXELS_API_KEY;
+
+// Fetch a photo from Pexels for a given destination name
+const fetchPexelsImage = async (query) => {
+  try {
+    const response = await axios.get('https://api.pexels.com/v1/search', {
+      headers: { Authorization: PEXELS_API_KEY },
+      params: { query: `${query} travel landscape`, per_page: 1, orientation: 'landscape' }
+    });
+    const photo = response.data.photos?.[0];
+    return photo?.src?.large || null;
+  } catch (err) {
+    console.warn(`Pexels image fetch failed for "${query}":`, err.message);
+    return null;
+  }
+};
 
 export function TravelAI() {
   const [user, setUser] = useState(null);
@@ -82,6 +98,18 @@ export function TravelAI() {
     }
   };
 
+  // Enrich destinations with Pexels images
+  const enrichWithPexelsImages = async (destinations) => {
+    if (!PEXELS_API_KEY) return destinations;
+    const enriched = await Promise.all(
+      destinations.map(async (dest) => {
+        const pexelsImage = await fetchPexelsImage(dest.name);
+        return pexelsImage ? { ...dest, image: pexelsImage } : dest;
+      })
+    );
+    return enriched;
+  };
+
   // AI Mood Analysis Integration - NOW USES BACKEND
   const analyzeMoodAndRecommend = async () => {
     if (!selectedMood) {
@@ -93,7 +121,6 @@ export function TravelAI() {
     setError(null);
 
     try {
-      // Call your BACKEND endpoint - this is the correct way!
       const response = await axios.post(
         `${API_BASE_URL}/ai/mood-analysis`,
         {
@@ -107,19 +134,18 @@ export function TravelAI() {
         }
       );
 
-      if (response.data.success) {
-        setMoodDestinations(response.data.destinations);
+      if (response.data.success && response.data.destinations?.length) {
+        const enriched = await enrichWithPexelsImages(response.data.destinations);
+        setMoodDestinations(enriched);
       } else {
-        setError(response.data.message || 'Failed to get recommendations');
-        setMoodDestinations(getSampleDestinations(selectedMood));
+        const fallback = await enrichWithPexelsImages(getSampleDestinations(selectedMood));
+        setMoodDestinations(fallback);
       }
 
     } catch (err) {
-      console.error('AI Mood Analysis Error:', err);
-      setError(err.response?.data?.message || 'Failed to get recommendations. Please try again.');
-      
-      // Fallback to sample data
-      setMoodDestinations(getSampleDestinations(selectedMood));
+      console.warn('AI Mood Analysis unavailable, using fallback:', err.message);
+      const fallback = await enrichWithPexelsImages(getSampleDestinations(selectedMood));
+      setMoodDestinations(fallback);
     } finally {
       setGenerating(false);
     }
@@ -138,7 +164,6 @@ export function TravelAI() {
     setError(null);
 
     try {
-      // Call your BACKEND endpoint
       const response = await axios.post(
         `${API_BASE_URL}/ai/itineraries`,
         {
@@ -153,18 +178,19 @@ export function TravelAI() {
         }
       );
 
-      if (response.data.success) {
-        setItineraryData(response.data.itinerary);
+      if (response.data.success && response.data.itinerary) {
+        const itin = response.data.itinerary;
+        const normalisedDays = (itin.days || []).map(d => ({
+          ...d,
+          day: d.day ?? d.dayNumber,
+        }));
+        setItineraryData({ ...itin, days: normalisedDays });
       } else {
-        setError(response.data.message || 'Failed to generate itinerary');
         setItineraryData(getSampleItinerary(destination));
       }
 
     } catch (err) {
-      console.error('AI Itinerary Error:', err);
-      setError(err.response?.data?.message || 'Failed to generate itinerary. Please try again.');
-      
-      // Fallback to sample itinerary
+      console.warn('AI Itinerary unavailable, using fallback:', err.message);
       setItineraryData(getSampleItinerary(destination));
     } finally {
       setGenerating(false);
@@ -184,7 +210,6 @@ export function TravelAI() {
     setError(null);
 
     try {
-      // Call your BACKEND endpoint
       const response = await axios.post(
         `${API_BASE_URL}/ai/risk-analyses`,
         {
@@ -199,24 +224,29 @@ export function TravelAI() {
       );
 
       if (response.data.success) {
+        const normalisedFactors = (response.data.riskFactors || []).map(f => ({
+          ...f,
+          risk: f.risk ?? (f.riskLevel
+            ? f.riskLevel.charAt(0).toUpperCase() + f.riskLevel.slice(1).toLowerCase()
+            : 'Low'),
+        }));
+        const normalisedRecs = (response.data.recommendations || []).map(r =>
+          typeof r === 'string' ? r : (r.action || String(r))
+        );
         setRiskData({
           overall: response.data.overall,
-          riskLevel: response.data.overallRisk?.score || 50,
+          riskLevel: response.data.overallRisk?.score ?? 50,
           destination: response.data.destination,
           travelDate: response.data.travelDate,
-          factors: response.data.riskFactors,
-          recommendations: response.data.recommendations
+          factors: normalisedFactors,
+          recommendations: normalisedRecs,
         });
       } else {
-        setError(response.data.message || 'Failed to analyze risk');
         setRiskData(getSampleRiskData(destination));
       }
 
     } catch (err) {
-      console.error('AI Risk Analysis Error:', err);
-      setError(err.response?.data?.message || 'Failed to analyze risk. Please try again.');
-      
-      // Fallback to sample risk data
+      console.warn('AI Risk Analysis unavailable, using fallback:', err.message);
       setRiskData(getSampleRiskData(destination));
     } finally {
       setGenerating(false);

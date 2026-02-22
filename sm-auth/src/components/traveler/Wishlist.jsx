@@ -288,15 +288,6 @@ export function Wishlist({ onBack }) {
                   )}
                 </div>
               </div>
-
-              <div className="flex gap-2">
-                <button className="flex-1 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-md">
-                  Plan Trip
-                </button>
-                <button className="p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
-                  <ExternalLink className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           </div>
         ))}
@@ -335,16 +326,13 @@ export function Wishlist({ onBack }) {
               <div className="text-lg text-blue-600">{(items.reduce((sum, item) => sum + (item.rating || 0), 0) / items.length).toFixed(1)}</div>
             </div>
           </div>
-          <p className="text-sm text-blue-800 mt-4">
-            Based on your wishlist, we recommend starting with your highest-rated destinations during their best seasons!
-          </p>
         </div>
       )}
 
  
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl my-8">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold">Add to Wishlist</h3>
               <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -418,7 +406,7 @@ export function Wishlist({ onBack }) {
               <div className="grid grid-cols-2 gap-4">
                 {/* Best Time */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Best Time</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Time you want to visit</label>
                   <input
                     type="text"
                     placeholder="e.g., Oct - Mar"

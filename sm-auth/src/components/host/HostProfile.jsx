@@ -1,816 +1,1109 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  CheckCircle, AlertCircle, Shield, Camera, Phone, Mail,
-  MapPin, Languages, Lock, User, X, Star, Users,
-  Clock, Briefcase, Globe, CreditCard, FileText, ChevronRight,
-  Eye, EyeOff, Save, Upload, BarChart2, Award, Loader
+  CheckCircle, Award, Star, Users, Clock, Shield,
+  Camera, Edit, Phone, Mail, MapPin, Calendar, X,
+  Lock, User, Briefcase, Globe, BarChart2, Trophy,
+  Crown, Sparkles, Medal, Heart, Zap, ThumbsUp,
+  MessageCircle, TrendingUp, Wallet, Download, AlertCircle
 } from 'lucide-react';
 
-const API = 'http://localhost:5000';
-const getToken = () => localStorage.getItem('token');
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const apiFetch = async (path, opts = {}) => {
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getToken()}`,
-      ...(opts.headers || {}),
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Request failed');
-  return data;
-};
-
-const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null;
-
-// ─── Sub-components ────────────────────────────────────────────────────────────
-const Field = ({ label, children, hint }) => (
-  <div className="mb-4">
-    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</label>
-    {children}
-    {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
-  </div>
-);
-
-const Input = ({ className = '', ...props }) => (
-  <input
-    {...props}
-    className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent bg-white disabled:bg-gray-50 disabled:text-gray-500 ${className}`}
-  />
-);
-
-const Sel = ({ children, ...props }) => (
-  <select {...props} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white">
-    {children}
-  </select>
-);
-
-const Toast = ({ msg, type, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
-  return (
-    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-medium ${type === 'success' ? 'bg-teal-600' : 'bg-red-500'}`}>
-      {type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-      {msg}
-      <button onClick={onClose}><X className="w-4 h-4 opacity-70 hover:opacity-100" /></button>
-    </div>
-  );
-};
-
-const StatCard = ({ icon: Icon, label, value, color }) => (
-  <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
-    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-      <Icon className="w-5 h-5" />
-    </div>
-    <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-bold text-gray-800">{value ?? '—'}</p>
-    </div>
-  </div>
-);
-
-// Verification row — only shows "Completed" if the timestamp field exists in DB
-const VerifRow = ({ label, done, date }) => (
-  <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-    <div className="flex items-center gap-3">
-      {done
-        ? <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0" />
-        : <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />}
-      <div>
-        <p className="text-sm font-medium text-gray-700">{label}</p>
-        {done && date ? <p className="text-xs text-teal-600">Completed {date}</p>
-          : done ? <p className="text-xs text-teal-600">Completed</p>
-          : <p className="text-xs text-amber-500">Pending</p>}
-      </div>
-    </div>
-  </div>
-);
-
-// ════════════════════════════════════════════════════════════════════════════════
-export function HostProfile() {
-  const [user, setUser]             = useState(null);
-  const [hostData, setHostData]     = useState(null);
+export function HostProfile({ user: initialUser }) {
+  const [user, setUser] = useState(initialUser);
+  const [hostData, setHostData] = useState(null);
   const [profileStatus, setProfileStatus] = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [toast, setToast]           = useState(null);
-  const [activeTab, setActiveTab]   = useState('profile');
-  const [uploadingImg, setUploadingImg] = useState(false);
-  const fileRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Reference for file input
+  const fileInputRef = useRef(null);
 
-  // Edit basic profile
-  const [editForm, setEditForm] = useState({ fullName: '', phone: '', location: '', languages: '', bio: '' });
-  const [editLoading, setEditLoading] = useState(false);
-
-  // Complete host profile
-  const [completeForm, setCompleteForm] = useState({
-    location: '', languages: '', bio: '', price: '', propertyImage: '',
-    services: [], experience: 'Beginner', responseTime: 'Within 1 hour',
-    cancellationPolicy: 'Flexible', minStay: '1', maxGuests: '4',
-    availableFromDate: '', availableToDate: ''
+  // Edit Profile Form State
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    phone: '',
+    location: '',
+    languages: '',
+    bio: ''
   });
-  const [completeLoading, setCompleteLoading] = useState(false);
 
-  // Password
-  const [pwForm, setPwForm]   = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [showPw, setShowPw]   = useState({ cur: false, new: false, con: false });
-  const [pwLoading, setPwLoading] = useState(false);
+  // Change Password Form State
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
-  const showToast = (msg, type = 'success') => setToast({ msg, type });
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
 
-  // ── Fetch everything from DB ─────────────────────────────────────────────────
-  const fetchData = async () => {
-    setLoading(true);
+  // API fetch helper
+  const apiFetch = async (path, options = {}) => {
+    const token = getAuthToken();
+    const response = await fetch(`http://localhost:5000${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...(options.headers || {})
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Request failed');
+    return data;
+  };
+
+  // Fetch all host data
+  const fetchHostData = async () => {
     try {
-      // Run all 3 fetches in parallel
-      const [meData, hostJson, statusJson] = await Promise.allSettled([
-        apiFetch('/api/auth/me'),
-        apiFetch('/api/hosts/my-profile'),
-        apiFetch('/api/hosts/profile-status'),
-      ]);
+      setLoading(true);
+      setError('');
 
-      // ── User data ──
-      if (meData.status === 'fulfilled' && meData.value.success) {
-        const u = meData.value.user;
-        setUser(u);
+      // Fetch user profile
+      const meData = await apiFetch('/api/auth/me');
+      if (meData.success) {
+        setUser(meData.user);
         setEditForm({
-          fullName:  u.fullName  || '',
-          phone:     u.phone     || '',
-          location:  u.location  || '',
-          languages: Array.isArray(u.languages) ? u.languages.join(', ') : (u.languages || ''),
-          bio:       u.bio       || '',
+          fullName: meData.user.fullName || '',
+          phone: meData.user.phone || '',
+          location: meData.user.location || '',
+          languages: Array.isArray(meData.user.languages) 
+            ? meData.user.languages.join(', ') 
+            : (meData.user.languages || ''),
+          bio: meData.user.bio || ''
         });
       }
 
-      // ── Host profile data ──
-      if (hostJson.status === 'fulfilled' && hostJson.value.success) {
-        const h = hostJson.value.host;
-        setHostData(h);
-        // Pre-fill host setup form with existing DB values
-        setCompleteForm({
-          location:           h.location       || '',
-          languages:          Array.isArray(h.languages) ? h.languages.join(', ') : (h.languages || ''),
-          bio:                h.description    || h.bio || '',
-          price:              h.price          ? String(h.price)     : '',
-          propertyImage:      h.propertyImage  || '',
-          services:           h.services       || [],
-          experience:         h.experience     || 'Beginner',
-          responseTime:       h.responseTime   || 'Within 1 hour',
-          cancellationPolicy: h.cancellationPolicy || 'Flexible',
-          minStay:            h.minStay        ? String(h.minStay)   : '1',
-          maxGuests:          h.maxGuests      ? String(h.maxGuests) : '4',
-          availableFromDate:  h.availableFromDate ? h.availableFromDate.split('T')[0] : '',
-          availableToDate:    h.availableToDate   ? h.availableToDate.split('T')[0]   : '',
-        });
+      // Fetch host profile
+      const hostData = await apiFetch('/api/hosts/my-profile');
+      if (hostData.success) {
+        setHostData(hostData.host);
       }
 
-      // ── Profile completion status ──
-      if (statusJson.status === 'fulfilled' && statusJson.value.success) {
-        setProfileStatus(statusJson.value);
+      // Fetch profile status
+      const statusData = await apiFetch('/api/hosts/profile-status');
+      if (statusData.success) {
+        setProfileStatus(statusData);
       }
 
-    } catch (e) {
-      showToast('Failed to load profile data', 'error');
+    } catch (err) {
+      console.error('Error fetching host data:', err);
+      setError('Failed to load profile data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  // Load data on mount
+  useEffect(() => {
+    fetchHostData();
+  }, []);
 
-  // ── Profile picture upload ─────────────────────────────────────────────────
-  const handlePicChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) return showToast('Please select an image file', 'error');
-    if (file.size > 5 * 1024 * 1024) return showToast('Image must be under 5MB', 'error');
-    setUploadingImg(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        const data = await apiFetch('/api/auth/profile-picture', {
-          method: 'PUT',
-          body: JSON.stringify({ profilePicture: ev.target.result }),
-        });
-        if (data.success) { setUser(data.user); showToast('Profile picture updated!'); }
-        else showToast(data.message || 'Upload failed', 'error');
-      } catch { showToast('Upload failed', 'error'); }
-      finally { setUploadingImg(false); }
-    };
-    reader.readAsDataURL(file);
+  // Handle profile picture upload
+  const handleProfilePictureClick = () => {
+    fileInputRef.current?.click();
   };
 
-  // ── Save basic profile ─────────────────────────────────────────────────────
-  const handleEditSave = async () => {
-    setEditLoading(true);
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    setError('');
+    setSuccess('');
+
     try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Image = event.target.result;
+
+        const data = await apiFetch('/api/auth/profile-picture', {
+          method: 'PUT',
+          body: JSON.stringify({ profilePicture: base64Image })
+        });
+
+        if (data.success) {
+          setUser(data.user);
+          setSuccess('Profile picture updated successfully!');
+          setTimeout(() => setSuccess(''), 3000);
+          // Refresh host data to update image
+          fetchHostData();
+        }
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setUploadingImage(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading profile picture:', err);
+      setError('Failed to upload profile picture');
+      setUploadingImage(false);
+    }
+  };
+
+  // Handle Edit Profile Submit
+  const handleEditProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Parse languages from comma-separated string
+      const languagesArray = editForm.languages
+        .split(',')
+        .map(lang => lang.trim())
+        .filter(Boolean);
+
       const data = await apiFetch('/api/auth/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          fullName:  editForm.fullName,
-          phone:     editForm.phone,
-          location:  editForm.location,
-          languages: editForm.languages.split(',').map(l => l.trim()).filter(Boolean),
-          bio:       editForm.bio,
-        }),
+          fullName: editForm.fullName,
+          phone: editForm.phone,
+          location: editForm.location,
+          languages: languagesArray,
+          bio: editForm.bio
+        })
       });
-      if (data.success) { setUser(data.user); showToast('Profile updated!'); }
-      else showToast(data.message || 'Update failed', 'error');
-    } catch (e) { showToast(e.message || 'Update failed', 'error'); }
-    finally { setEditLoading(false); }
-  };
 
-  // ── Toggle service ─────────────────────────────────────────────────────────
-  const toggleService = (svc) =>
-    setCompleteForm(p => ({
-      ...p,
-      services: p.services.includes(svc) ? p.services.filter(s => s !== svc) : [...p.services, svc],
-    }));
-
-  // ── Complete host profile ──────────────────────────────────────────────────
-  const handleCompleteProfile = async () => {
-    const { location, languages, bio, price, services, availableFromDate, availableToDate, propertyImage } = completeForm;
-    if (!location.trim())                              return showToast('Location is required', 'error');
-    if (!languages.trim())                             return showToast('Languages are required', 'error');
-    if (!bio.trim() || bio.trim().length < 20)         return showToast('Bio must be at least 20 characters', 'error');
-    if (!price || parseFloat(price) <= 0)              return showToast('Price must be a positive number', 'error');
-    if (!services.length)                              return showToast('Select at least one service', 'error');
-    if (!availableFromDate || !availableToDate)        return showToast('Availability dates are required', 'error');
-    if (services.includes('Accommodation') && !propertyImage.trim())
-                                                       return showToast('Property image URL is required for Accommodation', 'error');
-    setCompleteLoading(true);
-    try {
-      const data = await apiFetch('/api/hosts/complete-profile', {
-        method: 'PUT',
-        body: JSON.stringify({
-          location:           completeForm.location.trim(),
-          languages:          completeForm.languages.split(',').map(l => l.trim()).filter(Boolean),
-          bio:                completeForm.bio.trim(),
-          price:              parseFloat(completeForm.price),
-          propertyImage:      completeForm.propertyImage.trim(),
-          services:           completeForm.services,
-          experience:         completeForm.experience,
-          responseTime:       completeForm.responseTime,
-          cancellationPolicy: completeForm.cancellationPolicy,
-          minStay:            parseInt(completeForm.minStay) || 1,
-          maxGuests:          parseInt(completeForm.maxGuests) || 4,
-          availableFromDate:  completeForm.availableFromDate,
-          availableToDate:    completeForm.availableToDate,
-        }),
-      });
       if (data.success) {
-        showToast('Host profile saved! 🎉');
-        fetchData();
-        setActiveTab('profile');
-      } else showToast(data.message || 'Failed to save profile', 'error');
-    } catch (e) { showToast(e.message || 'Failed to save profile', 'error'); }
-    finally { setCompleteLoading(false); }
+        setUser(data.user);
+        setSuccess('Profile updated successfully!');
+        setTimeout(() => {
+          setShowEditModal(false);
+          setSuccess('');
+        }, 2000);
+        // Refresh host data
+        fetchHostData();
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ── Change password ────────────────────────────────────────────────────────
-  const handlePwChange = async () => {
-    if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword)
-      return showToast('Please fill all password fields', 'error');
-    if (pwForm.newPassword.length < 6)
-      return showToast('New password must be at least 6 characters', 'error');
-    if (pwForm.newPassword !== pwForm.confirmPassword)
-      return showToast('New passwords do not match', 'error');
-    setPwLoading(true);
+  // Handle Change Password Submit
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    // Validation
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setError('Please fill in all password fields');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('New passwords do not match');
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await apiFetch('/api/auth/change-password', {
         method: 'PUT',
-        body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
       });
+
       if (data.success) {
-        showToast('Password changed successfully!');
-        setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      } else showToast(data.message || 'Failed to change password', 'error');
-    } catch (e) { showToast(e.message || 'Failed to change password', 'error'); }
-    finally { setPwLoading(false); }
+        setSuccess('Password changed successfully!');
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setSuccess('');
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Error changing password:', err);
+      setError(err.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ── Loading / Error states ─────────────────────────────────────────────────
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-64">
-      <Loader className="w-8 h-8 animate-spin text-teal-500 mr-3" />
-      <span className="text-gray-500 text-sm">Loading profile...</span>
-    </div>
-  );
+  // Handle input changes
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-  if (!user) return (
-    <div className="text-center py-20 text-gray-400">
-      <AlertCircle className="w-12 h-12 mx-auto mb-3" />
-      <p>Could not load profile. Please log in again.</p>
-    </div>
-  );
+  const handlePasswordFormChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-  // ── Derived values — ALL from DB, no hardcoded fallbacks ───────────────────
-  const isProfileComplete  = profileStatus?.profileComplete   ?? false;
-  const completionPct      = profileStatus?.completionPercentage ?? 0;
-  const missingFields      = profileStatus?.missingFields     ?? [];
+  // Format joined date
+  const formatJoinedDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
 
-  // Real stats from DB
-  const hostRating   = user.hostRating    ?? hostData?.rating    ?? null;
-  const totalGuests  = user.totalGuests   ?? hostData?.totalGuests ?? null;
-  const responseRate = user.responseRate  ?? hostData?.responseRate ?? null;
+  // ==================== BADGE LOGIC ====================
+  // All badges are awarded based on REAL data from the database
+  // No hardcoded values - everything comes from user and hostData
 
-  // Verification flags — real DB fields, no hardcoded true
-  const emailVerified = !!user.emailVerified || !!user.email; // email exists = email verified
-  const phoneVerified = !!user.phoneVerified || !!user.phone;
-  const kycDone       = !!user.kycCompleted;
-  const idDone        = !!user.idVerifiedAt;
-  const bgDone        = !!user.bgCheckAt;
-  const trainingDone  = !!user.trainingAt;
-  const bankDone      = !!user.bankVerifiedAt;
+  const calculateBadges = () => {
+    if (!user || !hostData) return [];
 
-  // Badge logic — real DB values
-  const isSuperhost = user.hostBadge === 'Superhost' || user.hostBadge === 'Pro Host';
-  const isTopRated  = hostRating !== null && hostRating >= 4.5;
-  const isVerified  = !!user.verified;
-  const isResponsive = responseRate !== null && responseRate >= 90;
-  const isProHost   = user.hostBadge === 'Pro Host';
-  const isTrusted   = kycDone;
+    const badges = [];
 
-  const SERVICE_OPTIONS = ['Local Guide', 'Transportation', 'Meals', 'Photography', 'Activities', 'Accommodation'];
-  const SVC_EMOJI = { 'Local Guide': '🗺️', Transportation: '🚗', Meals: '🍽️', Photography: '📷', Activities: '🏄', Accommodation: '🏠' };
+    // 1. Verified Host Badge (from user.verified)
+    if (user.verified) {
+      badges.push({
+        id: 'verified',
+        name: 'Verified Host',
+        icon: CheckCircle,
+        iconColor: 'text-blue-500',
+        bgColor: 'bg-blue-50',
+        description: 'Identity verified by Bhromonbondhu',
+        level: 'basic',
+        unlocked: true
+      });
+    }
+
+    // 2. KYC Completed Badge (from user.kycCompleted)
+    if (user.kycCompleted) {
+      badges.push({
+        id: 'kyc',
+        name: 'KYC Verified',
+        icon: Shield,
+        iconColor: 'text-green-600',
+        bgColor: 'bg-green-50',
+        description: 'Completed KYC verification',
+        level: 'basic',
+        unlocked: true
+      });
+    }
+
+    // 3. Profile Complete Badge (from profileStatus)
+    if (profileStatus?.profileComplete) {
+      badges.push({
+        id: 'profile-complete',
+        name: 'Profile Complete',
+        icon: CheckCircle,
+        iconColor: 'text-teal-500',
+        bgColor: 'bg-teal-50',
+        description: 'All profile information filled',
+        level: 'basic',
+        unlocked: true
+      });
+    }
+
+    // 4. Host Badge (from user.hostBadge or hostData)
+    // This is the main badge that determines host level
+    const hostBadge = user.hostBadge || hostData?.hostBadge || 'Host';
+    
+    // Map badge levels with appropriate icons and colors
+    if (hostBadge === 'Superhost') {
+      badges.push({
+        id: 'superhost',
+        name: 'Superhost',
+        icon: Crown,
+        iconColor: 'text-purple-600',
+        bgColor: 'bg-purple-50',
+        description: 'Exceptional hosting experience',
+        level: 'premium',
+        unlocked: true
+      });
+    } else if (hostBadge === 'Pro Host') {
+      badges.push({
+        id: 'prohost',
+        name: 'Pro Host',
+        icon: Award,
+        iconColor: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+        description: 'Professional hosting service',
+        level: 'advanced',
+        unlocked: true
+      });
+    } else {
+      badges.push({
+        id: 'host',
+        name: 'Host',
+        icon: User,
+        iconColor: 'text-gray-600',
+        bgColor: 'bg-gray-50',
+        description: 'Active host on Bhromonbondhu',
+        level: 'basic',
+        unlocked: true
+      });
+    }
+
+    // 5. Top Rated Badge (based on hostRating)
+    const hostRating = user.hostRating || hostData?.hostRating || 0;
+    if (hostRating >= 4.5) {
+      badges.push({
+        id: 'top-rated',
+        name: 'Top Rated',
+        icon: Star,
+        iconColor: 'text-yellow-500',
+        bgColor: 'bg-yellow-50',
+        description: `Rated ${hostRating.toFixed(1)}/5 by guests`,
+        level: 'premium',
+        unlocked: true
+      });
+    } else if (hostRating >= 4.0) {
+      badges.push({
+        id: 'highly-rated',
+        name: 'Highly Rated',
+        icon: Star,
+        iconColor: 'text-yellow-500',
+        bgColor: 'bg-yellow-50',
+        description: `Rated ${hostRating.toFixed(1)}/5 by guests`,
+        level: 'advanced',
+        unlocked: true
+      });
+    }
+
+    // 6. Responsive Badge (based on responseRate)
+    const responseRate = user.responseRate || hostData?.responseRate || 0;
+    if (responseRate >= 95) {
+      badges.push({
+        id: 'ultra-responsive',
+        name: 'Ultra Responsive',
+        icon: Zap,
+        iconColor: 'text-orange-500',
+        bgColor: 'bg-orange-50',
+        description: `${responseRate}% response rate`,
+        level: 'premium',
+        unlocked: true
+      });
+    } else if (responseRate >= 80) {
+      badges.push({
+        id: 'responsive',
+        name: 'Responsive',
+        icon: MessageCircle,
+        iconColor: 'text-orange-500',
+        bgColor: 'bg-orange-50',
+        description: `${responseRate}% response rate`,
+        level: 'advanced',
+        unlocked: true
+      });
+    }
+
+    // 7. Experienced Host Badge (based on totalGuests)
+    const totalGuests = user.totalGuests || hostData?.totalGuests || 0;
+    if (totalGuests >= 100) {
+      badges.push({
+        id: 'master-host',
+        name: 'Master Host',
+        icon: Trophy,
+        iconColor: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        description: `Hosted ${totalGuests}+ guests`,
+        level: 'elite',
+        unlocked: true
+      });
+    } else if (totalGuests >= 50) {
+      badges.push({
+        id: 'expert-host',
+        name: 'Expert Host',
+        icon: Medal,
+        iconColor: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        description: `Hosted ${totalGuests}+ guests`,
+        level: 'premium',
+        unlocked: true
+      });
+    } else if (totalGuests >= 20) {
+      badges.push({
+        id: 'experienced-host',
+        name: 'Experienced Host',
+        icon: TrendingUp,
+        iconColor: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        description: `Hosted ${totalGuests}+ guests`,
+        level: 'advanced',
+        unlocked: true
+      });
+    }
+
+    // 8. Early Adopter Badge (based on account age)
+    const accountAge = new Date() - new Date(user.createdAt);
+    const yearsAsHost = accountAge / (1000 * 60 * 60 * 24 * 365);
+    if (yearsAsHost >= 2) {
+      badges.push({
+        id: 'veteran',
+        name: 'Veteran Host',
+        icon: Clock,
+        iconColor: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+        description: `Hosting since ${formatJoinedDate(user.createdAt)}`,
+        level: 'premium',
+        unlocked: true
+      });
+    }
+
+    // 9. Popular Host Badge (based on number of reviews)
+    const totalReviews = hostData?.reviews || 0;
+    if (totalReviews >= 50) {
+      badges.push({
+        id: 'popular',
+        name: 'Popular Host',
+        icon: Heart,
+        iconColor: 'text-red-500',
+        bgColor: 'bg-red-50',
+        description: `${totalReviews}+ guest reviews`,
+        level: 'premium',
+        unlocked: true
+      });
+    } else if (totalReviews >= 20) {
+      badges.push({
+        id: 'well-reviewed',
+        name: 'Well Reviewed',
+        icon: ThumbsUp,
+        iconColor: 'text-red-500',
+        bgColor: 'bg-red-50',
+        description: `${totalReviews}+ guest reviews`,
+        level: 'advanced',
+        unlocked: true
+      });
+    }
+
+    // Sort badges by level: elite > premium > advanced > basic
+    const levelOrder = { elite: 0, premium: 1, advanced: 2, basic: 3 };
+    return badges.sort((a, b) => levelOrder[a.level] - levelOrder[b.level]);
+  };
+
+  const badges = calculateBadges();
+
+  // Group badges by level for display
+  const eliteBadges = badges.filter(b => b.level === 'elite');
+  const premiumBadges = badges.filter(b => b.level === 'premium');
+  const advancedBadges = badges.filter(b => b.level === 'advanced');
+  const basicBadges = badges.filter(b => b.level === 'basic');
+
+  if (!user || !hostData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading host profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-
+    <div className="space-y-6">
+      
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Host Profile</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Manage your account and hosting setup</p>
+      <div>
+        <h2 className="text-2xl mb-2">Host Profile</h2>
+        <p className="text-gray-600">Manage your hosting account and showcase your badges</p>
+      </div>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+          {success}
         </div>
-        {!isProfileComplete && (
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
-            <AlertCircle className="w-4 h-4 text-amber-500" />
-            <span className="text-sm text-amber-700 font-medium">{completionPct}% complete</span>
-            <button onClick={() => setActiveTab('complete')} className="text-xs bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600">
-              Complete now
-            </button>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Main Profile Content */}
+      <div className="max-w-5xl space-y-6">
+        
+        {/* Profile Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="flex items-start gap-6 mb-6">
+            <div className="relative">
+              {/* Profile Picture or Default Icon */}
+              {user.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt={user.fullName || user.username}
+                  className="w-24 h-24 rounded-full object-cover ring-4 ring-teal-50"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center ring-4 ring-teal-50">
+                  <User className="w-12 h-12 text-gray-400" />
+                </div>
+              )}
+              
+              {/* Camera Button with Upload Functionality */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                className="hidden"
+              />
+              <button 
+                onClick={handleProfilePictureClick}
+                disabled={uploadingImage}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-teal-500 text-white rounded-full flex items-center justify-center hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Change profile picture"
+              >
+                {uploadingImage ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h3 className="text-xl">{user.fullName || user.username}</h3>
+                {user.verified && (
+                  <CheckCircle className="w-5 h-5 text-blue-500" title="Verified Host" />
+                )}
+                {user.hostBadge && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-full">
+                    <Crown className="w-3 h-3" />
+                    {user.hostBadge}
+                  </span>
+                )}
+                {profileStatus?.profileComplete && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2 py-1 rounded-full">
+                    <CheckCircle className="w-3 h-3" />
+                    Profile Complete
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-600 mb-3">@{user.username}</p>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Profile
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <Star className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Rating</p>
+              <p className="font-semibold">{user.hostRating?.toFixed(1) || '0'}/5</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <Users className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Guests</p>
+              <p className="font-semibold">{user.totalGuests || 0}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <BarChart2 className="w-5 h-5 text-green-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Response</p>
+              <p className="font-semibold">{user.responseRate || 0}%</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <Clock className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Member</p>
+              <p className="font-semibold">{formatJoinedDate(user.createdAt)}</p>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div className="border-t pt-6">
+            <h4 className="mb-4">Contact Information</h4>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Email</label>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span>{user.email}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Phone</label>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span>{user.phone || 'Not provided'}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Location</label>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400" />
+                  <span>{hostData?.location || user.location || 'Not provided'}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Languages</label>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-gray-400" />
+                  <span>
+                    {hostData?.languages?.length > 0 
+                      ? hostData.languages.join(', ') 
+                      : user.languages?.length > 0
+                        ? user.languages.join(', ')
+                        : 'Not provided'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bio Section */}
+          {user.bio && (
+            <div className="border-t pt-6 mt-4">
+              <h4 className="mb-2">About</h4>
+              <p className="text-gray-700">{user.bio}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Badges Section - The main feature */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              <h3 className="text-lg">Host Badges</h3>
+            </div>
+            <span className="text-xs text-gray-500">{badges.length} badges earned</span>
+          </div>
+
+          {/* Badges Legend */}
+          <div className="flex gap-4 mb-6 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span>Elite</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+              <span>Premium</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span>Advanced</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+              <span>Basic</span>
+            </div>
+          </div>
+
+          {/* Elite Badges */}
+          {eliteBadges.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-purple-600 mb-3 flex items-center gap-1">
+                <Crown className="w-4 h-4" /> Elite Badges
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {eliteBadges.map(badge => (
+                  <div
+                    key={badge.id}
+                    className={`${badge.bgColor} rounded-xl p-4 text-center border border-purple-100 shadow-sm hover:shadow-md transition-shadow cursor-help`}
+                    title={badge.description}
+                  >
+                    <badge.icon className={`w-8 h-8 ${badge.iconColor} mx-auto mb-2`} />
+                    <p className="text-sm font-medium text-gray-800">{badge.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{badge.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Premium Badges */}
+          {premiumBadges.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-amber-600 mb-3 flex items-center gap-1">
+                <Award className="w-4 h-4" /> Premium Badges
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {premiumBadges.map(badge => (
+                  <div
+                    key={badge.id}
+                    className={`${badge.bgColor} rounded-xl p-4 text-center border border-amber-100 shadow-sm hover:shadow-md transition-shadow cursor-help`}
+                    title={badge.description}
+                  >
+                    <badge.icon className={`w-8 h-8 ${badge.iconColor} mx-auto mb-2`} />
+                    <p className="text-sm font-medium text-gray-800">{badge.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{badge.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Advanced Badges */}
+          {advancedBadges.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-blue-600 mb-3 flex items-center gap-1">
+                <TrendingUp className="w-4 h-4" /> Advanced Badges
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {advancedBadges.map(badge => (
+                  <div
+                    key={badge.id}
+                    className={`${badge.bgColor} rounded-xl p-4 text-center border border-blue-100 shadow-sm hover:shadow-md transition-shadow cursor-help`}
+                    title={badge.description}
+                  >
+                    <badge.icon className={`w-8 h-8 ${badge.iconColor} mx-auto mb-2`} />
+                    <p className="text-sm font-medium text-gray-800">{badge.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{badge.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Basic Badges */}
+          {basicBadges.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-1">
+                <CheckCircle className="w-4 h-4" /> Basic Badges
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {basicBadges.map(badge => (
+                  <div
+                    key={badge.id}
+                    className={`${badge.bgColor} rounded-xl p-4 text-center border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-help`}
+                    title={badge.description}
+                  >
+                    <badge.icon className={`w-8 h-8 ${badge.iconColor} mx-auto mb-2`} />
+                    <p className="text-sm font-medium text-gray-800">{badge.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{badge.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {badges.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <Trophy className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p>No badges earned yet. Complete your profile and start hosting to earn badges!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Change Password - Only this remains from Security Settings */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <h3 className="mb-4">Change Password</h3>
+          <button 
+            onClick={() => setShowPasswordModal(true)}
+            className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Change Password
+          </button>
+        </div>
+
+        {/* Profile Completeness */}
+        {!profileStatus?.profileComplete && profileStatus?.missingFields?.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-amber-800 mb-2">Complete Your Profile</h3>
+                <p className="text-sm text-amber-700 mb-3">
+                  Your profile is {profileStatus?.completionPercentage || 0}% complete. 
+                  Add the following to earn badges and start hosting:
+                </p>
+                <ul className="space-y-1 text-sm text-amber-700">
+                  {profileStatus.missingFields.map(field => (
+                    <li key={field} className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                      {field === 'location' && 'Add your location'}
+                      {field === 'languages' && 'Add languages you speak'}
+                      {field === 'bio/description' && 'Write a bio about yourself'}
+                      {field === 'price' && 'Set your hosting price'}
+                      {field === 'propertyImage' && 'Upload property images'}
+                      {field === 'services' && 'Select services you offer'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-        {[
-          { id: 'profile',  label: 'Profile',    icon: User },
-          { id: 'complete', label: 'Host Setup',  icon: Briefcase },
-          { id: 'security', label: 'Security',    icon: Lock },
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-              ${activeTab === id ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-            {id === 'complete' && !isProfileComplete && <span className="w-2 h-2 bg-amber-500 rounded-full" />}
-          </button>
-        ))}
-      </div>
-
-      {/* ════ PROFILE TAB ════ */}
-      {activeTab === 'profile' && (
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* Basic info card */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-start gap-5 mb-6">
-                {/* Avatar */}
-                <div className="relative flex-shrink-0">
-                  {user.profilePicture ? (
-                    <img src={user.profilePicture} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-teal-50" />
-                  ) : (
-                    <div className="w-20 h-20 rounded-full bg-teal-100 flex items-center justify-center ring-4 ring-teal-50">
-                      <User className="w-9 h-9 text-teal-500" />
-                    </div>
-                  )}
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handlePicChange} className="hidden" />
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploadingImg}
-                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-teal-500 text-white rounded-full flex items-center justify-center hover:bg-teal-600 shadow-md disabled:opacity-60"
-                    title="Change photo"
-                  >
-                    {uploadingImg
-                      ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <Camera className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                {/* Name block */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-xl font-bold text-gray-800">{user.fullName || user.username}</h3>
-                    {isVerified && <CheckCircle className="w-5 h-5 text-teal-500" title="Verified" />}
-                  </div>
-                  <p className="text-sm text-gray-500">@{user.username}</p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {user.hostBadge && (
-                      <span className="inline-flex items-center gap-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full">
-                        <Award className="w-3 h-3" /> {user.hostBadge}
-                      </span>
-                    )}
-                    {isProfileComplete && (
-                      <span className="inline-flex items-center gap-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full">
-                        <CheckCircle className="w-3 h-3" /> Profile Complete
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Editable fields */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Full Name">
-                  <Input value={editForm.fullName} onChange={e => setEditForm(p => ({ ...p, fullName: e.target.value }))} placeholder="Your full name" />
-                </Field>
-                <Field label="Phone">
-                  <Input value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} placeholder="01XXXXXXXXX" />
-                </Field>
-                <Field label="Location">
-                  <Input value={editForm.location} onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))} placeholder="City, Bangladesh" />
-                </Field>
-                <Field label="Languages" hint="Comma separated: Bengali, English">
-                  <Input value={editForm.languages} onChange={e => setEditForm(p => ({ ...p, languages: e.target.value }))} placeholder="Bengali, English" />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label="Email (cannot be changed)">
-                    <Input value={user.email} disabled />
-                  </Field>
-                </div>
-                <div className="sm:col-span-2">
-                  <Field label="Bio">
-                    <textarea
-                      value={editForm.bio}
-                      onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))}
-                      rows={3}
-                      placeholder="Tell guests about yourself..."
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-                    />
-                  </Field>
-                </div>
-              </div>
-
-              <button
-                onClick={handleEditSave}
-                disabled={editLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-teal-500 text-white text-sm font-medium rounded-lg hover:bg-teal-600 disabled:opacity-50"
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Edit Profile</h3>
+              <button 
+                onClick={() => {
+                  setShowEditModal(false);
+                  setError('');
+                  setSuccess('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
               >
-                <Save className="w-4 h-4" />
-                {editLoading ? 'Saving...' : 'Save Changes'}
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Verification card — all from DB */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-2 mb-4">
-                <Shield className="w-5 h-5 text-teal-500" />
-                <h3 className="font-semibold text-gray-800">Verification Status</h3>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
               </div>
-              <VerifRow label="Email Verified"                  done={emailVerified}  date={null} />
-              <VerifRow label="Phone Verified"                  done={phoneVerified}  date={null} />
-              <VerifRow label="Identity Verification (NID/Passport)" done={idDone}   date={fmt(user.idVerifiedAt)} />
-              <VerifRow label="Police Background Check"         done={bgDone}         date={fmt(user.bgCheckAt)} />
-              <VerifRow label="Host Training"                   done={trainingDone}   date={fmt(user.trainingAt)} />
-              <VerifRow label="Bank Account Verification"       done={bankDone}       date={fmt(user.bankVerifiedAt)} />
-
-              {kycDone ? (
-                <div className="mt-4 p-3 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 flex-shrink-0" /> All verifications complete — you're a trusted host!
-                </div>
-              ) : (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" /> Some verifications are pending. Contact support to complete them.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-5">
-            {/* Stats — real DB values, no hardcoded fallbacks */}
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard icon={Star}     label="Rating"   value={hostRating   !== null ? `${hostRating}/5` : 'No ratings'}  color="bg-yellow-100 text-yellow-600" />
-              <StatCard icon={Users}    label="Guests"   value={totalGuests  !== null ? totalGuests       : 'No guests'}   color="bg-blue-100 text-blue-600" />
-              <StatCard icon={BarChart2} label="Response" value={responseRate !== null ? `${responseRate}%` : 'N/A'}       color="bg-green-100 text-green-600" />
-              <StatCard icon={Clock}    label="Member"   value={fmt(user.createdAt)   || '—'}                              color="bg-purple-100 text-purple-600" />
-            </div>
-
-            {/* Profile completeness */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <h4 className="font-semibold text-gray-800 mb-3">Profile Completeness</h4>
-              <div className="w-full bg-gray-100 rounded-full h-2.5 mb-3">
-                <div
-                  className="h-2.5 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${completionPct}%`,
-                    background: completionPct === 100 ? '#14b8a6' : completionPct >= 60 ? '#f59e0b' : '#ef4444',
-                  }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mb-3">{completionPct}% complete</p>
-              {missingFields.length > 0 ? (
-                <div className="space-y-1.5">
-                  {missingFields.map(f => (
-                    <div key={f} className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg">
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" /> Missing: {f}
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setActiveTab('complete')}
-                    className="mt-2 w-full text-xs text-teal-600 border border-teal-300 rounded-lg py-1.5 hover:bg-teal-50 flex items-center justify-center gap-1"
-                  >
-                    Complete profile <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-teal-600 font-medium">✓ Your profile is fully complete!</p>
-              )}
-            </div>
-
-            {/* Badges — driven by real DB values */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <h4 className="font-semibold text-gray-800 mb-3">Badges</h4>
-              {[
-                { emoji: '🏆', label: 'Superhost',  active: isSuperhost },
-                { emoji: '⭐', label: 'Top Rated',  active: isTopRated },
-                { emoji: '✓',  label: 'Verified',   active: isVerified },
-                { emoji: '💬', label: 'Responsive', active: isResponsive },
-                { emoji: '🎖️', label: 'Pro Host',   active: isProHost },
-                { emoji: '🌟', label: 'Trusted',    active: isTrusted },
-              ].length === 0 ? (
-                <p className="text-xs text-gray-400">No badges earned yet</p>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { emoji: '🏆', label: 'Superhost',  active: isSuperhost },
-                    { emoji: '⭐', label: 'Top Rated',  active: isTopRated },
-                    { emoji: '✓',  label: 'Verified',   active: isVerified },
-                    { emoji: '💬', label: 'Responsive', active: isResponsive },
-                    { emoji: '🎖️', label: 'Pro Host',   active: isProHost },
-                    { emoji: '🌟', label: 'Trusted',    active: isTrusted },
-                  ].map(b => (
-                    <div key={b.label} className={`text-center p-2 rounded-xl ${b.active ? 'bg-teal-50' : 'bg-gray-50 opacity-40 grayscale'}`}>
-                      <div className="text-2xl mb-0.5">{b.emoji}</div>
-                      <p className="text-xs text-gray-600">{b.label}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Danger Zone */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border-2 border-red-100">
-              <h3 className="font-semibold text-red-600 mb-3">Danger Zone</h3>
-              <div className="space-y-2">
-                <button className="w-full py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">Download My Data</button>
-                <button className="w-full py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600">Delete Account</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ════ HOST SETUP TAB ════ */}
-      {activeTab === 'complete' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-teal-500 to-emerald-500 px-6 py-5">
-            <h3 className="text-lg font-bold text-white">
-              {isProfileComplete ? 'Update Host Profile' : 'Complete Your Host Profile'}
-            </h3>
-            <p className="text-teal-100 text-sm mt-1">
-              {isProfileComplete
-                ? 'Your profile is live. Update any details below.'
-                : 'Fill in the details below to start accepting guests. Fields marked * are required.'}
-            </p>
-          </div>
-
-          <div className="p-6 space-y-8">
-            {/* Location & Languages */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-teal-500" /> Location & Languages
-              </h4>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Your Location *">
-                  <Input value={completeForm.location} onChange={e => setCompleteForm(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Cox's Bazar, Bangladesh" />
-                </Field>
-                <Field label="Languages Spoken *" hint="Comma separated">
-                  <Input value={completeForm.languages} onChange={e => setCompleteForm(p => ({ ...p, languages: e.target.value }))} placeholder="Bengali, English, Hindi" />
-                </Field>
-              </div>
-            </div>
-
-            {/* Bio */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <User className="w-4 h-4 text-teal-500" /> About You
-              </h4>
-              <Field label="Bio / Description * (min 20 characters)">
-                <textarea
-                  value={completeForm.bio}
-                  onChange={e => setCompleteForm(p => ({ ...p, bio: e.target.value }))}
-                  rows={4}
-                  placeholder="Share your story, local knowledge, and what makes your hosting special..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
-                />
-                <p className="mt-1 text-xs text-gray-400">{completeForm.bio.length} characters (min 20)</p>
-              </Field>
-            </div>
-
-            {/* Services */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Briefcase className="w-4 h-4 text-teal-500" /> Services Offered *
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {SERVICE_OPTIONS.map(svc => {
-                  const active = completeForm.services.includes(svc);
-                  return (
-                    <button
-                      key={svc} type="button" onClick={() => toggleService(svc)}
-                      className={`px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all text-left
-                        ${active ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300'}`}
-                    >
-                      <span className="mr-1.5">{SVC_EMOJI[svc]}</span>{svc}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-teal-500" /> Pricing & Capacity
-              </h4>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <Field label="Price per day (BDT) *">
-                  <Input type="number" value={completeForm.price} onChange={e => setCompleteForm(p => ({ ...p, price: e.target.value }))} placeholder="e.g. 2500" min="0" />
-                </Field>
-                <Field label="Max Guests *">
-                  <Input type="number" value={completeForm.maxGuests} onChange={e => setCompleteForm(p => ({ ...p, maxGuests: e.target.value }))} placeholder="4" min="1" />
-                </Field>
-                <Field label="Minimum Stay (nights)">
-                  <Input type="number" value={completeForm.minStay} onChange={e => setCompleteForm(p => ({ ...p, minStay: e.target.value }))} placeholder="1" min="1" />
-                </Field>
-              </div>
-            </div>
-
-            {/* Property image (only if Accommodation selected) */}
-            {completeForm.services.includes('Accommodation') && (
-              <div>
-                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-teal-500" /> Property Image
-                </h4>
-                <Field label="Property Image URL *" hint="Paste a direct image URL (Imgur, Cloudinary, etc.)">
-                  <Input value={completeForm.propertyImage} onChange={e => setCompleteForm(p => ({ ...p, propertyImage: e.target.value }))} placeholder="https://example.com/property.jpg" />
-                </Field>
-                {completeForm.propertyImage && (
-                  <div className="mt-2 w-full h-40 rounded-xl overflow-hidden border border-gray-200">
-                    <img src={completeForm.propertyImage} alt="Preview" className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
-                  </div>
-                )}
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
               </div>
             )}
 
-            {/* Availability */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-teal-500" /> Availability
-              </h4>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Available From *">
-                  <Input type="date" value={completeForm.availableFromDate} onChange={e => setCompleteForm(p => ({ ...p, availableFromDate: e.target.value }))} />
-                </Field>
-                <Field label="Available Until *">
-                  <Input type="date" value={completeForm.availableToDate} onChange={e => setCompleteForm(p => ({ ...p, availableToDate: e.target.value }))} />
-                </Field>
+            <form onSubmit={handleEditProfile} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Full Name</label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={editForm.fullName}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
+                />
               </div>
-            </div>
 
-            {/* Preferences */}
-            <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-teal-500" /> Preferences
-              </h4>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <Field label="Experience Level">
-                  <Sel value={completeForm.experience} onChange={e => setCompleteForm(p => ({ ...p, experience: e.target.value }))}>
-                    <option>Beginner</option><option>Intermediate</option><option>Expert</option>
-                  </Sel>
-                </Field>
-                <Field label="Response Time">
-                  <Sel value={completeForm.responseTime} onChange={e => setCompleteForm(p => ({ ...p, responseTime: e.target.value }))}>
-                    <option>Within 30 minutes</option><option>Within 1 hour</option><option>Within 2 hours</option><option>Within 24 hours</option>
-                  </Sel>
-                </Field>
-                <Field label="Cancellation Policy">
-                  <Sel value={completeForm.cancellationPolicy} onChange={e => setCompleteForm(p => ({ ...p, cancellationPolicy: e.target.value }))}>
-                    <option>Flexible</option><option>Moderate</option><option>Strict</option>
-                  </Sel>
-                </Field>
+              <div>
+                <label className="block text-sm font-medium mb-2">Phone</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={editForm.phone}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="01XXXXXXXXX"
+                />
               </div>
-            </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400">* Required fields</p>
-              <button
-                onClick={handleCompleteProfile}
-                disabled={completeLoading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-teal-500 text-white text-sm font-semibold rounded-xl hover:bg-teal-600 disabled:opacity-50 shadow-sm"
-              >
-                {completeLoading
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
-                  : <><Save className="w-4 h-4" /> Save Host Profile</>}
-              </button>
-            </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={editForm.location}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="e.g., Cox's Bazar, Bangladesh"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Languages</label>
+                <input
+                  type="text"
+                  name="languages"
+                  value={editForm.languages}
+                  onChange={handleEditFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="Bengali, English (comma separated)"
+                />
+                <p className="text-xs text-gray-500 mt-1">Separate multiple languages with commas</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Bio</label>
+                <textarea
+                  name="bio"
+                  value={editForm.bio}
+                  onChange={handleEditFormChange}
+                  rows="3"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="Tell guests about yourself..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Email (cannot be changed)</label>
+                <input
+                  type="email"
+                  value={user.email}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* ════ SECURITY TAB ════ */}
-      {activeTab === 'security' && (
-        <div className="grid sm:grid-cols-2 gap-6">
-          {/* Change password */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-5">
-              <Lock className="w-5 h-5 text-teal-500" />
-              <h3 className="font-semibold text-gray-800">Change Password</h3>
-            </div>
-            <div className="space-y-4">
-              {[
-                { key: 'currentPassword', label: 'Current Password', vis: 'cur' },
-                { key: 'newPassword',     label: 'New Password',     vis: 'new' },
-                { key: 'confirmPassword', label: 'Confirm New Password', vis: 'con' },
-              ].map(({ key, label, vis }) => (
-                <Field key={key} label={label}>
-                  <div className="relative">
-                    <Input
-                      type={showPw[vis] ? 'text' : 'password'}
-                      value={pwForm[key]}
-                      onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
-                      className="pr-10"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPw(p => ({ ...p, [vis]: !p[vis] }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPw[vis] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </Field>
-              ))}
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-                <p>• Minimum 6 characters</p>
-                <p>• New passwords must match</p>
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-teal-500" />
+                <h3 className="text-xl font-semibold">Change Password</h3>
               </div>
-              <button
-                onClick={handlePwChange}
-                disabled={pwLoading}
-                className="w-full py-2.5 bg-teal-500 text-white text-sm font-medium rounded-xl hover:bg-teal-600 disabled:opacity-50"
+              <button 
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setError('');
+                  setSuccess('');
+                  setPasswordForm({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: ''
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
               >
-                {pwLoading ? 'Changing...' : 'Change Password'}
+                <X className="w-6 h-6" />
               </button>
             </div>
-          </div>
 
-          {/* Other settings */}
-          <div className="space-y-5">
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-4">Notification Preferences</h3>
-              {[
-                { id: 'n1', label: 'New booking notifications', checked: true },
-                { id: 'n2', label: 'Message notifications',     checked: true },
-                { id: 'n3', label: 'Review notifications',      checked: true },
-                { id: 'n4', label: 'Promotional emails',        checked: false },
-              ].map(({ id, label, checked }) => (
-                <label key={id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0 cursor-pointer">
-                  <input type="checkbox" defaultChecked={checked} className="w-4 h-4 accent-teal-500 rounded" />
-                  <span className="text-sm text-gray-700">{label}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-red-100">
-              <h3 className="font-semibold text-red-600 mb-3">Danger Zone</h3>
-              <div className="space-y-2">
-                <button className="w-full py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">Download My Data</button>
-                <button className="w-full py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600">Delete Account</button>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+                {error}
               </div>
-            </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                {success}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Current Password</label>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  value={passwordForm.currentPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
+                  placeholder="Enter current password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">New Password</label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={passwordForm.newPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
+                  placeholder="Enter new password (min. 6 characters)"
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordForm.confirmPassword}
+                  onChange={handlePasswordFormChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
+                  placeholder="Re-enter new password"
+                  minLength={6}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  • Password must be at least 6 characters long<br />
+                  • Make sure your new passwords match
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setError('');
+                    setSuccess('');
+                    setPasswordForm({
+                      currentPassword: '',
+                      newPassword: '',
+                      confirmPassword: ''
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

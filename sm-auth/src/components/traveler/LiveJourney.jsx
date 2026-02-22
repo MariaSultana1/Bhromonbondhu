@@ -95,6 +95,44 @@ export function LiveJourney() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mapCenter, setMapCenter] = useState([23.8103, 90.4125]);
+  const [apiDebug, setApiDebug] = useState(null);
+  // New SOS state variables
+  const [sosAlertId, setSosAlertId] = useState(null);
+  const [locationUpdateInterval, setLocationUpdateInterval] = useState(null);
+
+  // Helper functions
+  const getSource = (trip) => {
+    return trip.transport?.from || 
+           trip.ticketInfo?.from || 
+           trip.transportFrom || 
+           trip.location || 
+           trip.source || 
+           'Dhaka';
+  };
+
+  const getDestination = (trip) => {
+    return trip.destination || 
+           trip.transport?.to || 
+           trip.ticketInfo?.to || 
+           trip.transportTo || 
+           'Destination';
+  };
+
+  const getProvider = (trip) => {
+    return trip.transport?.provider || 
+           trip.ticketInfo?.provider || 
+           trip.transportProvider || 
+           trip.provider || 
+           'Provider';
+  };
+
+  const getTransportType = (trip) => {
+    return trip.transport?.type || 
+           trip.ticketInfo?.type || 
+           trip.transportType || 
+           trip.type || 
+           'Transport';
+  };
 
   // Fetch trips with transport bookings only
   useEffect(() => {
@@ -106,8 +144,23 @@ export function LiveJourney() {
       setDeviceStatus(status);
     }, 30000);
 
-    return () => clearInterval(statusInterval);
+    return () => {
+      clearInterval(statusInterval);
+      // Clean up location update interval
+      if (locationUpdateInterval) {
+        clearInterval(locationUpdateInterval);
+      }
+    };
   }, []);
+
+  // Clean up location updates when component unmounts or SOS is deactivated
+  useEffect(() => {
+    return () => {
+      if (locationUpdateInterval) {
+        clearInterval(locationUpdateInterval);
+      }
+    };
+  }, [locationUpdateInterval]);
 
   const fetchUpcomingTrips = async () => {
     try {
@@ -119,6 +172,8 @@ export function LiveJourney() {
         throw new Error('No authentication token found');
       }
 
+      console.log('📡 Fetching trips...');
+      
       const response = await fetch(`${API_URL}/trips`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -126,21 +181,47 @@ export function LiveJourney() {
         }
       });
 
+      console.log('📡 Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch trips');
+        throw new Error(`Failed to fetch trips: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('📦 Response data:', data);
       
       if (data.success && data.trips) {
-        // ✅ Filter for upcoming trips with transport bookings ONLY
+        // Log each trip's transport status
+        console.log('📋 All trips:');
+        data.trips.forEach((trip, i) => {
+          console.log(`  Trip ${i+1}:`, {
+            destination: trip.destination,
+            status: trip.status,
+            bookingStatus: trip.bookingStatus,
+            transport: trip.transport ? {
+              booked: trip.transport.booked,
+              type: trip.transport.type,
+              from: trip.transport.from,
+              to: trip.transport.to
+            } : 'No transport object',
+            ticketBooked: trip.ticketBooked
+          });
+        });
+
+        // Include both 'upcoming' and 'confirmed' status
         const transportTrips = data.trips.filter(trip => {
-          const status = trip.status || 'upcoming';
-          const hasTransport = trip.transportType && trip.transportTicketId;
-          return status === 'upcoming' && hasTransport;
+          const status = trip.status || trip.bookingStatus || 'upcoming';
+          // Check multiple possible locations for transport info
+          const hasTransport = 
+            (trip.transport && trip.transport.booked === true) ||
+            trip.ticketBooked === true ||
+            (trip.transportType && trip.transportTicketId);
+          
+          // Include both upcoming and confirmed trips
+          return (status === 'upcoming' || status === 'confirmed') && hasTransport;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
         
-        console.log('✅ Fetched transport trips:', transportTrips.length);
+        console.log('✅ Filtered transport trips:', transportTrips.length);
         setUpcomingTrips(transportTrips);
         
         // Get device status
@@ -170,8 +251,6 @@ export function LiveJourney() {
           
           console.log('📍 Location updated:', newLocation);
           setCurrentLocation(newLocation);
-          
-          // Center map on current location
           setMapCenter([newLocation.lat, newLocation.lng]);
         },
         (error) => {
@@ -197,34 +276,200 @@ export function LiveJourney() {
     try {
       setSelectedTrip(trip);
       
-      // Create route from source to destination
-      const source = trip.transportFrom || trip.location || 'Dhaka';
-      const destination = trip.transportTo || trip.destination || "Cox's Bazar";
+      console.log('📍 Selected trip data:', trip);
+      
+      // Get source and destination from various possible locations
+      let source, destination, provider, transportType;
+      
+      // Check multiple possible structures
+      if (trip.transport && trip.transport.from && trip.transport.to) {
+        // New structure with transport object
+        source = trip.transport.from;
+        destination = trip.transport.to;
+        provider = trip.transport.provider;
+        transportType = trip.transport.type;
+      } else if (trip.ticketInfo && trip.ticketInfo.from && trip.ticketInfo.to) {
+        // From ticketInfo structure
+        source = trip.ticketInfo.from;
+        destination = trip.ticketInfo.to;
+        provider = trip.ticketInfo.provider;
+        transportType = trip.ticketInfo.type;
+      } else if (trip.transportFrom && trip.transportTo) {
+        // Legacy structure
+        source = trip.transportFrom;
+        destination = trip.transportTo;
+        provider = trip.transportProvider;
+        transportType = trip.transportType;
+      } else {
+        // Fallback defaults
+        source = trip.location || trip.source || 'Dhaka';
+        destination = trip.destination || "Cox's Bazar";
+        provider = trip.provider || 'Transport Provider';
+        transportType = trip.transportType || 'transport';
+      }
+      
+      console.log('📍 Route details:', { 
+        source, 
+        destination, 
+        provider, 
+        transportType,
+        fullTrip: trip 
+      });
       
       const sourceCoords = cityCoordinates[source] || [23.8103, 90.4125];
       const destCoords = cityCoordinates[destination] || [21.4272, 91.9737];
       
       setRouteCoordinates([sourceCoords, destCoords]);
       
-      // Set initial map center to midpoint
       const centerLat = (sourceCoords[0] + destCoords[0]) / 2;
       const centerLng = (sourceCoords[1] + destCoords[1]) / 2;
       setMapCenter([centerLat, centerLng]);
 
-      console.log('✅ Route loaded:', source, '→', destination);
+      // Store provider and transport type for display
+      setSelectedTrip(prev => ({
+        ...prev,
+        displayProvider: provider,
+        displayType: transportType,
+        displaySource: source,
+        displayDestination: destination
+      }));
+
+      console.log('✅ Route loaded successfully');
     } catch (error) {
       console.error('❌ Error loading route:', error);
     }
   };
 
-  const handleSOS = () => {
-    setSosActive(true);
-    alert('SOS Activated! Emergency contacts have been notified and your location is being shared.');
+  // Updated SOS handler
+  const handleSOS = async () => {
+    try {
+      if (!currentLocation) {
+        alert('Unable to get your current location. Please enable GPS and try again.');
+        return;
+      }
+
+      setSosActive(true);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Authentication error. Please login again.');
+        return;
+      }
+
+      // Get trip info if there's a selected trip
+      const tripInfo = selectedTrip ? {
+        tripId: selectedTrip._id,
+        destination: selectedTrip.destination,
+        source: selectedTrip.transport?.from || selectedTrip.transportFrom || selectedTrip.location,
+        transportType: selectedTrip.transport?.type || selectedTrip.transportType,
+        provider: selectedTrip.transport?.provider || selectedTrip.transportProvider
+      } : null;
+
+      console.log('🚨 Triggering SOS with location:', currentLocation);
+
+      // Trigger SOS alert
+      const response = await fetch(`${API_URL}/sos/trigger`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          location: {
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
+            accuracy: currentLocation.accuracy
+          },
+          tripInfo,
+          deviceInfo: {
+            battery: deviceStatus.battery,
+            connection: deviceStatus.connection.effectiveType,
+            online: deviceStatus.online
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to trigger SOS');
+      }
+
+      console.log('✅ SOS triggered:', data);
+      setSosAlertId(data.alertId);
+
+      // Show success message
+      alert('🚨 SOS ACTIVATED!\n\nEmergency contacts have been notified.\nYour location is being shared with our support team.\nHelp is on the way!');
+
+      // Start sending location updates every 30 seconds
+      const intervalId = setInterval(async () => {
+        if (currentLocation && sosActive) {
+          try {
+            await fetch(`${API_URL}/sos/${data.alertId}/location`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                location: {
+                  lat: currentLocation.lat,
+                  lng: currentLocation.lng,
+                  accuracy: currentLocation.accuracy
+                }
+              })
+            });
+            console.log('📍 SOS location updated');
+          } catch (err) {
+            console.error('❌ Failed to update SOS location:', err);
+          }
+        }
+      }, 30000); // Update every 30 seconds
+
+      setLocationUpdateInterval(intervalId);
+
+    } catch (error) {
+      console.error('❌ SOS error:', error);
+      setSosActive(false);
+      alert('Failed to trigger SOS. Please call emergency services directly at 999.');
+    }
+  };
+
+  // Function to deactivate SOS
+  const deactivateSOS = async () => {
+    if (locationUpdateInterval) {
+      clearInterval(locationUpdateInterval);
+      setLocationUpdateInterval(null);
+    }
+    setSosActive(false);
+    setSosAlertId(null);
   };
 
   const handleEndJourney = () => {
     setShowTripCompletion(true);
   };
+
+  // Debug effect to log trip data
+  useEffect(() => {
+    if (upcomingTrips.length > 0) {
+      console.log('🔍 First trip raw data:', upcomingTrips[0]);
+      console.log('🔍 First trip structure check:', {
+        hasTransport: !!upcomingTrips[0].transport,
+        transportFrom: upcomingTrips[0].transport?.from,
+        transportTo: upcomingTrips[0].transport?.to,
+        transportProvider: upcomingTrips[0].transport?.provider,
+        transportType: upcomingTrips[0].transport?.type,
+        hasTicketInfo: !!upcomingTrips[0].ticketInfo,
+        ticketFrom: upcomingTrips[0].ticketInfo?.from,
+        ticketTo: upcomingTrips[0].ticketInfo?.to,
+        legacyFrom: upcomingTrips[0].transportFrom,
+        legacyTo: upcomingTrips[0].transportTo,
+        legacyProvider: upcomingTrips[0].transportProvider,
+        location: upcomingTrips[0].location,
+        destination: upcomingTrips[0].destination
+      });
+    }
+  }, [upcomingTrips]);
 
   if (loading) {
     return (
@@ -249,8 +494,37 @@ export function LiveJourney() {
     );
   }
 
+  // Debug panel
+  if (apiDebug) {
+    console.log('🔍 Debug info:', apiDebug);
+  }
+
   // ========== TRACKING VIEW ==========
   if (selectedTrip) {
+    const displaySource = selectedTrip.displaySource || 
+                         selectedTrip.transport?.from || 
+                         selectedTrip.transportFrom || 
+                         selectedTrip.location || 
+                         'Dhaka';
+    
+    const displayDestination = selectedTrip.displayDestination || 
+                              selectedTrip.destination || 
+                              selectedTrip.transport?.to || 
+                              selectedTrip.transportTo || 
+                              "Cox's Bazar";
+    
+    const displayProvider = selectedTrip.displayProvider || 
+                           selectedTrip.transport?.provider || 
+                           selectedTrip.transportProvider || 
+                           selectedTrip.provider || 
+                           'Transport Provider';
+    
+    const displayType = selectedTrip.displayType || 
+                       selectedTrip.transport?.type || 
+                       selectedTrip.transportType || 
+                       selectedTrip.type || 
+                       'Transport';
+
     return (
       <div className="space-y-6">
         {/* Back Button */}
@@ -258,6 +532,7 @@ export function LiveJourney() {
           onClick={() => {
             setSelectedTrip(null);
             setCurrentLocation(null);
+            deactivateSOS(); // Deactivate SOS if active
           }}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
@@ -269,11 +544,16 @@ export function LiveJourney() {
         <div>
           <h2 className="text-2xl mb-2">Tracking Journey</h2>
           <p className="text-gray-600">
-            {selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'} → {selectedTrip.transportTo || selectedTrip.destination}
+            {displaySource} → {displayDestination}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            {selectedTrip.transportType} • {selectedTrip.transportProvider}
+            {displayType} • {displayProvider}
           </p>
+          {selectedTrip.bookingId && (
+            <p className="text-xs text-gray-400 mt-1">
+              Booking ID: {selectedTrip.bookingId}
+            </p>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -283,17 +563,24 @@ export function LiveJourney() {
             <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-xl mb-1">Journey to {selectedTrip.destination}</h3>
+                  <h3 className="text-xl mb-1">Journey to {displayDestination}</h3>
                   <p className="text-white/90 text-sm">
-                    Transport: {selectedTrip.transportType}
+                    Transport: {displayType} • {displayProvider}
                   </p>
-                  <p className="text-white/80 text-xs mt-1">Booking ID: {selectedTrip.bookingId}</p>
+                  <p className="text-white/80 text-xs mt-1">
+                    From: {displaySource}
+                  </p>
+                  {selectedTrip.bookingId && (
+                    <p className="text-white/80 text-xs mt-1">
+                      Booking ID: {selectedTrip.bookingId}
+                    </p>
+                  )}
                 </div>
                 <Navigation className="w-8 h-8" />
               </div>
               
               <div className="flex items-center justify-between text-sm mt-4">
-                <span>Date: {new Date(selectedTrip.date).toLocaleDateString()}</span>
+                <span>Date: {new Date(selectedTrip.date || selectedTrip.journeyDate || selectedTrip.startDate).toLocaleDateString()}</span>
                 {currentLocation && (
                   <span className="bg-white/20 px-3 py-1 rounded-full">
                     📍 Tracking Active
@@ -301,7 +588,6 @@ export function LiveJourney() {
                 )}
               </div>
 
-              {/* End Journey Button */}
               <button
                 onClick={handleEndJourney}
                 className="w-full mt-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 font-semibold flex items-center justify-center gap-2 border-2 border-green-500 transition-all"
@@ -326,7 +612,6 @@ export function LiveJourney() {
                     attribution='&copy; OpenStreetMap'
                   />
                   
-                  {/* Route line */}
                   {routeCoordinates.length === 2 && (
                     <Polyline
                       positions={routeCoordinates}
@@ -337,29 +622,26 @@ export function LiveJourney() {
                     />
                   )}
 
-                  {/* Start marker */}
                   {routeCoordinates[0] && (
                     <Marker position={routeCoordinates[0]}>
                       <Popup>
                         <div className="text-sm">
-                          <strong>Start: {selectedTrip.transportFrom || 'Dhaka'}</strong>
+                          <strong>Start: {displaySource}</strong>
                         </div>
                       </Popup>
                     </Marker>
                   )}
 
-                  {/* End marker */}
                   {routeCoordinates[1] && (
                     <Marker position={routeCoordinates[1]}>
                       <Popup>
                         <div className="text-sm">
-                          <strong>Destination: {selectedTrip.transportTo || selectedTrip.destination}</strong>
+                          <strong>Destination: {displayDestination}</strong>
                         </div>
                       </Popup>
                     </Marker>
                   )}
 
-                  {/* Current location marker (blue) */}
                   {currentLocation && (
                     <Marker position={[currentLocation.lat, currentLocation.lng]} icon={blueIcon}>
                       <Popup>
@@ -371,23 +653,6 @@ export function LiveJourney() {
                     </Marker>
                   )}
                 </MapContainer>
-              </div>
-              
-              <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Navigation className="w-4 h-4" />
-                  <span>{selectedTrip.transportType || 'Transport'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Wifi className="w-4 h-4" />
-                  <span>{deviceStatus.connection.effectiveType.toUpperCase()}</span>
-                </div>
-                {currentLocation && (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <MapPin className="w-4 h-4 animate-pulse" />
-                    <span>Live Tracking</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -411,6 +676,7 @@ export function LiveJourney() {
               </button>
               {sosActive && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800 font-semibold mb-2">🚨 SOS ACTIVE</p>
                   <p className="text-sm text-red-800">
                     ✓ Emergency contacts notified
                     <br />
@@ -418,11 +684,14 @@ export function LiveJourney() {
                     <br />
                     ✓ Support team alerted
                   </p>
+                  <button
+                    onClick={deactivateSOS}
+                    className="w-full mt-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium"
+                  >
+                    Deactivate SOS
+                  </button>
                 </div>
               )}
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Press only in case of emergency
-              </p>
             </div>
 
             {/* Emergency Contacts */}
@@ -444,73 +713,6 @@ export function LiveJourney() {
                 ))}
               </div>
             </div>
-
-            {/* Device Status */}
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="mb-4">Device Status</h3>
-              <div className="space-y-3">
-                {/* Battery */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Battery className={`w-5 h-5 ${
-                        deviceStatus.battery.level > 60 ? 'text-green-500' :
-                        deviceStatus.battery.level > 30 ? 'text-yellow-500' : 'text-red-500'
-                      }`} />
-                      <span className="text-sm">Battery</span>
-                    </div>
-                    <span className="text-sm font-semibold">{deviceStatus.battery.level}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        deviceStatus.battery.level > 60 ? 'bg-green-500' :
-                        deviceStatus.battery.level > 30 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${deviceStatus.battery.level}%` }}
-                    ></div>
-                  </div>
-                  {deviceStatus.battery.charging && (
-                    <p className="text-xs text-green-600 mt-1">⚡ Charging</p>
-                  )}
-                </div>
-
-                {/* Connection */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm">Connection</span>
-                  </div>
-                  <span className="text-sm text-blue-600 font-semibold">
-                    {deviceStatus.connection.effectiveType.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* GPS */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-purple-500" />
-                    <span className="text-sm">GPS</span>
-                  </div>
-                  <span className={`text-sm font-semibold ${
-                    currentLocation ? 'text-green-600' : 'text-gray-600'
-                  }`}>
-                    {currentLocation ? 'Active' : deviceStatus.gps}
-                  </span>
-                </div>
-
-                {/* Online Status */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${deviceStatus.online ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-sm">Online Status</span>
-                  </div>
-                  <span className={`text-sm font-semibold ${deviceStatus.online ? 'text-green-600' : 'text-red-600'}`}>
-                    {deviceStatus.online ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -522,12 +724,12 @@ export function LiveJourney() {
               tripData={{
                 destination: selectedTrip.destination,
                 date: selectedTrip.date,
-                source: selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'
+                source: selectedTrip.transport?.from || selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'
               }}
               onCompleted={(data) => {
                 setShowTripCompletion(false);
                 setSelectedTrip(null);
-                fetchUpcomingTrips(); // Refresh trips list
+                fetchUpcomingTrips();
               }}
               onClose={() => setShowTripCompletion(false)}
             />
@@ -546,6 +748,24 @@ export function LiveJourney() {
         <p className="text-gray-600">Track your transport bookings in real-time</p>
       </div>
 
+      {/* Debug Info (temporary) */}
+      {apiDebug && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h3 className="font-semibold mb-2">Debug Info:</h3>
+          <p>Total trips in DB: {apiDebug.totalTrips}</p>
+          {apiDebug.firstTrip ? (
+            <div>
+              <p>First trip: {apiDebug.firstTrip.destination}</p>
+              <p>Status: {apiDebug.firstTrip.status}</p>
+              <p>Has transport: {apiDebug.firstTrip.hasTransport ? 'Yes' : 'No'}</p>
+              <p>Transport booked: {apiDebug.firstTrip.transportBooked ? 'Yes' : 'No'}</p>
+            </div>
+          ) : (
+            <p>No trips found</p>
+          )}
+        </div>
+      )}
+
       {/* Upcoming Trips */}
       {upcomingTrips.length > 0 ? (
         <>
@@ -556,10 +776,10 @@ export function LiveJourney() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h4 className="text-2xl mb-2">
-                    {upcomingTrips[0].transportFrom || upcomingTrips[0].location || 'Dhaka'} → {upcomingTrips[0].destination}
+                    {getSource(upcomingTrips[0])} → {getDestination(upcomingTrips[0])}
                   </h4>
                   <p className="text-blue-100">
-                    {upcomingTrips[0].transportType} • {upcomingTrips[0].transportProvider}
+                    {getTransportType(upcomingTrips[0])} • {getProvider(upcomingTrips[0])}
                   </p>
                 </div>
                 <Navigation className="w-8 h-8" />
@@ -570,13 +790,13 @@ export function LiveJourney() {
                   <div>
                     <p className="text-blue-100 text-sm mb-1">Travel Date</p>
                     <p className="text-lg font-semibold">
-                      {new Date(upcomingTrips[0].date).toLocaleDateString()}
+                      {new Date(upcomingTrips[0].date || upcomingTrips[0].journeyDate || upcomingTrips[0].startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-blue-100 text-sm mb-1">Booking ID</p>
                     <p className="text-lg font-semibold">
-                      {upcomingTrips[0].bookingId}
+                      {upcomingTrips[0].bookingId || upcomingTrips[0].ticketInfo?.bookingId || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -604,14 +824,18 @@ export function LiveJourney() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h4 className="text-lg font-semibold mb-1">
-                          {trip.transportFrom || trip.location || 'Dhaka'} → {trip.destination}
+                          {getSource(trip)} → {getDestination(trip)}
                         </h4>
                         <p className="text-gray-600 text-sm">
-                          🚌 {trip.transportType} • {trip.transportProvider}
+                          🚌 {getTransportType(trip)} • {getProvider(trip)}
                         </p>
-                        <p className="text-gray-500 text-xs mt-1">📅 {new Date(trip.date).toLocaleDateString()}</p>
-                        {trip.bookingId && (
-                          <p className="text-gray-500 text-xs mt-1">Booking: {trip.bookingId}</p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          📅 {new Date(trip.date || trip.journeyDate || trip.startDate).toLocaleDateString()}
+                        </p>
+                        {(trip.bookingId || trip.ticketInfo?.bookingId) && (
+                          <p className="text-gray-500 text-xs mt-1">
+                            Booking: {trip.bookingId || trip.ticketInfo?.bookingId}
+                          </p>
                         )}
                       </div>
                     </div>

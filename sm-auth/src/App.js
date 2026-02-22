@@ -1,5 +1,6 @@
 // App.js 
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import Login from './components/Login';
 import SignUpas from './components/SignUpas'; 
 import Register from './components/Register';
@@ -9,13 +10,11 @@ import HostDashboard from './components/HostDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 
 function App() {
-  // Add 
-  const [currentView, setCurrentView] = useState('home'); // 'home', 'signupas', 'login', 'register', 'dashboard'
+  const [currentView, setCurrentView] = useState('home');
   const [user, setUser] = useState(null);
-  const [userType, setUserType] = useState('tourist'); // Default type
+  const [userType, setUserType] = useState('tourist');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already logged in on app mount
   useEffect(() => {
     const checkAuthentication = async () => {
       const token = localStorage.getItem('token');
@@ -61,18 +60,9 @@ function App() {
     setCurrentView('home');
   };
 
-  // Navigation functions
-  const goToHome = () => {
-    setCurrentView('home');
-  };
-
-  const goToLogin = () => {
-    setCurrentView('login');
-  };
-
-  const goToSignUpAs = () => {
-    setCurrentView('signupas');
-  };
+  const goToHome = () => setCurrentView('home');
+  const goToLogin = () => setCurrentView('login');
+  const goToSignUpAs = () => setCurrentView('signupas');
 
   const goToRegister = (type = 'tourist') => {
     setUserType(type);
@@ -111,7 +101,6 @@ function App() {
     }
   };
 
-  // Render appropriate dashboard based on user role
   const renderDashboard = () => {
     if (!user) return null;
 
@@ -135,7 +124,6 @@ function App() {
     }
   };
 
-  // Loading screen
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#e1f3f7] to-[#cde5f9]">
@@ -156,47 +144,44 @@ function App() {
   }
 
   return (
-    <div className="App min-h-screen">
-      {/* Home Page */}
-      {currentView === 'home' && (
-        <HomePage 
-          goLogin={goToLogin}
-          goSignup={goToSignUpAs} // Now goes to SignUpas page
-        />
-      )}
-      
-      {/* SignUpas Page */}
-      {currentView === 'signupas' && (
-        <SignUpas 
-          selectTraveller={() => goToRegister('tourist')} // Maps to 'tourist' role
-          selectHost={() => goToRegister('host')} // Maps to 'host' role
-          goLogin={goToLogin}
-          goHome={goToHome} // Add goHome prop
-        />
-      )}
-      
-      {/* Login Page */}
-      {currentView === 'login' && (
-        <Login 
-          goSignupAs={goToSignUpAs} // Changed to goToSignUpAs
-          onLoginSuccess={handleLoginSuccess} 
-          goHome={goToHome}
-        />
-      )}
-      
-      {/* Registration Page */}
-      {currentView === 'register' && (
-        <Register 
-          userType={userType}
-          goLogin={goToLogin}
-          onRegisterSuccess={handleRegisterSuccess}
-          goHome={goToHome}
-        />
-      )}
-      
-      {/* Dashboard */}
-      {currentView === 'dashboard' && user && renderDashboard()}
-    </div>
+    <BrowserRouter>
+      <div className="App min-h-screen">
+        {currentView === 'home' && (
+          <HomePage 
+            goLogin={goToLogin}
+            goSignup={goToSignUpAs}
+          />
+        )}
+        
+        {currentView === 'signupas' && (
+          <SignUpas 
+            selectTraveller={() => goToRegister('tourist')}
+            selectHost={() => goToRegister('host')}
+            goLogin={goToLogin}
+            goHome={goToHome}
+          />
+        )}
+        
+        {currentView === 'login' && (
+          <Login 
+            goSignupAs={goToSignUpAs}
+            onLoginSuccess={handleLoginSuccess} 
+            goHome={goToHome}
+          />
+        )}
+        
+        {currentView === 'register' && (
+          <Register 
+            userType={userType}
+            goLogin={goToLogin}
+            onRegisterSuccess={handleRegisterSuccess}
+            goHome={goToHome}
+          />
+        )}
+        
+        {currentView === 'dashboard' && user && renderDashboard()}
+      </div>
+    </BrowserRouter>
   );
 }
 

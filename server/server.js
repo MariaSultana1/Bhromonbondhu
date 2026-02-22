@@ -2522,9 +2522,11 @@ app.get('/api/traveler/booking-requests', authenticate, async (req, res) => {
 });
 
 // Book Transport Tickets (Store booking in database)
+// Book Transport Tickets (Store booking in database) - IMPROVED VERSION
 app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
   try {
     console.log('📥 Transport booking request received');
+    console.log('User:', req.user.email);
     
     const {
       bookingId,
@@ -2554,232 +2556,167 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
       console.error('❌ Missing required booking information');
       return res.status(400).json({
         success: false,
-        message: 'Missing required booking information: bookingId, pnr, transportType, provider, from, to, journeyDate'
+        message: 'Missing required booking information'
       });
     }
 
-    if (!passengers || passengers.length === 0) {
-      console.error('❌ No passengers provided');
-      return res.status(400).json({
-        success: false,
-        message: 'At least one passenger is required'
-      });
-    }
+    // Create transport ticket
+    const transportTicket = new TransportTicket({
+      userId: req.user._id,
+      bookingId,
+      pnr,
+      transportType,
+      provider,
+      from,
+      to,
+      journeyDate,
+      departureTime,
+      arrivalTime,
+      duration,
+      vehicleNumber,
+      trainNumber,
+      flightNumber,
+      passengers,
+      contactEmail,
+      contactPhone,
+      totalAmount,
+      pricePerTicket,
+      paymentMethod,
+      paymentDetails: {
+        cardNumber: paymentDetails?.cardNumber ? '****' + paymentDetails.cardNumber.slice(-4) : undefined,
+        cardholderName: paymentDetails?.cardholderName,
+        bkashNumber: paymentDetails?.bkashNumber,
+        transactionId: `TXN${Date.now()}`
+      },
+      status: 'confirmed'
+    });
 
-    // Validate contact email
-    if (!contactEmail || !/^\S+@\S+\.\S+$/.test(contactEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid contact email is required'
-      });
-    }
+    await transportTicket.save();
+    console.log('✅ Transport ticket saved:', transportTicket._id);
 
-    // Validate contact phone
-    const phoneValidation = validatePhoneNumber(contactPhone);
-    if (!phoneValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        message: `Contact ${phoneValidation.message}`
-      });
-    }
-
-    // Validate each passenger
-    for (let i = 0; i < passengers.length; i++) {
-      const passenger = passengers[i];
-      
-      if (!passenger.firstName || !passenger.lastName) {
-        return res.status(400).json({
-          success: false,
-          message: `Passenger ${i + 1}: First name and last name are required`
-        });
-      }
-
-      // Validate age
-      const ageValidation = validateAge(passenger.age);
-      if (!ageValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: `Passenger ${i + 1}: ${ageValidation.message}`
-        });
-      }
-
-      // Validate NID if provided
-      if (passenger.nid) {
-        const nidValidation = validateNID(passenger.nid);
-        if (!nidValidation.valid) {
-          return res.status(400).json({
-            success: false,
-            message: `Passenger ${i + 1}: ${nidValidation.message}`
-          });
-        }
-      }
-
-      // Validate Passport if provided
-      if (passenger.passport) {
-        const passportValidation = validatePassport(passenger.passport);
-        if (!passportValidation.valid) {
-          return res.status(400).json({
-            success: false,
-            message: `Passenger ${i + 1}: ${passportValidation.message}`
-          });
-        }
-      }
-
-      // For flights, require either NID or Passport
-      if (transportType === 'flight' && !passenger.nid && !passenger.passport) {
-        return res.status(400).json({
-          success: false,
-          message: `Passenger ${i + 1}: NID or Passport is required for flight bookings`
-        });
-      }
-    }
-
-    // Validate payment details based on method
-    if (paymentMethod === 'card') {
-      if (!paymentDetails?.cardNumber || !paymentDetails?.cardholderName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Card number and cardholder name are required for card payment'
-        });
-      }
-
-      // Note: In production, never store full card numbers
-      // Only store last 4 digits for reference
-      const cardValidation = validateCardNumber(paymentDetails.cardNumber);
-      if (!cardValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: cardValidation.message
-        });
-      }
-    } else if (paymentMethod === 'bkash') {
-      if (!paymentDetails?.bkashNumber) {
-        return res.status(400).json({
-          success: false,
-          message: 'bKash number is required for bKash payment'
-        });
-      }
-
-      const bkashValidation = validateBkashNumber(paymentDetails.bkashNumber);
-      if (!bkashValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: `bKash ${bkashValidation.message}`
-        });
-      }
-    }
-
-    // Prepare payment details for storage (secure)
-    const securePaymentDetails = {};
-    if (paymentMethod === 'card') {
-      const cleaned = paymentDetails.cardNumber.replace(/\s+/g, '');
-      securePaymentDetails.cardNumber = '**** **** **** ' + cleaned.slice(-4);
-      securePaymentDetails.cardholderName = paymentDetails.cardholderName;
-    } else if (paymentMethod === 'bkash') {
-      securePaymentDetails.bkashNumber = paymentDetails.bkashNumber;
-    }
-    securePaymentDetails.transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-
-    // Get tripId from query params if coming from AllTrips
-    const { tripId } = req.query;
-    
+    // Create or update trip
     let trip;
     
-    if (tripId) {
-      // Update existing trip
-      trip = await Trip.findOne({
-        _id: tripId,
-        userId: req.user._id
-      });
-    }
-    
-    if (trip) {
+    // Check if trip already exists for this destination/date
+    const existingTrip = await Trip.findOne({
+      userId: req.user._id,
+      destination: to,
+      $or: [
+        { startDate: journeyDate },
+        { date: journeyDate }
+      ]
+    });
+
+    if (existingTrip) {
+      console.log('📝 Updating existing trip:', existingTrip._id);
+      
       // Update existing trip with transport info
-      console.log('✅ Updating existing trip with transport info');
-      trip.transport = {
+      existingTrip.transport = {
         booked: true,
-        bookingId,
-        pnr,
-        type: transportType,
-        provider,
-        from,
-        to,
-        journeyDate,
-        departureTime,
-        arrivalTime,
-        duration,
-        vehicleNumber,
-        trainNumber,
-        flightNumber,
-        passengers,
-        contactEmail,
-        contactPhone,
-        price: totalAmount,
-        pricePerTicket
+        ticketId: transportTicket._id,
+        bookingId: transportTicket.bookingId,
+        pnr: transportTicket.pnr,
+        type: transportTicket.transportType,
+        provider: transportTicket.provider,
+        from: transportTicket.from,
+        to: transportTicket.to,
+        journeyDate: transportTicket.journeyDate,
+        departureTime: transportTicket.departureTime,
+        arrivalTime: transportTicket.arrivalTime,
+        duration: transportTicket.duration,
+        vehicleNumber: transportTicket.vehicleNumber,
+        trainNumber: transportTicket.trainNumber,
+        flightNumber: transportTicket.flightNumber,
+        passengers: transportTicket.passengers,
+        contactEmail: transportTicket.contactEmail,
+        contactPhone: transportTicket.contactPhone,
+        price: transportTicket.totalAmount,
+        pricePerTicket: transportTicket.pricePerTicket
       };
-      trip.destination = to;
-      trip.startDate = journeyDate;
-      trip.endDate = journeyDate;
-      trip.totalAmount = (trip.totalAmount || 0) + totalAmount;
-      trip.grandTotal = (trip.grandTotal || 0) + totalAmount;
-      trip.paymentMethod = paymentMethod;
-      trip.paymentStatus = 'paid';
-      trip.bookingStatus = 'confirmed';
+      
+      // Also set legacy fields for compatibility
+      existingTrip.transportType = transportTicket.transportType;
+      existingTrip.transportProvider = transportTicket.provider;
+      existingTrip.transportFrom = transportTicket.from;
+      existingTrip.transportTo = transportTicket.to;
+      existingTrip.transportDate = transportTicket.journeyDate;
+      existingTrip.transportTicketId = transportTicket._id;
+      
+      existingTrip.status = 'upcoming';
+      existingTrip.bookingStatus = 'confirmed';
+      
+      trip = existingTrip;
     } else {
-      // Create new trip
-      console.log('✅ Creating new trip with transport info');
+      console.log('📝 Creating new trip');
+      
+      // Create new trip with transport info
       trip = new Trip({
         userId: req.user._id,
         destination: to,
         location: to,
         startDate: journeyDate,
         endDate: journeyDate,
+        date: journeyDate,
         transport: {
           booked: true,
-          bookingId,
-          pnr,
-          type: transportType,
-          provider,
-          from,
-          to,
-          journeyDate,
-          departureTime,
-          arrivalTime,
-          duration,
-          vehicleNumber,
-          trainNumber,
-          flightNumber,
-          passengers,
-          contactEmail,
-          contactPhone,
-          price: totalAmount,
-          pricePerTicket
+          ticketId: transportTicket._id,
+          bookingId: transportTicket.bookingId,
+          pnr: transportTicket.pnr,
+          type: transportTicket.transportType,
+          provider: transportTicket.provider,
+          from: transportTicket.from,
+          to: transportTicket.to,
+          journeyDate: transportTicket.journeyDate,
+          departureTime: transportTicket.departureTime,
+          arrivalTime: transportTicket.arrivalTime,
+          duration: transportTicket.duration,
+          vehicleNumber: transportTicket.vehicleNumber,
+          trainNumber: transportTicket.trainNumber,
+          flightNumber: transportTicket.flightNumber,
+          passengers: transportTicket.passengers,
+          contactEmail: transportTicket.contactEmail,
+          contactPhone: transportTicket.contactPhone,
+          price: transportTicket.totalAmount,
+          pricePerTicket: transportTicket.pricePerTicket
         },
-        totalAmount,
-        grandTotal: totalAmount,
-        paymentMethod,
-        paymentStatus: 'paid',
-        bookingStatus: 'confirmed'
+        // Legacy fields
+        transportType: transportTicket.transportType,
+        transportProvider: transportTicket.provider,
+        transportFrom: transportTicket.from,
+        transportTo: transportTicket.to,
+        transportDate: transportTicket.journeyDate,
+        transportTicketId: transportTicket._id,
+        totalAmount: transportTicket.totalAmount,
+        grandTotal: transportTicket.totalAmount,
+        status: 'upcoming',
+        bookingStatus: 'confirmed',
+        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&q=80',
+        weather: '25°C, Pleasant'
       });
     }
 
     await trip.save();
-    
-    console.log(`✅ Transport booked successfully. Trip ID: ${trip._id}`);
+    console.log('✅ Trip saved:', trip._id);
+    console.log('📊 Transport booked:', trip.transport?.booked);
 
     res.status(201).json({
       success: true,
-      message: 'Ticket booking saved successfully',
+      message: 'Transport ticket booked successfully',
+      ticket: {
+        id: transportTicket._id,
+        bookingId: transportTicket.bookingId,
+        pnr: transportTicket.pnr
+      },
       trip: {
         id: trip._id,
-        bookingId: trip.bookingId,
         destination: trip.destination,
-        transport: trip.transport,
-        bookingStatus: trip.bookingStatus
+        transportBooked: trip.transport?.booked || false,
+        status: trip.status
       }
     });
+
   } catch (error) {
-    console.error('❌ Transport ticket booking error:', error);
+    console.error('❌ Transport booking error:', error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -2787,6 +2724,8 @@ app.post('/api/transport-tickets/book', authenticate, async (req, res) => {
     });
   }
 });
+
+
 
 // Get all transport tickets for user
 app.get('/api/transport-tickets', authenticate, async (req, res) => {
@@ -3577,7 +3516,127 @@ app.get('/api/trips/:id/completion-status', authenticate, async (req, res) => {
   }
 });
 
+// ==================== ALBUM PHOTO SCHEMA & ROUTES ====================
+// Add this block to server.js after the other schemas (before "Start Server")
+
+const albumPhotoSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+  tripId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trip',
+    default: null
+  },
+  destination: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  caption: {
+    type: String,
+    default: '',
+    maxlength: 300,
+    trim: true
+  },
+  imageData: {
+    // base64 data URI  e.g. "data:image/jpeg;base64,..."
+    type: String,
+    required: true
+  },
+  takenAt: {
+    type: Date,
+    default: Date.now
+  },
+  liked: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true });
+
+albumPhotoSchema.index({ userId: 1, destination: 1 });
+albumPhotoSchema.index({ userId: 1, createdAt: -1 });
+
+const AlbumPhoto = mongoose.model('AlbumPhoto', albumPhotoSchema);
+
+// ── GET /api/album-photos  – all photos for current user (optionally by destination)
+app.get('/api/album-photos', authenticate, async (req, res) => {
+  try {
+    const { destination } = req.query;
+    const query = { userId: req.user._id };
+    if (destination) query.destination = { $regex: destination, $options: 'i' };
+
+    const photos = await AlbumPhoto.find(query).sort({ takenAt: -1 });
+    res.json({ success: true, count: photos.length, photos });
+  } catch (err) {
+    console.error('❌ Get album photos error:', err);
+    res.status(500).json({ success: false, message: 'Error fetching photos' });
+  }
+});
+
+// ── POST /api/album-photos  – upload one photo
+app.post('/api/album-photos', authenticate, async (req, res) => {
+  try {
+    const { imageData, destination, caption, tripId, takenAt } = req.body;
+
+    if (!imageData) return res.status(400).json({ success: false, message: 'imageData is required' });
+    if (!destination) return res.status(400).json({ success: false, message: 'destination is required' });
+    if (!imageData.startsWith('data:image/')) return res.status(400).json({ success: false, message: 'Invalid image format' });
+
+    // 10 MB limit
+    const sizeBytes = (imageData.length * 3) / 4;
+    if (sizeBytes > 10 * 1024 * 1024) return res.status(400).json({ success: false, message: 'Image too large (max 10 MB)' });
+
+    const photo = await AlbumPhoto.create({
+      userId: req.user._id,
+      tripId: tripId || null,
+      destination: destination.trim(),
+      caption: (caption || '').trim(),
+      imageData,
+      takenAt: takenAt ? new Date(takenAt) : new Date(),
+    });
+
+    console.log(`✅ Photo uploaded for ${req.user.email} → ${destination}`);
+    res.status(201).json({ success: true, message: 'Photo uploaded', photo });
+  } catch (err) {
+    console.error('❌ Upload photo error:', err);
+    res.status(500).json({ success: false, message: 'Error uploading photo', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
+  }
+});
+
+// ── PATCH /api/album-photos/:id  – update caption or liked
+app.patch('/api/album-photos/:id', authenticate, async (req, res) => {
+  try {
+    const { caption, liked } = req.body;
+    const photo = await AlbumPhoto.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!photo) return res.status(404).json({ success: false, message: 'Photo not found' });
+
+    if (caption !== undefined) photo.caption = caption.trim();
+    if (liked !== undefined) photo.liked = liked;
+    await photo.save();
+
+    res.json({ success: true, message: 'Photo updated', photo });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error updating photo' });
+  }
+});
+
+// ── DELETE /api/album-photos/:id
+app.delete('/api/album-photos/:id', authenticate, async (req, res) => {
+  try {
+    const photo = await AlbumPhoto.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    if (!photo) return res.status(404).json({ success: false, message: 'Photo not found' });
+    res.json({ success: true, message: 'Photo deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error deleting photo' });
+  }
+});
+
 // Get route and checkpoints for a trip (Protected)
+
 app.get('/api/trips/:id/route', authenticate, async (req, res) => {
   try {
     const trip = await Trip.findOne({
@@ -9421,6 +9480,590 @@ function formatTimeAgo(date) {
     });
   }
 }
+
+// ==================== SOS/EMERGENCY ROUTES ====================
+
+// SOS Alert Schema
+const sosAlertSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  userPhone: {
+    type: String
+  },
+  location: {
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
+    accuracy: { type: Number },
+    address: { type: String }
+  },
+  tripInfo: {
+    tripId: { type: mongoose.Schema.Types.ObjectId, ref: 'Trip' },
+    destination: String,
+    source: String,
+    transportType: String,
+    provider: String
+  },
+  deviceInfo: {
+    battery: { level: Number, charging: Boolean },
+    connection: String,
+    online: Boolean
+  },
+  status: {
+    type: String,
+    enum: ['active', 'resolved', 'false_alarm'],
+    default: 'active'
+  },
+  resolvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  resolvedAt: Date,
+  resolutionNotes: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Add index for geospatial queries
+sosAlertSchema.index({ location: '2dsphere' });
+sosAlertSchema.index({ status: 1, createdAt: -1 });
+
+const SOSAlert = mongoose.model('SOSAlert', sosAlertSchema);
+
+// Trigger SOS alert (Protected)
+app.post('/api/sos/trigger', authenticate, async (req, res) => {
+  try {
+    const { location, tripInfo, deviceInfo } = req.body;
+
+    if (!location || !location.lat || !location.lng) {
+      return res.status(400).json({
+        success: false,
+        message: 'Location is required'
+      });
+    }
+
+    // Get reverse geocoding for address (optional)
+    let address = '';
+    try {
+      const geoResponse = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}&zoom=18&addressdetails=1`);
+      if (geoResponse.data && geoResponse.data.display_name) {
+        address = geoResponse.data.display_name;
+      }
+    } catch (geoError) {
+      console.log('Geocoding failed, proceeding without address');
+    }
+
+    // Create SOS alert
+    const sosAlert = new SOSAlert({
+      userId: req.user._id,
+      userName: req.user.fullName || req.user.username,
+      userEmail: req.user.email,
+      userPhone: req.user.phone || 'Not provided',
+      location: {
+        lat: location.lat,
+        lng: location.lng,
+        accuracy: location.accuracy,
+        address: address
+      },
+      tripInfo: tripInfo || {},
+      deviceInfo: deviceInfo || {},
+      status: 'active'
+    });
+
+    await sosAlert.save();
+
+    // Send email to admin (if email service configured)
+    // sendSOSEmailToAdmin(sosAlert);
+
+    // Send SMS to emergency contacts (if SMS service configured)
+    // sendSOSSMSToContacts(sosAlert);
+
+    console.log(`🚨 SOS Alert triggered by user: ${req.user.email} (ID: ${sosAlert._id})`);
+
+    // Emit socket event for real-time admin notification
+    // if (io) {
+    //   io.emit('new-sos-alert', sosAlert);
+    // }
+
+    res.status(201).json({
+      success: true,
+      message: 'SOS alert triggered successfully. Help is on the way!',
+      alertId: sosAlert._id,
+      timestamp: sosAlert.createdAt
+    });
+
+  } catch (error) {
+    console.error('❌ SOS trigger error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to trigger SOS alert. Please call emergency services directly.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update SOS location (for continuous tracking)
+app.post('/api/sos/:alertId/location', authenticate, async (req, res) => {
+  try {
+    const { location } = req.body;
+    const { alertId } = req.params;
+
+    if (!location || !location.lat || !location.lng) {
+      return res.status(400).json({
+        success: false,
+        message: 'Location is required'
+      });
+    }
+
+    const sosAlert = await SOSAlert.findOne({
+      _id: alertId,
+      userId: req.user._id,
+      status: 'active'
+    });
+
+    if (!sosAlert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active SOS alert not found'
+      });
+    }
+
+    // Update location
+    sosAlert.location = {
+      lat: location.lat,
+      lng: location.lng,
+      accuracy: location.accuracy
+    };
+    sosAlert.updatedAt = new Date();
+
+    await sosAlert.save();
+
+    // Emit socket event for real-time tracking
+    // if (io) {
+    //   io.emit('sos-location-update', {
+    //     alertId: sosAlert._id,
+    //     location: sosAlert.location,
+    //     timestamp: sosAlert.updatedAt
+    //   });
+    // }
+
+    res.json({
+      success: true,
+      message: 'Location updated',
+      timestamp: sosAlert.updatedAt
+    });
+
+  } catch (error) {
+    console.error('❌ SOS location update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update location'
+    });
+  }
+});
+
+// Resolve SOS alert (by admin)
+app.put('/api/admin/sos/:alertId/resolve', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can resolve SOS alerts'
+      });
+    }
+
+    const { resolutionNotes } = req.body;
+    const { alertId } = req.params;
+
+    const sosAlert = await SOSAlert.findByIdAndUpdate(
+      alertId,
+      {
+        status: 'resolved',
+        resolvedBy: req.user._id,
+        resolvedAt: new Date(),
+        resolutionNotes: resolutionNotes || 'Resolved by admin'
+      },
+      { new: true }
+    );
+
+    if (!sosAlert) {
+      return res.status(404).json({
+        success: false,
+        message: 'SOS alert not found'
+      });
+    }
+
+    console.log(`✅ SOS Alert ${alertId} resolved by admin: ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'SOS alert resolved',
+      alert: sosAlert
+    });
+
+  } catch (error) {
+    console.error('❌ Resolve SOS error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resolve SOS alert'
+    });
+  }
+});
+
+// Get all active SOS alerts (for admin)
+app.get('/api/admin/sos/active', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can view SOS alerts'
+      });
+    }
+
+    const activeAlerts = await SOSAlert.find({ status: 'active' })
+      .populate('userId', 'fullName email phone profilePicture')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: activeAlerts.length,
+      alerts: activeAlerts
+    });
+
+  } catch (error) {
+    console.error('❌ Get active SOS alerts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch SOS alerts'
+    });
+  }
+});
+
+// Get SOS alert history (for admin)
+app.get('/api/admin/sos/history', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can view SOS history'
+      });
+    }
+
+    const { page = 1, limit = 20, status } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let query = {};
+    if (status) {
+      query.status = status;
+    }
+
+    const alerts = await SOSAlert.find(query)
+      .populate('userId', 'fullName email phone')
+      .populate('resolvedBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await SOSAlert.countDocuments(query);
+
+    res.json({
+      success: true,
+      alerts,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalAlerts: total,
+        hasMore: skip + alerts.length < total
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get SOS history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch SOS history'
+    });
+  }
+});
+
+// Get SOS alert details (for admin)
+app.get('/api/admin/sos/:alertId', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can view SOS details'
+      });
+    }
+
+    const alert = await SOSAlert.findById(req.params.alertId)
+      .populate('userId', 'fullName email phone profilePicture')
+      .populate('resolvedBy', 'fullName email');
+
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        message: 'SOS alert not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      alert
+    });
+
+  } catch (error) {
+    console.error('❌ Get SOS details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch SOS details'
+    });
+  }
+});
+
+app.get('/api/admin/revenue', authenticate, adminOnly, async (req, res) => {
+  try {
+    // ── Pull all HostEarning records ───────────────────────────────────
+    const hostEarnings = await HostEarning.find({}).lean();
+
+    // ── Pull all Trip records that have a platformFee ──────────────────
+    const trips = await Trip.find({ platformFee: { $exists: true, $gt: 0 } }).lean();
+
+    // ── Build 12-month buckets ─────────────────────────────────────────
+    const now  = new Date();
+    const buckets = {};
+    for (let i = 11; i >= 0; i--) {
+      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      buckets[key] = {
+        label:            d.toLocaleString('default', { month: 'short', year: '2-digit' }),
+        shortLabel:       d.toLocaleString('default', { month: 'short' }),
+        hostEarningFee:   0,   // sum of HostEarning.platformFee
+        tripFee:          0,   // sum of Trip.platformFee
+        total:            0,
+      };
+    }
+
+    // ── Aggregate HostEarning.platformFee by month ─────────────────────
+    let totalHostFee = 0;
+    hostEarnings.forEach(e => {
+      const d   = new Date(e.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const fee = Number(e.platformFee) || 0;
+      totalHostFee += fee;
+      if (buckets[key]) buckets[key].hostEarningFee += fee;
+    });
+
+    // ── Aggregate Trip.platformFee by month ────────────────────────────
+    let totalTripFee = 0;
+    trips.forEach(t => {
+      const d   = new Date(t.createdAt);        // adjust field if needed
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const fee = Number(t.platformFee) || 0;
+      totalTripFee += fee;
+      if (buckets[key]) buckets[key].tripFee += fee;
+    });
+
+    // ── Calculate totals per bucket ────────────────────────────────────
+    const monthly = Object.values(buckets).map(b => ({
+      ...b,
+      total: b.hostEarningFee + b.tripFee,
+    }));
+
+    // ── Month-over-month growth ────────────────────────────────────────
+    const thisMonth = monthly.at(-1);
+    const lastMonth = monthly.at(-2);
+    const growth = lastMonth?.total > 0
+      ? +((thisMonth.total - lastMonth.total) / lastMonth.total * 100).toFixed(1)
+      : 0;
+
+    res.json({
+      success: true,
+      revenue: {
+        monthly,
+        totals: {
+          hostEarningFee:  Math.round(totalHostFee),
+          tripFee:         Math.round(totalTripFee),
+          grandTotal:      Math.round(totalHostFee + totalTripFee),
+          hostEarningCount: hostEarnings.length,
+          tripCount:        trips.length,
+        },
+        growth: {
+          percentage: growth,
+          thisMonth:  Math.round(thisMonth?.total  || 0),
+          lastMonth:  Math.round(lastMonth?.total  || 0),
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Admin revenue error:', err);
+    res.status(500).json({ success: false, message: 'Error fetching revenue data' });
+  }
+});
+
+
+// ── 1. Traveler: Submit a complaint ─────────────────────────
+app.post('/api/complaints', authenticate, async (req, res) => {
+  try {
+    const { bookingId, hostId, issue, description, priority, amount } = req.body;
+
+    if (!bookingId || !hostId || !issue || !description) {
+      return res.status(400).json({ success: false, message: 'bookingId, hostId, issue and description are required' });
+    }
+
+    if (description.trim().length < 20) {
+      return res.status(400).json({ success: false, message: 'Description must be at least 20 characters' });
+    }
+
+    // Verify booking belongs to this traveler
+    const booking = await Booking.findOne({ _id: bookingId, userId: req.user._id });
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    // Find the host User ID (hostId here is the Host profile _id)
+    const hostProfile = await Host.findById(hostId);
+    const hostUserId = hostProfile ? hostProfile.userId : hostId;
+
+    const dispute = await Dispute.create({
+      bookingId,
+      bookingRefId: `CMP${Date.now()}`,
+      travelerId: req.user._id,
+      hostId: hostUserId,
+      issue,
+      description: description.trim(),
+      amount: amount || 0,
+      priority: priority || 'medium',
+      status: 'open',
+    });
+
+    res.status(201).json({ success: true, message: 'Complaint submitted successfully', complaint: dispute });
+  } catch (error) {
+    console.error('❌ Submit complaint error:', error);
+    res.status(500).json({ success: false, message: 'Error submitting complaint', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
+  }
+});
+
+// ── 2. Traveler: Get all complaints for a specific booking ───
+app.get('/api/complaints/booking/:bookingId', authenticate, async (req, res) => {
+  try {
+    const complaints = await Dispute.find({
+      bookingId: req.params.bookingId,
+      travelerId: req.user._id,
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, complaints });
+  } catch (error) {
+    console.error('❌ Get complaints error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching complaints' });
+  }
+});
+
+// ── 3. Traveler: Get all my complaints ──────────────────────
+app.get('/api/complaints/my', authenticate, async (req, res) => {
+  try {
+    const complaints = await Dispute.find({ travelerId: req.user._id })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, complaints });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching complaints' });
+  }
+});
+
+// ── 4. Admin: Reply to a complaint ──────────────────────────
+app.put('/api/admin/complaints/:id/reply', authenticate, adminOnly, async (req, res) => {
+  try {
+    const { message, status, refundAmount } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Reply message is required' });
+    }
+
+    const dispute = await Dispute.findById(req.params.id);
+    if (!dispute) return res.status(404).json({ success: false, message: 'Complaint not found' });
+
+    // Push to messages array
+    dispute.messages.push({
+      senderId: req.user._id,
+      content: message.trim(),
+      timestamp: new Date(),
+    });
+
+    // Update resolution field (shown prominently to traveler)
+    dispute.resolution = message.trim();
+
+    if (status) dispute.status = status;
+    if (refundAmount !== undefined) dispute.refundAmount = refundAmount;
+    if (status === 'resolved') {
+      dispute.resolvedAt = new Date();
+      dispute.resolvedBy = req.user._id;
+    }
+
+    await dispute.save();
+
+    res.json({ success: true, message: 'Reply sent successfully', complaint: dispute });
+  } catch (error) {
+    console.error('❌ Reply to complaint error:', error);
+    res.status(500).json({ success: false, message: 'Error sending reply' });
+  }
+});
+
+// ── 5. Admin: List all complaints (alias of disputes) ────────
+// NOTE: /api/admin/disputes already exists in your server.js and returns the same data.
+// This alias is optional — the admin dashboard can use either endpoint.
+app.get('/api/admin/complaints', authenticate, adminOnly, async (req, res) => {
+  try {
+    const { status, priority, page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let query = {};
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
+
+    const complaints = await Dispute.find(query)
+      .populate('travelerId', 'fullName email phone')
+      .populate('hostId', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Dispute.countDocuments(query);
+
+    res.json({
+      success: true,
+      total,
+      complaints,
+      pagination: {
+        page: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        hasMore: skip + complaints.length < total,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching complaints' });
+  }
+});
+
 
 // ==================== COMMUNITY ROUTES ====================
 

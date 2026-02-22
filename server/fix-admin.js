@@ -14,7 +14,7 @@ async function fixAdmin() {
     const usersCollection = db.collection('users');
 
 
-    const email = 'bhromonbondhu@gmail.com'; // <-- your admin email
+    const email = 'maria@gmail.com'; // <-- your admin email
     const newPassword = 'admin123';  // <-- set desired password
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
