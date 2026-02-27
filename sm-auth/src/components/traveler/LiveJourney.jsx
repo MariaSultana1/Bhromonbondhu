@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Navigation, AlertCircle, Phone, Battery, Wifi, X, MapPinned, Loader } from 'lucide-react';
+import { MapPin, Navigation, AlertCircle, Phone, Battery, Wifi, Signal, X, MapPinned, Loader } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -46,38 +46,257 @@ const emergencyContacts = [
   { name: 'Platform Support', number: '+880 1XXX-XXXXXX', type: 'support' }
 ];
 
-// Get device status
+// ==================== DEVICE STATUS UTILITIES ====================
+
+/**
+ * Get device status including battery, connection, GPS, and online status
+ */
 const getDeviceStatus = async () => {
   try {
-    const battery = navigator.getBattery && await navigator.getBattery();
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    
+    // Battery API
+    let battery = {
+      level: 78,
+      charging: false,
+    };
+
+    try {
+      if (navigator.getBattery) {
+        const batteryManager = await navigator.getBattery();
+        battery = {
+          level: Math.round(batteryManager.level * 100),
+          charging: batteryManager.charging,
+        };
+      } else if (navigator.battery) {
+        // Older API
+        const batteryManager = navigator.battery;
+        battery = {
+          level: Math.round(batteryManager.level * 100),
+          charging: batteryManager.charging,
+        };
+      }
+    } catch (e) {
+      console.log('Battery API not available, using default');
+    }
+
+    // Network connection
+    let connection = {
+      effectiveType: '4g',
+      downlink: 10,
+      rtt: 50,
+    };
+
+    try {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        connection = {
+          effectiveType: conn.effectiveType || '4g',
+          downlink: conn.downlink || 10,
+          rtt: conn.rtt || 50,
+        };
+      }
+    } catch (e) {
+      console.log('Network API not available, using default');
+    }
+
+    // GPS status
+    let gps = 'Idle';
+    let accuracy = null;
+
+    // Online status
+    const online = navigator.onLine;
+
     return {
-      battery: battery ? {
-        level: Math.round(battery.level * 100),
-        charging: battery.charging,
-      } : {
-        level: 78,
-        charging: false,
-      },
-      connection: connection ? {
-        effectiveType: connection.effectiveType,
-      } : {
-        effectiveType: '4g',
-      },
-      gps: 'Active',
-      online: navigator.onLine
+      battery,
+      connection,
+      gps,
+      accuracy,
+      online,
+      timestamp: new Date(),
     };
   } catch (error) {
     console.error('Error getting device status:', error);
     return {
       battery: { level: 78, charging: false },
-      connection: { effectiveType: '4g' },
-      gps: 'Active',
-      online: navigator.onLine
+      connection: { effectiveType: '4g', downlink: 10, rtt: 50 },
+      gps: 'Error',
+      accuracy: null,
+      online: navigator.onLine,
+      timestamp: new Date(),
     };
   }
 };
+
+/**
+ * Get signal strength based on connection type
+ */
+const getSignalStrength = (connection) => {
+  const effectiveType = connection?.effectiveType || '4g';
+  const levels = {
+    '4g': 4,
+    '3g': 3,
+    '2g': 2,
+    'slow-2g': 1,
+  };
+  return levels[effectiveType] || 4;
+};
+
+/**
+ * Get connection quality label
+ */
+const getConnectionLabel = (effectiveType) => {
+  const labels = {
+    '4g': 'Excellent',
+    '3g': 'Good',
+    '2g': 'Poor',
+    'slow-2g': 'Very Poor',
+  };
+  return labels[effectiveType] || 'Unknown';
+};
+
+/**
+ * Get battery status color
+ */
+const getBatteryColor = (level) => {
+  if (level >= 75) return 'text-green-500';
+  if (level >= 50) return 'text-blue-500';
+  if (level >= 25) return 'text-yellow-500';
+  return 'text-red-500';
+};
+
+/**
+ * Get battery status label
+ */
+const getBatteryLabel = (level) => {
+  if (level >= 75) return 'Excellent';
+  if (level >= 50) return 'Good';
+  if (level >= 25) return 'Low';
+  return 'Critical';
+};
+
+// ==================== DEVICE STATUS WIDGET ====================
+
+/**
+ * Device Status Widget Component
+ */
+function DeviceStatusWidget({ deviceStatus }) {
+  const signalStrength = getSignalStrength(deviceStatus.connection);
+  const connectionLabel = getConnectionLabel(deviceStatus.connection?.effectiveType);
+  const batteryColor = getBatteryColor(deviceStatus.battery?.level);
+  const batteryLabel = getBatteryLabel(deviceStatus.battery?.level);
+
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+      <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <Signal className="w-5 h-5 text-blue-500" />
+        Device Status
+      </h3>
+
+      {/* Battery Status */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Battery className={`w-5 h-5 ${batteryColor}`} />
+            <span className="text-sm text-gray-600">Battery</span>
+          </div>
+          <span className={`text-sm font-semibold ${batteryColor}`}>
+            {deviceStatus.battery?.level}%
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all ${
+              deviceStatus.battery?.level >= 75
+                ? 'bg-green-500'
+                : deviceStatus.battery?.level >= 50
+                ? 'bg-blue-500'
+                : deviceStatus.battery?.level >= 25
+                ? 'bg-yellow-500'
+                : 'bg-red-500'
+            }`}
+            style={{ width: `${deviceStatus.battery?.level}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-gray-500">{batteryLabel}</span>
+          <span className="text-xs text-gray-500">
+            {deviceStatus.battery?.charging ? '🔌 Charging' : '🔋 On Battery'}
+          </span>
+        </div>
+      </div>
+
+      {/* Network Connection */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Wifi className="w-5 h-5 text-blue-500" />
+            <span className="text-sm text-gray-600">Network</span>
+          </div>
+          <span className="text-sm font-semibold text-blue-600">
+            {deviceStatus.connection?.effectiveType?.toUpperCase()}
+          </span>
+        </div>
+        <div className="flex gap-1 mb-2">
+          {[1, 2, 3, 4].map((bar) => (
+            <div
+              key={bar}
+              className={`flex-1 h-2 rounded ${
+                bar <= signalStrength ? 'bg-blue-500' : 'bg-gray-200'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between">
+          <span className="text-xs text-gray-500">{connectionLabel}</span>
+          <span className="text-xs text-gray-500">
+            {deviceStatus.connection?.downlink}Mbps
+          </span>
+        </div>
+      </div>
+
+      {/* GPS Status */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-green-500" />
+            <span className="text-sm text-gray-600">GPS</span>
+          </div>
+          <span className="text-sm font-semibold text-green-600">
+            {deviceStatus.gps}
+          </span>
+        </div>
+        {deviceStatus.accuracy && (
+          <p className="text-xs text-gray-500 mt-1">
+            Accuracy: ±{Math.round(deviceStatus.accuracy)}m
+          </p>
+        )}
+      </div>
+
+      {/* Online Status */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-600">Online Status</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-3 h-3 rounded-full ${
+              deviceStatus.online ? 'bg-green-500' : 'bg-red-500'
+            }`}
+          />
+          <span className={`text-sm font-semibold ${
+            deviceStatus.online ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {deviceStatus.online ? 'Online' : 'Offline'}
+          </span>
+        </div>
+      </div>
+
+      {/* Last Updated */}
+      <p className="text-xs text-gray-400 mt-3">
+        Updated: {new Date(deviceStatus.timestamp).toLocaleTimeString()}
+      </p>
+    </div>
+  );
+}
+
+// ==================== MAIN COMPONENT ====================
 
 export function LiveJourney() {
   const [sosActive, setSosActive] = useState(false);
@@ -88,15 +307,56 @@ export function LiveJourney() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState({
     battery: { level: 78, charging: false },
-    connection: { effectiveType: '4g' },
-    gps: 'Active',
-    online: true
+    connection: { effectiveType: '4g', downlink: 10, rtt: 50 },
+    gps: 'Idle',
+    accuracy: null,
+    online: true,
+    timestamp: new Date(),
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mapCenter, setMapCenter] = useState([23.8103, 90.4125]);
+  const [apiDebug, setApiDebug] = useState(null);
+  const [sosAlertId, setSosAlertId] = useState(null);
+  const [locationUpdateInterval, setLocationUpdateInterval] = useState(null);
 
-  // Fetch trips with transport bookings only
+  // Helper functions
+  const getSource = (trip) => {
+    return trip.transport?.from || 
+           trip.ticketInfo?.from || 
+           trip.transportFrom || 
+           trip.location || 
+           trip.source || 
+           'Dhaka';
+  };
+
+  const getDestination = (trip) => {
+    return trip.destination || 
+           trip.transport?.to || 
+           trip.ticketInfo?.to || 
+           trip.transportTo || 
+           'Destination';
+  };
+
+  const getProvider = (trip) => {
+    return trip.transport?.provider || 
+           trip.ticketInfo?.provider || 
+           trip.transportProvider || 
+           trip.provider || 
+           'Provider';
+  };
+
+  const getTransportType = (trip) => {
+    return trip.transport?.type || 
+           trip.ticketInfo?.type || 
+           trip.transportType || 
+           trip.type || 
+           'Transport';
+  };
+
+  // ==================== DEVICE STATUS EFFECTS ====================
+
+  // Fetch trips
   useEffect(() => {
     fetchUpcomingTrips();
     
@@ -106,54 +366,29 @@ export function LiveJourney() {
       setDeviceStatus(status);
     }, 30000);
 
-    return () => clearInterval(statusInterval);
+    // Get initial device status
+    getDeviceStatus().then(status => {
+      setDeviceStatus(status);
+    });
+
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+      setDeviceStatus(prev => ({ ...prev, online: true }));
+    });
+
+    window.addEventListener('offline', () => {
+      setDeviceStatus(prev => ({ ...prev, online: false }));
+    });
+
+    return () => {
+      clearInterval(statusInterval);
+      window.removeEventListener('online', () => {});
+      window.removeEventListener('offline', () => {});
+      if (locationUpdateInterval) {
+        clearInterval(locationUpdateInterval);
+      }
+    };
   }, []);
-
-  const fetchUpcomingTrips = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await fetch(`${API_URL}/trips`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch trips');
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.trips) {
-        // ✅ Filter for upcoming trips with transport bookings ONLY
-        const transportTrips = data.trips.filter(trip => {
-          const status = trip.status || 'upcoming';
-          const hasTransport = trip.transportType && trip.transportTicketId;
-          return status === 'upcoming' && hasTransport;
-        }).sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        console.log('✅ Fetched transport trips:', transportTrips.length);
-        setUpcomingTrips(transportTrips);
-        
-        // Get device status
-        const status = await getDeviceStatus();
-        setDeviceStatus(status);
-      }
-    } catch (err) {
-      console.error('❌ Error fetching trips:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Track device location in real-time
   useEffect(() => {
@@ -170,9 +405,15 @@ export function LiveJourney() {
           
           console.log('📍 Location updated:', newLocation);
           setCurrentLocation(newLocation);
-          
-          // Center map on current location
           setMapCenter([newLocation.lat, newLocation.lng]);
+
+          // Update device status with GPS info
+          setDeviceStatus(prev => ({
+            ...prev,
+            gps: 'Active',
+            accuracy: newLocation.accuracy,
+            timestamp: new Date(),
+          }));
         },
         (error) => {
           console.error('❌ Location error:', error);
@@ -192,34 +433,213 @@ export function LiveJourney() {
     }
   }, [selectedTrip]);
 
-  // Load route data for selected trip
+  const fetchUpcomingTrips = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      console.log('📡 Fetching trips...');
+      
+      const response = await fetch(`${API_URL}/trips`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch trips: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📦 Response data:', data);
+      
+      if (data.success && data.trips) {
+        const transportTrips = data.trips.filter(trip => {
+          const status = trip.status || trip.bookingStatus || 'upcoming';
+          const hasTransport = 
+            (trip.transport && trip.transport.booked === true) ||
+            trip.ticketBooked === true ||
+            (trip.transportType && trip.transportTicketId);
+          
+          return (status === 'upcoming' || status === 'confirmed') && hasTransport;
+        }).sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        console.log('✅ Filtered transport trips:', transportTrips.length);
+        setUpcomingTrips(transportTrips);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching trips:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleTrackJourney = async (trip) => {
     try {
       setSelectedTrip(trip);
       
-      // Create route from source to destination
-      const source = trip.transportFrom || trip.location || 'Dhaka';
-      const destination = trip.transportTo || trip.destination || "Cox's Bazar";
+      console.log('📍 Selected trip data:', trip);
+      
+      let source, destination, provider, transportType;
+      
+      if (trip.transport && trip.transport.from && trip.transport.to) {
+        source = trip.transport.from;
+        destination = trip.transport.to;
+        provider = trip.transport.provider;
+        transportType = trip.transport.type;
+      } else if (trip.ticketInfo && trip.ticketInfo.from && trip.ticketInfo.to) {
+        source = trip.ticketInfo.from;
+        destination = trip.ticketInfo.to;
+        provider = trip.ticketInfo.provider;
+        transportType = trip.ticketInfo.type;
+      } else if (trip.transportFrom && trip.transportTo) {
+        source = trip.transportFrom;
+        destination = trip.transportTo;
+        provider = trip.transportProvider;
+        transportType = trip.transportType;
+      } else {
+        source = trip.location || trip.source || 'Dhaka';
+        destination = trip.destination || "Cox's Bazar";
+        provider = trip.provider || 'Transport Provider';
+        transportType = trip.transportType || 'transport';
+      }
+      
+      console.log('📍 Route details:', { 
+        source, 
+        destination, 
+        provider, 
+        transportType,
+      });
       
       const sourceCoords = cityCoordinates[source] || [23.8103, 90.4125];
       const destCoords = cityCoordinates[destination] || [21.4272, 91.9737];
       
       setRouteCoordinates([sourceCoords, destCoords]);
       
-      // Set initial map center to midpoint
       const centerLat = (sourceCoords[0] + destCoords[0]) / 2;
       const centerLng = (sourceCoords[1] + destCoords[1]) / 2;
       setMapCenter([centerLat, centerLng]);
 
-      console.log('✅ Route loaded:', source, '→', destination);
+      setSelectedTrip(prev => ({
+        ...prev,
+        displayProvider: provider,
+        displayType: transportType,
+        displaySource: source,
+        displayDestination: destination
+      }));
+
+      console.log('✅ Route loaded successfully');
     } catch (error) {
       console.error('❌ Error loading route:', error);
     }
   };
 
-  const handleSOS = () => {
-    setSosActive(true);
-    alert('SOS Activated! Emergency contacts have been notified and your location is being shared.');
+  const handleSOS = async () => {
+    try {
+      if (!currentLocation) {
+        alert('Unable to get your current location. Please enable GPS and try again.');
+        return;
+      }
+
+      setSosActive(true);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Authentication error. Please login again.');
+        return;
+      }
+
+      const tripInfo = selectedTrip ? {
+        tripId: selectedTrip._id,
+        destination: selectedTrip.destination,
+        source: selectedTrip.transport?.from || selectedTrip.transportFrom || selectedTrip.location,
+        transportType: selectedTrip.transport?.type || selectedTrip.transportType,
+        provider: selectedTrip.transport?.provider || selectedTrip.transportProvider
+      } : null;
+
+      console.log('🚨 Triggering SOS with location:', currentLocation);
+
+      const response = await fetch(`${API_URL}/sos/trigger`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          location: {
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
+            accuracy: currentLocation.accuracy
+          },
+          tripInfo,
+          deviceInfo: {
+            battery: deviceStatus.battery,
+            connection: deviceStatus.connection.effectiveType,
+            online: deviceStatus.online
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to trigger SOS');
+      }
+
+      console.log('✅ SOS triggered:', data);
+      setSosAlertId(data.alertId);
+
+      alert('🚨 SOS ACTIVATED!\n\nEmergency contacts have been notified.\nYour location is being shared with our support team.\nHelp is on the way!');
+
+      const intervalId = setInterval(async () => {
+        if (currentLocation && sosActive) {
+          try {
+            await fetch(`${API_URL}/sos/${data.alertId}/location`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                location: {
+                  lat: currentLocation.lat,
+                  lng: currentLocation.lng,
+                  accuracy: currentLocation.accuracy
+                }
+              })
+            });
+            console.log('📍 SOS location updated');
+          } catch (err) {
+            console.error('❌ Failed to update SOS location:', err);
+          }
+        }
+      }, 30000);
+
+      setLocationUpdateInterval(intervalId);
+
+    } catch (error) {
+      console.error('❌ SOS error:', error);
+      setSosActive(false);
+      alert('Failed to trigger SOS. Please call emergency services directly at 999.');
+    }
+  };
+
+  const deactivateSOS = async () => {
+    if (locationUpdateInterval) {
+      clearInterval(locationUpdateInterval);
+      setLocationUpdateInterval(null);
+    }
+    setSosActive(false);
+    setSosAlertId(null);
   };
 
   const handleEndJourney = () => {
@@ -251,6 +671,30 @@ export function LiveJourney() {
 
   // ========== TRACKING VIEW ==========
   if (selectedTrip) {
+    const displaySource = selectedTrip.displaySource || 
+                         selectedTrip.transport?.from || 
+                         selectedTrip.transportFrom || 
+                         selectedTrip.location || 
+                         'Dhaka';
+    
+    const displayDestination = selectedTrip.displayDestination || 
+                              selectedTrip.destination || 
+                              selectedTrip.transport?.to || 
+                              selectedTrip.transportTo || 
+                              "Cox's Bazar";
+    
+    const displayProvider = selectedTrip.displayProvider || 
+                           selectedTrip.transport?.provider || 
+                           selectedTrip.transportProvider || 
+                           selectedTrip.provider || 
+                           'Transport Provider';
+    
+    const displayType = selectedTrip.displayType || 
+                       selectedTrip.transport?.type || 
+                       selectedTrip.transportType || 
+                       selectedTrip.type || 
+                       'Transport';
+
     return (
       <div className="space-y-6">
         {/* Back Button */}
@@ -258,6 +702,7 @@ export function LiveJourney() {
           onClick={() => {
             setSelectedTrip(null);
             setCurrentLocation(null);
+            deactivateSOS();
           }}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
@@ -269,11 +714,16 @@ export function LiveJourney() {
         <div>
           <h2 className="text-2xl mb-2">Tracking Journey</h2>
           <p className="text-gray-600">
-            {selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'} → {selectedTrip.transportTo || selectedTrip.destination}
+            {displaySource} → {displayDestination}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            {selectedTrip.transportType} • {selectedTrip.transportProvider}
+            {displayType} • {displayProvider}
           </p>
+          {selectedTrip.bookingId && (
+            <p className="text-xs text-gray-400 mt-1">
+              Booking ID: {selectedTrip.bookingId}
+            </p>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -283,17 +733,24 @@ export function LiveJourney() {
             <div className="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-xl mb-1">Journey to {selectedTrip.destination}</h3>
+                  <h3 className="text-xl mb-1">Journey to {displayDestination}</h3>
                   <p className="text-white/90 text-sm">
-                    Transport: {selectedTrip.transportType}
+                    Transport: {displayType} • {displayProvider}
                   </p>
-                  <p className="text-white/80 text-xs mt-1">Booking ID: {selectedTrip.bookingId}</p>
+                  <p className="text-white/80 text-xs mt-1">
+                    From: {displaySource}
+                  </p>
+                  {selectedTrip.bookingId && (
+                    <p className="text-white/80 text-xs mt-1">
+                      Booking ID: {selectedTrip.bookingId}
+                    </p>
+                  )}
                 </div>
                 <Navigation className="w-8 h-8" />
               </div>
               
               <div className="flex items-center justify-between text-sm mt-4">
-                <span>Date: {new Date(selectedTrip.date).toLocaleDateString()}</span>
+                <span>Date: {new Date(selectedTrip.date || selectedTrip.journeyDate || selectedTrip.startDate).toLocaleDateString()}</span>
                 {currentLocation && (
                   <span className="bg-white/20 px-3 py-1 rounded-full">
                     📍 Tracking Active
@@ -301,7 +758,6 @@ export function LiveJourney() {
                 )}
               </div>
 
-              {/* End Journey Button */}
               <button
                 onClick={handleEndJourney}
                 className="w-full mt-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 font-semibold flex items-center justify-center gap-2 border-2 border-green-500 transition-all"
@@ -326,7 +782,6 @@ export function LiveJourney() {
                     attribution='&copy; OpenStreetMap'
                   />
                   
-                  {/* Route line */}
                   {routeCoordinates.length === 2 && (
                     <Polyline
                       positions={routeCoordinates}
@@ -337,29 +792,26 @@ export function LiveJourney() {
                     />
                   )}
 
-                  {/* Start marker */}
                   {routeCoordinates[0] && (
                     <Marker position={routeCoordinates[0]}>
                       <Popup>
                         <div className="text-sm">
-                          <strong>Start: {selectedTrip.transportFrom || 'Dhaka'}</strong>
+                          <strong>Start: {displaySource}</strong>
                         </div>
                       </Popup>
                     </Marker>
                   )}
 
-                  {/* End marker */}
                   {routeCoordinates[1] && (
                     <Marker position={routeCoordinates[1]}>
                       <Popup>
                         <div className="text-sm">
-                          <strong>Destination: {selectedTrip.transportTo || selectedTrip.destination}</strong>
+                          <strong>Destination: {displayDestination}</strong>
                         </div>
                       </Popup>
                     </Marker>
                   )}
 
-                  {/* Current location marker (blue) */}
                   {currentLocation && (
                     <Marker position={[currentLocation.lat, currentLocation.lng]} icon={blueIcon}>
                       <Popup>
@@ -372,28 +824,14 @@ export function LiveJourney() {
                   )}
                 </MapContainer>
               </div>
-              
-              <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Navigation className="w-4 h-4" />
-                  <span>{selectedTrip.transportType || 'Transport'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Wifi className="w-4 h-4" />
-                  <span>{deviceStatus.connection.effectiveType.toUpperCase()}</span>
-                </div>
-                {currentLocation && (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <MapPin className="w-4 h-4 animate-pulse" />
-                    <span>Live Tracking</span>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Device Status */}
+            <DeviceStatusWidget deviceStatus={deviceStatus} />
+
             {/* SOS Button */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h3 className="mb-4 text-center">Emergency SOS</h3>
@@ -411,6 +849,7 @@ export function LiveJourney() {
               </button>
               {sosActive && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800 font-semibold mb-2">🚨 SOS ACTIVE</p>
                   <p className="text-sm text-red-800">
                     ✓ Emergency contacts notified
                     <br />
@@ -418,11 +857,14 @@ export function LiveJourney() {
                     <br />
                     ✓ Support team alerted
                   </p>
+                  <button
+                    onClick={deactivateSOS}
+                    className="w-full mt-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium"
+                  >
+                    Deactivate SOS
+                  </button>
                 </div>
               )}
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Press only in case of emergency
-              </p>
             </div>
 
             {/* Emergency Contacts */}
@@ -444,73 +886,6 @@ export function LiveJourney() {
                 ))}
               </div>
             </div>
-
-            {/* Device Status */}
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="mb-4">Device Status</h3>
-              <div className="space-y-3">
-                {/* Battery */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Battery className={`w-5 h-5 ${
-                        deviceStatus.battery.level > 60 ? 'text-green-500' :
-                        deviceStatus.battery.level > 30 ? 'text-yellow-500' : 'text-red-500'
-                      }`} />
-                      <span className="text-sm">Battery</span>
-                    </div>
-                    <span className="text-sm font-semibold">{deviceStatus.battery.level}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        deviceStatus.battery.level > 60 ? 'bg-green-500' :
-                        deviceStatus.battery.level > 30 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${deviceStatus.battery.level}%` }}
-                    ></div>
-                  </div>
-                  {deviceStatus.battery.charging && (
-                    <p className="text-xs text-green-600 mt-1">⚡ Charging</p>
-                  )}
-                </div>
-
-                {/* Connection */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm">Connection</span>
-                  </div>
-                  <span className="text-sm text-blue-600 font-semibold">
-                    {deviceStatus.connection.effectiveType.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* GPS */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-purple-500" />
-                    <span className="text-sm">GPS</span>
-                  </div>
-                  <span className={`text-sm font-semibold ${
-                    currentLocation ? 'text-green-600' : 'text-gray-600'
-                  }`}>
-                    {currentLocation ? 'Active' : deviceStatus.gps}
-                  </span>
-                </div>
-
-                {/* Online Status */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${deviceStatus.online ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-sm">Online Status</span>
-                  </div>
-                  <span className={`text-sm font-semibold ${deviceStatus.online ? 'text-green-600' : 'text-red-600'}`}>
-                    {deviceStatus.online ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -522,12 +897,12 @@ export function LiveJourney() {
               tripData={{
                 destination: selectedTrip.destination,
                 date: selectedTrip.date,
-                source: selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'
+                source: selectedTrip.transport?.from || selectedTrip.transportFrom || selectedTrip.location || 'Dhaka'
               }}
               onCompleted={(data) => {
                 setShowTripCompletion(false);
                 setSelectedTrip(null);
-                fetchUpcomingTrips(); // Refresh trips list
+                fetchUpcomingTrips();
               }}
               onClose={() => setShowTripCompletion(false)}
             />
@@ -546,6 +921,39 @@ export function LiveJourney() {
         <p className="text-gray-600">Track your transport bookings in real-time</p>
       </div>
 
+      {/* Device Status Summary (List View) */}
+      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Battery className={`w-5 h-5 ${getBatteryColor(deviceStatus.battery?.level)}`} />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.battery?.level}% • {deviceStatus.battery?.charging ? '🔌' : '🔋'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Wifi className="w-5 h-5 text-blue-500" />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.connection?.effectiveType?.toUpperCase()} • {deviceStatus.connection?.downlink}Mbps
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  deviceStatus.online ? 'bg-green-500' : 'bg-red-500'
+                }`}
+              />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.online ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
+          <span className="text-xs text-gray-500">
+            Last updated: {new Date(deviceStatus.timestamp).toLocaleTimeString()}
+          </span>
+        </div>
+      </div>
+
       {/* Upcoming Trips */}
       {upcomingTrips.length > 0 ? (
         <>
@@ -556,10 +964,10 @@ export function LiveJourney() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h4 className="text-2xl mb-2">
-                    {upcomingTrips[0].transportFrom || upcomingTrips[0].location || 'Dhaka'} → {upcomingTrips[0].destination}
+                    {getSource(upcomingTrips[0])} → {getDestination(upcomingTrips[0])}
                   </h4>
                   <p className="text-blue-100">
-                    {upcomingTrips[0].transportType} • {upcomingTrips[0].transportProvider}
+                    {getTransportType(upcomingTrips[0])} • {getProvider(upcomingTrips[0])}
                   </p>
                 </div>
                 <Navigation className="w-8 h-8" />
@@ -570,13 +978,13 @@ export function LiveJourney() {
                   <div>
                     <p className="text-blue-100 text-sm mb-1">Travel Date</p>
                     <p className="text-lg font-semibold">
-                      {new Date(upcomingTrips[0].date).toLocaleDateString()}
+                      {new Date(upcomingTrips[0].date || upcomingTrips[0].journeyDate || upcomingTrips[0].startDate).toLocaleDateString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-blue-100 text-sm mb-1">Booking ID</p>
                     <p className="text-lg font-semibold">
-                      {upcomingTrips[0].bookingId}
+                      {upcomingTrips[0].bookingId || upcomingTrips[0].ticketInfo?.bookingId || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -604,14 +1012,18 @@ export function LiveJourney() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h4 className="text-lg font-semibold mb-1">
-                          {trip.transportFrom || trip.location || 'Dhaka'} → {trip.destination}
+                          {getSource(trip)} → {getDestination(trip)}
                         </h4>
                         <p className="text-gray-600 text-sm">
-                          🚌 {trip.transportType} • {trip.transportProvider}
+                          🚌 {getTransportType(trip)} • {getProvider(trip)}
                         </p>
-                        <p className="text-gray-500 text-xs mt-1">📅 {new Date(trip.date).toLocaleDateString()}</p>
-                        {trip.bookingId && (
-                          <p className="text-gray-500 text-xs mt-1">Booking: {trip.bookingId}</p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          📅 {new Date(trip.date || trip.journeyDate || trip.startDate).toLocaleDateString()}
+                        </p>
+                        {(trip.bookingId || trip.ticketInfo?.bookingId) && (
+                          <p className="text-gray-500 text-xs mt-1">
+                            Booking: {trip.bookingId || trip.ticketInfo?.bookingId}
+                          </p>
                         )}
                       </div>
                     </div>

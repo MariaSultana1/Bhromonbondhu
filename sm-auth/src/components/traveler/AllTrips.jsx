@@ -114,12 +114,17 @@ function TripDetailsModal({ trip, onClose }) {
                   <div>
                     <h4 className="text-lg font-bold text-gray-800">{trip.hostName || trip.hostInfo.name}</h4>
                     <p className="text-sm text-gray-600">{trip.hostInfo.location}</p>
-                    {trip.hostInfo.rating > 0 && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm font-semibold">{trip.hostInfo.rating.toFixed(1)}</span>
-                      </div>
-                    )}
+                    {(trip.hostInfo?.user?.rating || trip.hostInfo?.rating) > 0 && (
+  <div className="flex items-center gap-1 mt-1">
+    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+    <span className="text-sm font-semibold">
+      {(trip.hostInfo?.user?.rating || trip.hostInfo?.rating || 0).toFixed(1)}
+    </span>
+    <span className="text-xs text-gray-500">
+      ({trip.hostInfo?.user?.reviews || trip.hostInfo?.reviews || 0} reviews)
+    </span>
+  </div>
+)}
                   </div>
                 </div>
 

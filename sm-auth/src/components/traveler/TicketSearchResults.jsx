@@ -3,6 +3,25 @@
 import React, { useState } from 'react';
 import { Clock, MapPin, Star, ChevronDown, ChevronUp, Filter, ArrowRight, Wifi, Coffee, Zap, Shield } from 'lucide-react';
 
+// Safely parse a date string (YYYY-MM-DD) without UTC timezone shift
+// Safely format a time string (HH:MM or HH:MM:SS) to 12-hour display
+const formatTime = (timeStr) => {
+  if (!timeStr) return '--:--';
+  const normalized = timeStr.toString().length === 5 ? `${timeStr}:00` : timeStr.toString();
+  const d = new Date(`1970-01-01T${normalized}`);
+  if (isNaN(d.getTime())) return timeStr;
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return null;
+  const parts = dateStr.toString().split(/[-/T]/);
+  if (parts.length < 3) return new Date(dateStr); // fallback
+  const [year, month, day] = parts;
+  const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return isNaN(d.getTime()) ? null : d;
+};
+
 export function TicketSearchResults({ tickets, loading, onSelectTicket, searchParams }) {
   const [sortBy, setSortBy] = useState('price');
   const [filterClass, setFilterClass] = useState('all');
@@ -49,6 +68,8 @@ export function TicketSearchResults({ tickets, loading, onSelectTicket, searchPa
     );
   }
 
+  const parsedDate = parseLocalDate(searchParams.date);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -60,12 +81,14 @@ export function TicketSearchResults({ tickets, loading, onSelectTicket, searchPa
                 {searchParams.from} → {searchParams.to}
               </h1>
               <p className="text-gray-600">
-                {new Date(searchParams.date).toLocaleDateString('en-BD', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
+                {parsedDate
+                  ? parsedDate.toLocaleDateString('en-BD', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                  : searchParams.date}
               </p>
             </div>
             <div className="text-right">
@@ -229,11 +252,7 @@ export function TicketSearchResults({ tickets, loading, onSelectTicket, searchPa
                           <div className="flex items-center gap-6">
                             <div>
                               <p className="text-2xl font-bold text-gray-900">
-                                {new Date(`2000-01-01T${ticket.departureTime}`).toLocaleTimeString('en-US', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit',
-                                  hour12: true 
-                                })}
+                                {formatTime(ticket.departureTime)}
                               </p>
                               <p className="text-sm text-gray-600">{searchParams.from}</p>
                             </div>
@@ -250,11 +269,7 @@ export function TicketSearchResults({ tickets, loading, onSelectTicket, searchPa
 
                             <div className="text-right">
                               <p className="text-2xl font-bold text-gray-900">
-                                {new Date(`2000-01-01T${ticket.arrivalTime}`).toLocaleTimeString('en-US', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit',
-                                  hour12: true 
-                                })}
+                                {formatTime(ticket.arrivalTime)}
                               </p>
                               <p className="text-sm text-gray-600">{searchParams.to}</p>
                             </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Star, Upload, Loader } from 'lucide-react';
+import { X, Star, Loader } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -7,28 +7,8 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [review, setReview] = useState('');
-  const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const handlePhotoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const photoPromises = files.map(file => {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target.result);
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(photoPromises).then(base64Photos => {
-      setPhotos(prev => [...prev, ...base64Photos].slice(0, 3)); // Max 3 photos
-    });
-  };
-
-  const removePhoto = (index) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,8 +32,7 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
       console.log('📤 Data:', {
         tripId,
         rating,
-        review: review.trim() || null,
-        photosCount: photos.length
+        review: review.trim() || null
       });
 
       const response = await fetch(endpoint, {
@@ -64,8 +43,7 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
         },
         body: JSON.stringify({
           rating,
-          review: review.trim() || null,
-          photos
+          review: review.trim() || null
         })
       });
 
@@ -109,7 +87,7 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999] overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -146,6 +124,7 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
                   onMouseEnter={() => setHoveredRating(star)}
                   onMouseLeave={() => setHoveredRating(0)}
                   className="transition-transform hover:scale-110 focus:outline-none"
+                  disabled={loading}
                 >
                   <Star
                     className={`w-10 h-10 ${
@@ -185,54 +164,6 @@ export function TripCompletion({ tripId, tripData, onCompleted, onClose }) {
             <p className="text-xs text-gray-500 mt-1">
               {review.length}/500 characters
             </p>
-          </div>
-
-          {/* Photos */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Add Photos (Optional, max 3)
-            </label>
-            
-            {photos.length < 3 && (
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <div className="text-center">
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload photos</p>
-                  <p className="text-xs text-gray-500">PNG, JPG up to 5MB</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                  disabled={loading}
-                />
-              </label>
-            )}
-
-            {/* Photo Preview */}
-            {photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                {photos.map((photo, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={photo}
-                      alt={`Upload ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      disabled={loading}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Error Message */}

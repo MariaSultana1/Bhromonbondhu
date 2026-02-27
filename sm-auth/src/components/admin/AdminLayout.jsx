@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -14,9 +14,11 @@ import {
   Bell,
   Shield,
   Menu,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useAdminUserStats, useAdminDisputeStats, useAdminSOSAlerts } from '../../hooks/useCustomHooks';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -24,12 +26,26 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  // Fetch admin statistics from database
+  const { stats: userStats, loading: userLoading } = useAdminUserStats();
+  const { stats: disputeStats, loading: disputeLoading } = useAdminDisputeStats();
+  const { alerts: sosAlerts, loading: sosLoading } = useAdminSOSAlerts();
+  
+  // Check if user is admin
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      navigate('/');
+    }
+  }, [user, navigate]);
+  
   const navItems = [
     { path: '/admin', label: 'Dashboard', icon: <BarChart className="w-5 h-5" /> },
     { path: '/admin/users', label: 'Users', icon: <Users className="w-5 h-5" /> },
     { path: '/admin/hosts', label: 'Hosts', icon: <Briefcase className="w-5 h-5" /> },
     { path: '/admin/bookings', label: 'Bookings', icon: <Calendar className="w-5 h-5" /> },
     { path: '/admin/analytics', label: 'Analytics', icon: <BarChart className="w-5 h-5" /> },
+    { path: '/admin/disputes', label: 'Disputes', icon: <AlertTriangle className="w-5 h-5" /> },
+    { path: '/admin/sos', label: 'SOS Monitor', icon: <AlertTriangle className="w-5 h-5" /> },
     { path: '/admin/settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
@@ -39,6 +55,10 @@ const AdminLayout = () => {
       navigate('/');
     }
   };
+
+  // Count active alerts for badge
+  const activeSOSCount = sosAlerts?.length || 0;
+  const openDisputes = disputeStats?.openDisputes || 0;
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -70,19 +90,36 @@ const AdminLayout = () => {
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
+            let badgeCount = 0;
+            
+            // Add badge counts
+            if (item.path === '/admin/disputes' && openDisputes > 0) {
+              badgeCount = openDisputes;
+            }
+            if (item.path === '/admin/sos' && activeSOSCount > 0) {
+              badgeCount = activeSOSCount;
+            }
+            
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                className={`flex items-center justify-between px-4 py-3 rounded-lg transition-all ${
                   isActive
                     ? 'bg-white/20 text-white'
                     : 'hover:bg-white/10 text-white/80 hover:text-white'
                 }`}
               >
-                {item.icon}
-                <span className="font-medium">{item.label}</span>
+                <div className="flex items-center space-x-3">
+                  {item.icon}
+                  <span className="font-medium">{item.label}</span>
+                </div>
+                {badgeCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    {badgeCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -116,10 +153,27 @@ const AdminLayout = () => {
             </h2>
 
             <div className="flex items-center space-x-4">
+              {/* SOS Badge */}
+              {activeSOSCount > 0 && (
+                <button 
+                  onClick={() => navigate('/admin/sos')}
+                  className="relative p-2 rounded-full hover:bg-red-100 bg-red-50"
+                >
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  <div className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                    {activeSOSCount}
+                  </span>
+                </button>
+              )}
+              
+              {/* Notifications Bell */}
               <button className="relative p-2 rounded-full hover:bg-gray-100">
                 <Bell className="w-5 h-5 text-gray-600" />
                 <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></div>
               </button>
+              
+              {/* User Info */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden md:block">
                   <p className="font-medium text-gray-800">{user?.fullName}</p>
@@ -134,7 +188,7 @@ const AdminLayout = () => {
         </header>
 
         <div className="p-4 md:p-6">
-          <Outlet />
+          <Outlet context={{ userStats, disputeStats, sosAlerts }} />
         </div>
       </main>
     </div>
