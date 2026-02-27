@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Navigation, AlertCircle, Phone, Battery, Wifi, X, MapPinned, Loader } from 'lucide-react';
+import { MapPin, Navigation, AlertCircle, Phone, Battery, Wifi, Signal, X, MapPinned, Loader } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -46,38 +46,257 @@ const emergencyContacts = [
   { name: 'Platform Support', number: '+880 1XXX-XXXXXX', type: 'support' }
 ];
 
-// Get device status
+// ==================== DEVICE STATUS UTILITIES ====================
+
+/**
+ * Get device status including battery, connection, GPS, and online status
+ */
 const getDeviceStatus = async () => {
   try {
-    const battery = navigator.getBattery && await navigator.getBattery();
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    
+    // Battery API
+    let battery = {
+      level: 78,
+      charging: false,
+    };
+
+    try {
+      if (navigator.getBattery) {
+        const batteryManager = await navigator.getBattery();
+        battery = {
+          level: Math.round(batteryManager.level * 100),
+          charging: batteryManager.charging,
+        };
+      } else if (navigator.battery) {
+        // Older API
+        const batteryManager = navigator.battery;
+        battery = {
+          level: Math.round(batteryManager.level * 100),
+          charging: batteryManager.charging,
+        };
+      }
+    } catch (e) {
+      console.log('Battery API not available, using default');
+    }
+
+    // Network connection
+    let connection = {
+      effectiveType: '4g',
+      downlink: 10,
+      rtt: 50,
+    };
+
+    try {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        connection = {
+          effectiveType: conn.effectiveType || '4g',
+          downlink: conn.downlink || 10,
+          rtt: conn.rtt || 50,
+        };
+      }
+    } catch (e) {
+      console.log('Network API not available, using default');
+    }
+
+    // GPS status
+    let gps = 'Idle';
+    let accuracy = null;
+
+    // Online status
+    const online = navigator.onLine;
+
     return {
-      battery: battery ? {
-        level: Math.round(battery.level * 100),
-        charging: battery.charging,
-      } : {
-        level: 78,
-        charging: false,
-      },
-      connection: connection ? {
-        effectiveType: connection.effectiveType,
-      } : {
-        effectiveType: '4g',
-      },
-      gps: 'Active',
-      online: navigator.onLine
+      battery,
+      connection,
+      gps,
+      accuracy,
+      online,
+      timestamp: new Date(),
     };
   } catch (error) {
     console.error('Error getting device status:', error);
     return {
       battery: { level: 78, charging: false },
-      connection: { effectiveType: '4g' },
-      gps: 'Active',
-      online: navigator.onLine
+      connection: { effectiveType: '4g', downlink: 10, rtt: 50 },
+      gps: 'Error',
+      accuracy: null,
+      online: navigator.onLine,
+      timestamp: new Date(),
     };
   }
 };
+
+/**
+ * Get signal strength based on connection type
+ */
+const getSignalStrength = (connection) => {
+  const effectiveType = connection?.effectiveType || '4g';
+  const levels = {
+    '4g': 4,
+    '3g': 3,
+    '2g': 2,
+    'slow-2g': 1,
+  };
+  return levels[effectiveType] || 4;
+};
+
+/**
+ * Get connection quality label
+ */
+const getConnectionLabel = (effectiveType) => {
+  const labels = {
+    '4g': 'Excellent',
+    '3g': 'Good',
+    '2g': 'Poor',
+    'slow-2g': 'Very Poor',
+  };
+  return labels[effectiveType] || 'Unknown';
+};
+
+/**
+ * Get battery status color
+ */
+const getBatteryColor = (level) => {
+  if (level >= 75) return 'text-green-500';
+  if (level >= 50) return 'text-blue-500';
+  if (level >= 25) return 'text-yellow-500';
+  return 'text-red-500';
+};
+
+/**
+ * Get battery status label
+ */
+const getBatteryLabel = (level) => {
+  if (level >= 75) return 'Excellent';
+  if (level >= 50) return 'Good';
+  if (level >= 25) return 'Low';
+  return 'Critical';
+};
+
+// ==================== DEVICE STATUS WIDGET ====================
+
+/**
+ * Device Status Widget Component
+ */
+function DeviceStatusWidget({ deviceStatus }) {
+  const signalStrength = getSignalStrength(deviceStatus.connection);
+  const connectionLabel = getConnectionLabel(deviceStatus.connection?.effectiveType);
+  const batteryColor = getBatteryColor(deviceStatus.battery?.level);
+  const batteryLabel = getBatteryLabel(deviceStatus.battery?.level);
+
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+      <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <Signal className="w-5 h-5 text-blue-500" />
+        Device Status
+      </h3>
+
+      {/* Battery Status */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Battery className={`w-5 h-5 ${batteryColor}`} />
+            <span className="text-sm text-gray-600">Battery</span>
+          </div>
+          <span className={`text-sm font-semibold ${batteryColor}`}>
+            {deviceStatus.battery?.level}%
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all ${
+              deviceStatus.battery?.level >= 75
+                ? 'bg-green-500'
+                : deviceStatus.battery?.level >= 50
+                ? 'bg-blue-500'
+                : deviceStatus.battery?.level >= 25
+                ? 'bg-yellow-500'
+                : 'bg-red-500'
+            }`}
+            style={{ width: `${deviceStatus.battery?.level}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-gray-500">{batteryLabel}</span>
+          <span className="text-xs text-gray-500">
+            {deviceStatus.battery?.charging ? '🔌 Charging' : '🔋 On Battery'}
+          </span>
+        </div>
+      </div>
+
+      {/* Network Connection */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Wifi className="w-5 h-5 text-blue-500" />
+            <span className="text-sm text-gray-600">Network</span>
+          </div>
+          <span className="text-sm font-semibold text-blue-600">
+            {deviceStatus.connection?.effectiveType?.toUpperCase()}
+          </span>
+        </div>
+        <div className="flex gap-1 mb-2">
+          {[1, 2, 3, 4].map((bar) => (
+            <div
+              key={bar}
+              className={`flex-1 h-2 rounded ${
+                bar <= signalStrength ? 'bg-blue-500' : 'bg-gray-200'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between">
+          <span className="text-xs text-gray-500">{connectionLabel}</span>
+          <span className="text-xs text-gray-500">
+            {deviceStatus.connection?.downlink}Mbps
+          </span>
+        </div>
+      </div>
+
+      {/* GPS Status */}
+      <div className="mb-3 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-green-500" />
+            <span className="text-sm text-gray-600">GPS</span>
+          </div>
+          <span className="text-sm font-semibold text-green-600">
+            {deviceStatus.gps}
+          </span>
+        </div>
+        {deviceStatus.accuracy && (
+          <p className="text-xs text-gray-500 mt-1">
+            Accuracy: ±{Math.round(deviceStatus.accuracy)}m
+          </p>
+        )}
+      </div>
+
+      {/* Online Status */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-600">Online Status</span>
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-3 h-3 rounded-full ${
+              deviceStatus.online ? 'bg-green-500' : 'bg-red-500'
+            }`}
+          />
+          <span className={`text-sm font-semibold ${
+            deviceStatus.online ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {deviceStatus.online ? 'Online' : 'Offline'}
+          </span>
+        </div>
+      </div>
+
+      {/* Last Updated */}
+      <p className="text-xs text-gray-400 mt-3">
+        Updated: {new Date(deviceStatus.timestamp).toLocaleTimeString()}
+      </p>
+    </div>
+  );
+}
+
+// ==================== MAIN COMPONENT ====================
 
 export function LiveJourney() {
   const [sosActive, setSosActive] = useState(false);
@@ -88,15 +307,16 @@ export function LiveJourney() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState({
     battery: { level: 78, charging: false },
-    connection: { effectiveType: '4g' },
-    gps: 'Active',
-    online: true
+    connection: { effectiveType: '4g', downlink: 10, rtt: 50 },
+    gps: 'Idle',
+    accuracy: null,
+    online: true,
+    timestamp: new Date(),
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mapCenter, setMapCenter] = useState([23.8103, 90.4125]);
   const [apiDebug, setApiDebug] = useState(null);
-  // New SOS state variables
   const [sosAlertId, setSosAlertId] = useState(null);
   const [locationUpdateInterval, setLocationUpdateInterval] = useState(null);
 
@@ -134,7 +354,9 @@ export function LiveJourney() {
            'Transport';
   };
 
-  // Fetch trips with transport bookings only
+  // ==================== DEVICE STATUS EFFECTS ====================
+
+  // Fetch trips
   useEffect(() => {
     fetchUpcomingTrips();
     
@@ -144,23 +366,72 @@ export function LiveJourney() {
       setDeviceStatus(status);
     }, 30000);
 
+    // Get initial device status
+    getDeviceStatus().then(status => {
+      setDeviceStatus(status);
+    });
+
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+      setDeviceStatus(prev => ({ ...prev, online: true }));
+    });
+
+    window.addEventListener('offline', () => {
+      setDeviceStatus(prev => ({ ...prev, online: false }));
+    });
+
     return () => {
       clearInterval(statusInterval);
-      // Clean up location update interval
+      window.removeEventListener('online', () => {});
+      window.removeEventListener('offline', () => {});
       if (locationUpdateInterval) {
         clearInterval(locationUpdateInterval);
       }
     };
   }, []);
 
-  // Clean up location updates when component unmounts or SOS is deactivated
+  // Track device location in real-time
   useEffect(() => {
-    return () => {
-      if (locationUpdateInterval) {
-        clearInterval(locationUpdateInterval);
-      }
-    };
-  }, [locationUpdateInterval]);
+    if (selectedTrip && 'geolocation' in navigator) {
+      console.log('📍 Starting location tracking...');
+      
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
+          
+          console.log('📍 Location updated:', newLocation);
+          setCurrentLocation(newLocation);
+          setMapCenter([newLocation.lat, newLocation.lng]);
+
+          // Update device status with GPS info
+          setDeviceStatus(prev => ({
+            ...prev,
+            gps: 'Active',
+            accuracy: newLocation.accuracy,
+            timestamp: new Date(),
+          }));
+        },
+        (error) => {
+          console.error('❌ Location error:', error);
+          setDeviceStatus(prev => ({ ...prev, gps: 'Error' }));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+
+      return () => {
+        console.log('📍 Stopping location tracking...');
+        navigator.geolocation.clearWatch(watchId);
+      };
+    }
+  }, [selectedTrip]);
 
   const fetchUpcomingTrips = async () => {
     try {
@@ -191,42 +462,18 @@ export function LiveJourney() {
       console.log('📦 Response data:', data);
       
       if (data.success && data.trips) {
-        // Log each trip's transport status
-        console.log('📋 All trips:');
-        data.trips.forEach((trip, i) => {
-          console.log(`  Trip ${i+1}:`, {
-            destination: trip.destination,
-            status: trip.status,
-            bookingStatus: trip.bookingStatus,
-            transport: trip.transport ? {
-              booked: trip.transport.booked,
-              type: trip.transport.type,
-              from: trip.transport.from,
-              to: trip.transport.to
-            } : 'No transport object',
-            ticketBooked: trip.ticketBooked
-          });
-        });
-
-        // Include both 'upcoming' and 'confirmed' status
         const transportTrips = data.trips.filter(trip => {
           const status = trip.status || trip.bookingStatus || 'upcoming';
-          // Check multiple possible locations for transport info
           const hasTransport = 
             (trip.transport && trip.transport.booked === true) ||
             trip.ticketBooked === true ||
             (trip.transportType && trip.transportTicketId);
           
-          // Include both upcoming and confirmed trips
           return (status === 'upcoming' || status === 'confirmed') && hasTransport;
         }).sort((a, b) => new Date(a.date) - new Date(b.date));
         
         console.log('✅ Filtered transport trips:', transportTrips.length);
         setUpcomingTrips(transportTrips);
-        
-        // Get device status
-        const status = await getDeviceStatus();
-        setDeviceStatus(status);
       }
     } catch (err) {
       console.error('❌ Error fetching trips:', err);
@@ -236,72 +483,30 @@ export function LiveJourney() {
     }
   };
 
-  // Track device location in real-time
-  useEffect(() => {
-    if (selectedTrip && 'geolocation' in navigator) {
-      console.log('📍 Starting location tracking...');
-      
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          };
-          
-          console.log('📍 Location updated:', newLocation);
-          setCurrentLocation(newLocation);
-          setMapCenter([newLocation.lat, newLocation.lng]);
-        },
-        (error) => {
-          console.error('❌ Location error:', error);
-          setDeviceStatus(prev => ({ ...prev, gps: 'Error' }));
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        }
-      );
-
-      return () => {
-        console.log('📍 Stopping location tracking...');
-        navigator.geolocation.clearWatch(watchId);
-      };
-    }
-  }, [selectedTrip]);
-
-  // Load route data for selected trip
   const handleTrackJourney = async (trip) => {
     try {
       setSelectedTrip(trip);
       
       console.log('📍 Selected trip data:', trip);
       
-      // Get source and destination from various possible locations
       let source, destination, provider, transportType;
       
-      // Check multiple possible structures
       if (trip.transport && trip.transport.from && trip.transport.to) {
-        // New structure with transport object
         source = trip.transport.from;
         destination = trip.transport.to;
         provider = trip.transport.provider;
         transportType = trip.transport.type;
       } else if (trip.ticketInfo && trip.ticketInfo.from && trip.ticketInfo.to) {
-        // From ticketInfo structure
         source = trip.ticketInfo.from;
         destination = trip.ticketInfo.to;
         provider = trip.ticketInfo.provider;
         transportType = trip.ticketInfo.type;
       } else if (trip.transportFrom && trip.transportTo) {
-        // Legacy structure
         source = trip.transportFrom;
         destination = trip.transportTo;
         provider = trip.transportProvider;
         transportType = trip.transportType;
       } else {
-        // Fallback defaults
         source = trip.location || trip.source || 'Dhaka';
         destination = trip.destination || "Cox's Bazar";
         provider = trip.provider || 'Transport Provider';
@@ -313,7 +518,6 @@ export function LiveJourney() {
         destination, 
         provider, 
         transportType,
-        fullTrip: trip 
       });
       
       const sourceCoords = cityCoordinates[source] || [23.8103, 90.4125];
@@ -325,7 +529,6 @@ export function LiveJourney() {
       const centerLng = (sourceCoords[1] + destCoords[1]) / 2;
       setMapCenter([centerLat, centerLng]);
 
-      // Store provider and transport type for display
       setSelectedTrip(prev => ({
         ...prev,
         displayProvider: provider,
@@ -340,7 +543,6 @@ export function LiveJourney() {
     }
   };
 
-  // Updated SOS handler
   const handleSOS = async () => {
     try {
       if (!currentLocation) {
@@ -356,7 +558,6 @@ export function LiveJourney() {
         return;
       }
 
-      // Get trip info if there's a selected trip
       const tripInfo = selectedTrip ? {
         tripId: selectedTrip._id,
         destination: selectedTrip.destination,
@@ -367,7 +568,6 @@ export function LiveJourney() {
 
       console.log('🚨 Triggering SOS with location:', currentLocation);
 
-      // Trigger SOS alert
       const response = await fetch(`${API_URL}/sos/trigger`, {
         method: 'POST',
         headers: {
@@ -398,10 +598,8 @@ export function LiveJourney() {
       console.log('✅ SOS triggered:', data);
       setSosAlertId(data.alertId);
 
-      // Show success message
       alert('🚨 SOS ACTIVATED!\n\nEmergency contacts have been notified.\nYour location is being shared with our support team.\nHelp is on the way!');
 
-      // Start sending location updates every 30 seconds
       const intervalId = setInterval(async () => {
         if (currentLocation && sosActive) {
           try {
@@ -424,7 +622,7 @@ export function LiveJourney() {
             console.error('❌ Failed to update SOS location:', err);
           }
         }
-      }, 30000); // Update every 30 seconds
+      }, 30000);
 
       setLocationUpdateInterval(intervalId);
 
@@ -435,7 +633,6 @@ export function LiveJourney() {
     }
   };
 
-  // Function to deactivate SOS
   const deactivateSOS = async () => {
     if (locationUpdateInterval) {
       clearInterval(locationUpdateInterval);
@@ -448,28 +645,6 @@ export function LiveJourney() {
   const handleEndJourney = () => {
     setShowTripCompletion(true);
   };
-
-  // Debug effect to log trip data
-  useEffect(() => {
-    if (upcomingTrips.length > 0) {
-      console.log('🔍 First trip raw data:', upcomingTrips[0]);
-      console.log('🔍 First trip structure check:', {
-        hasTransport: !!upcomingTrips[0].transport,
-        transportFrom: upcomingTrips[0].transport?.from,
-        transportTo: upcomingTrips[0].transport?.to,
-        transportProvider: upcomingTrips[0].transport?.provider,
-        transportType: upcomingTrips[0].transport?.type,
-        hasTicketInfo: !!upcomingTrips[0].ticketInfo,
-        ticketFrom: upcomingTrips[0].ticketInfo?.from,
-        ticketTo: upcomingTrips[0].ticketInfo?.to,
-        legacyFrom: upcomingTrips[0].transportFrom,
-        legacyTo: upcomingTrips[0].transportTo,
-        legacyProvider: upcomingTrips[0].transportProvider,
-        location: upcomingTrips[0].location,
-        destination: upcomingTrips[0].destination
-      });
-    }
-  }, [upcomingTrips]);
 
   if (loading) {
     return (
@@ -492,11 +667,6 @@ export function LiveJourney() {
         </button>
       </div>
     );
-  }
-
-  // Debug panel
-  if (apiDebug) {
-    console.log('🔍 Debug info:', apiDebug);
   }
 
   // ========== TRACKING VIEW ==========
@@ -532,7 +702,7 @@ export function LiveJourney() {
           onClick={() => {
             setSelectedTrip(null);
             setCurrentLocation(null);
-            deactivateSOS(); // Deactivate SOS if active
+            deactivateSOS();
           }}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
@@ -659,6 +829,9 @@ export function LiveJourney() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Device Status */}
+            <DeviceStatusWidget deviceStatus={deviceStatus} />
+
             {/* SOS Button */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h3 className="mb-4 text-center">Emergency SOS</h3>
@@ -748,23 +921,38 @@ export function LiveJourney() {
         <p className="text-gray-600">Track your transport bookings in real-time</p>
       </div>
 
-      {/* Debug Info (temporary) */}
-      {apiDebug && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold mb-2">Debug Info:</h3>
-          <p>Total trips in DB: {apiDebug.totalTrips}</p>
-          {apiDebug.firstTrip ? (
-            <div>
-              <p>First trip: {apiDebug.firstTrip.destination}</p>
-              <p>Status: {apiDebug.firstTrip.status}</p>
-              <p>Has transport: {apiDebug.firstTrip.hasTransport ? 'Yes' : 'No'}</p>
-              <p>Transport booked: {apiDebug.firstTrip.transportBooked ? 'Yes' : 'No'}</p>
+      {/* Device Status Summary (List View) */}
+      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Battery className={`w-5 h-5 ${getBatteryColor(deviceStatus.battery?.level)}`} />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.battery?.level}% • {deviceStatus.battery?.charging ? '🔌' : '🔋'}
+              </span>
             </div>
-          ) : (
-            <p>No trips found</p>
-          )}
+            <div className="flex items-center gap-2">
+              <Wifi className="w-5 h-5 text-blue-500" />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.connection?.effectiveType?.toUpperCase()} • {deviceStatus.connection?.downlink}Mbps
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  deviceStatus.online ? 'bg-green-500' : 'bg-red-500'
+                }`}
+              />
+              <span className="text-sm text-gray-700">
+                {deviceStatus.online ? 'Online' : 'Offline'}
+              </span>
+            </div>
+          </div>
+          <span className="text-xs text-gray-500">
+            Last updated: {new Date(deviceStatus.timestamp).toLocaleTimeString()}
+          </span>
         </div>
-      )}
+      </div>
 
       {/* Upcoming Trips */}
       {upcomingTrips.length > 0 ? (

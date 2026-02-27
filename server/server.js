@@ -3810,6 +3810,130 @@ app.get('/api/hosts', async (req, res) => {
   }
 });
 
+
+app.post('/api/community/users/:userId/follow', authenticate, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+
+    // Cannot follow yourself
+    if (targetUserId === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot follow yourself'
+      });
+    }
+
+    // Check target user exists and is a tourist
+    const targetUser = await User.findOne({
+      _id: targetUserId,
+      isActive: true,
+      role: 'tourist'
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // For now we just return success (no persistent follow collection needed
+    // unless you want to store followers — add that logic here if needed)
+    res.json({
+      success: true,
+      message: `You are now following ${targetUser.fullName}`,
+      following: true
+    });
+  } catch (error) {
+    console.error('❌ Follow user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error following user',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Unfollow a user (Protected)
+app.delete('/api/community/users/:userId/follow', authenticate, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+
+    const targetUser = await User.findOne({
+      _id: targetUserId,
+      isActive: true
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `You have unfollowed ${targetUser.fullName}`,
+      following: false
+    });
+  } catch (error) {
+    console.error('❌ Unfollow user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error unfollowing user',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
+// =====================================================================
+// REPLACE the existing GET /api/community/suggested-users endpoint
+// =====================================================================
+
+app.get('/api/community/suggested-users', authenticate, async (req, res) => {
+  try {
+    // Only fetch tourists, excluding the currently logged-in user
+    const users = await User.find({
+      _id: { $ne: req.user._id },
+      isActive: true,
+      role: 'tourist'                      // ← ONLY tourists
+    })
+      .select('username fullName createdAt profilePicture')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const usersWithTripCount = await Promise.all(
+      users.map(async (user) => {
+        const tripCount = await Trip.countDocuments({ userId: user._id });
+        return {
+          id: user._id,
+          name: user.fullName,
+          username: user.username,
+          profilePicture: user.profilePicture || null,
+          trips: tripCount,
+          joined: getTimeAgo(user.createdAt)
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      users: usersWithTripCount
+    });
+  } catch (error) {
+    console.error('❌ Get suggested users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching suggested users',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+
+
+
 // ==================== FIXED POST /api/bookings ENDPOINT (Unified Schema) ====================
 app.post('/api/bookings', authenticate, async (req, res) => {
   try {
